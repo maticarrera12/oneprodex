@@ -1,0 +1,31 @@
+import Link from "next/link"
+
+import { UpcomingRow } from "@/features/home/components/upcoming-row"
+import type { Match, Team } from "@/features/matches/types"
+
+type UpcomingSectionProps = {
+  matches: Match[]
+  teams: Record<string, Team>
+}
+
+export function UpcomingSection({ matches, teams }: UpcomingSectionProps) {
+  return (
+    <section className="space-y-3">
+      <header className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.04em] text-foreground/85">Predict next</h2>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">{matches.length} partidos</span>
+          <Link href="/matches" className="text-xs font-semibold text-(--color-lime-hi)">
+            Ver todo
+          </Link>
+        </div>
+      </header>
+
+      <div className="space-y-2">
+        {matches.map((match) => (
+          <UpcomingRow key={match.id} match={match} teams={teams} />
+        ))}
+      </div>
+    </section>
+  )
+}
