@@ -52,7 +52,7 @@ export async function GET(request: Request) {
 
     const loginUrl = new URL('/login', origin)
     loginUrl.searchParams.set('error', 'auth')
-    loginUrl.searchParams.set('auth_code_exchange', error.message)
+    loginUrl.searchParams.set('auth_code_exchange', error?.message ?? 'auth_code_exchange_failed')
     return NextResponse.redirect(loginUrl)
   }
 
