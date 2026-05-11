@@ -4,7 +4,6 @@ import { supabasePublishableKey, supabaseUrl } from '@/lib/supabase/config'
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
-
   const supabase = createServerClient(
     supabaseUrl,
     supabasePublishableKey,

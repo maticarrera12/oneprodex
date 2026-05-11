@@ -1,8 +1,21 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
 import { signInWithDiscord, signInWithGoogle } from '@/features/auth/api'
 
+function saveNextCookie(next: string) {
+  document.cookie = `auth-next=${encodeURIComponent(next)}; path=/; max-age=600; SameSite=Lax`
+}
+
 export default function LoginPage() {
+  const searchParams = useSearchParams()
+  const next = searchParams.get('next') ?? undefined
+
+  function handleSignIn(fn: (next?: string) => Promise<unknown>) {
+    if (next) saveNextCookie(next)
+    fn(next)
+  }
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-6">
       <div className="w-full max-w-sm space-y-8">
@@ -32,7 +45,7 @@ export default function LoginPage() {
         {/* Botones */}
         <div className="space-y-3">
           <button
-            onClick={signInWithGoogle}
+            onClick={() => handleSignIn(signInWithGoogle)}
             className="flex w-full items-center justify-center gap-3 rounded-xl border border-[var(--color-border-hi)] bg-[var(--color-card-hi)] px-4 py-3.5 font-sans text-sm font-semibold text-foreground transition-transform active:scale-[0.97]"
           >
             <GoogleIcon />
@@ -40,7 +53,7 @@ export default function LoginPage() {
           </button>
 
           <button
-            onClick={signInWithDiscord}
+            onClick={() => handleSignIn(signInWithDiscord)}
             className="flex w-full items-center justify-center gap-3 rounded-xl border border-[var(--color-border-hi)] bg-[var(--color-card-hi)] px-4 py-3.5 font-sans text-sm font-semibold text-foreground transition-transform active:scale-[0.97]"
           >
             <DiscordIcon />

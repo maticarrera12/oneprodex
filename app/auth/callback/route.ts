@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
@@ -6,7 +7,11 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
   const providerError = searchParams.get('error')
   const providerErrorDescription = searchParams.get('error_description')
-  const next = searchParams.get('next') ?? '/'
+
+  const cookieStore = await cookies()
+  const nextCookie = cookieStore.get('auth-next')?.value
+  const nextFromQuery = searchParams.get('next')
+  const next = nextFromQuery ?? (nextCookie ? decodeURIComponent(nextCookie) : '/')
 
   if (providerError) {
     const loginUrl = new URL('/login', origin)
@@ -22,7 +27,9 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      const response = NextResponse.redirect(`${origin}${next}`)
+      response.cookies.delete('auth-next')
+      return response
     }
 
     const loginUrl = new URL('/login', origin)
