@@ -33,7 +33,15 @@ export function LiveCard({ match, teams }: LiveCardProps) {
 
         <div className="relative mt-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Flag code={match.home} />
+            {match.homeLogo ? (
+              <img
+                src={match.homeLogo}
+                alt={home?.name ?? match.home}
+                className="size-7 rounded-full border border-white/20 object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.2)]"
+              />
+            ) : (
+              <Flag code={match.home} />
+            )}
             <span className="text-[15px] font-semibold">{home?.code ?? match.home}</span>
           </div>
           <p className="font-mono text-[28px] leading-none font-semibold tracking-[-0.02em]">
@@ -43,7 +51,15 @@ export function LiveCard({ match, teams }: LiveCardProps) {
           </p>
           <div className="flex items-center gap-2">
             <span className="text-[15px] font-semibold">{away?.code ?? match.away}</span>
-            <Flag code={match.away} />
+            {match.awayLogo ? (
+              <img
+                src={match.awayLogo}
+                alt={away?.name ?? match.away}
+                className="size-7 rounded-full border border-white/20 object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.2)]"
+              />
+            ) : (
+              <Flag code={match.away} />
+            )}
           </div>
         </div>
 

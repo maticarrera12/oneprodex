@@ -42,8 +42,12 @@ export function GroupModal({ open, onClose, defaultTab = 'create' }: GroupModalP
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={spring}
+            onClick={onClose}
           >
-            <div className="w-full max-w-md rounded-3xl bg-background px-4 pb-10 pt-4">
+            <div
+              className="w-full max-w-md rounded-3xl bg-background px-4 pb-10 pt-4"
+              onClick={(event) => event.stopPropagation()}
+            >
               <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-(--color-border-hi)" />
 
               <div className="mb-6 flex gap-2 rounded-xl border border-(--color-border-hi) bg-(--color-card-hi) p-1">

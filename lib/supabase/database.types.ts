@@ -285,6 +285,7 @@ export type Database = {
           c2: string | null
           c3: string | null
           code: string
+          logo: string | null
           name: string
         }
         Insert: {
@@ -293,6 +294,7 @@ export type Database = {
           c2?: string | null
           c3?: string | null
           code: string
+          logo?: string | null
           name: string
         }
         Update: {
@@ -301,6 +303,7 @@ export type Database = {
           c2?: string | null
           c3?: string | null
           code?: string
+          logo?: string | null
           name?: string
         }
         Relationships: []

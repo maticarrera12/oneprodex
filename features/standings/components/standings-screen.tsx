@@ -60,14 +60,13 @@ export default function StandingsScreen({ groups }: StandingsScreenProps) {
               key={group.id}
               type="button"
               onClick={() => setGroupId(group.id)}
-              className={`min-w-14 rounded-xl border px-3 py-2 text-center ${
+              className={`inline-flex w-14 items-center justify-center rounded-xl border px-3 py-2 text-center ${
                 active
                   ? "border-(--color-border-hi) bg-(--color-card-hi)"
                   : "border-transparent bg-transparent"
               }`}
             >
-              <p className="font-mono text-[9px] uppercase tracking-wider text-(--color-text3)">Grupo</p>
-              <p className={`mt-0.5 text-lg font-bold ${active ? "text-(--color-lime-hi)" : "text-foreground"}`}>
+              <p className={`text-center text-xs font-bold ${active ? "text-(--color-lime-hi)" : "text-foreground"}`}>
                 {group.id}
               </p>
             </button>

@@ -17,6 +17,8 @@ export interface Match {
   id: string
   home: string
   away: string
+  homeLogo?: string | null
+  awayLogo?: string | null
   hs: number | null
   as: number | null
   pred: Prediction | null

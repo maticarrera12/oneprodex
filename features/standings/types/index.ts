@@ -4,6 +4,11 @@ export type StandingQualification = "qual" | "playoff" | "out"
 
 export interface StandingRow {
   team: string
+  teamName?: string | null
+  logo?: string | null
+  c1?: string | null
+  c2?: string | null
+  c3?: string | null
   pj: number
   g: number
   e: number

@@ -42,6 +42,7 @@ export function mapTeam(team: AFTeam): TeamRow {
     code: team.code ?? String(team.id),
     name: team.name,
     api_id: team.id,
+    logo: team.logo ?? null,
     c1: team.colors?.player?.primary ?? null,
     c2: team.colors?.player?.number ?? null,
     c3: team.colors?.player?.border ?? null,

@@ -2,8 +2,6 @@
 
 import { motion } from "framer-motion"
 
-import { Flag } from "@/features/home/components/flag"
-import { TEAMS } from "@/features/matches/mock"
 import type { StandingRow as StandingRowType } from "@/features/standings/types"
 
 type StandingsRowProps = {
@@ -14,7 +12,6 @@ type StandingsRowProps = {
 }
 
 export function StandingsRow({ row, position, index, showBorder }: StandingsRowProps) {
-  const team = TEAMS[row.team]
   const markerClass =
     row.qualification === "qual"
       ? "bg-(--color-lime-mid)"
@@ -34,7 +31,18 @@ export function StandingsRow({ row, position, index, showBorder }: StandingsRowP
       <span className={`absolute top-1.5 bottom-1.5 left-0 w-1 rounded-r-sm ${markerClass}`} />
       <span className="pl-1 font-mono text-xs text-(--color-text3)">{position}</span>
       <div className="flex items-center justify-center">
-        <Flag code={team?.code ?? row.team} size={22} />
+        {row.logo ? (
+          <img
+            src={row.logo}
+            alt={row.team}
+            className="size-[22px] rounded-full border border-white/20 object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.2)]"
+            onError={(event) => {
+              event.currentTarget.style.display = "none"
+            }}
+          />
+        ) : (
+          <span className="inline-flex size-[22px]" />
+        )}
       </div>
       <span className="text-center font-mono text-xs text-(--color-text2)">{row.pj}</span>
       <span className="text-center font-mono text-xs text-(--color-text2)">{row.g}</span>

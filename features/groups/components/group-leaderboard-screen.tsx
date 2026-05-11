@@ -42,6 +42,7 @@ export function GroupLeaderboardScreen({ group, leaderboard, groups }: GroupLead
         <GroupHeader
           name={group.name}
           members={group.members}
+          inviteCode={group.invite_code}
           onAdd={() => setModalOpen(true)}
           groups={groups}
           activeId={group.id}

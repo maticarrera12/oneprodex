@@ -34,6 +34,7 @@ export interface AFTeam {
   id: number
   name: string
   code: string | null
+  logo?: string | null
   colors?: AFTeamColors | null
 }
 
@@ -125,6 +126,7 @@ export interface TeamRow {
   code: string
   name: string
   api_id: number
+  logo: string | null
   c1: string | null
   c2: string | null
   c3: string | null
