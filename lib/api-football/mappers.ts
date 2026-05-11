@@ -1,9 +1,13 @@
 import type {
   AFFixture,
+  AFMatchEvent,
+  AFSquadPlayer,
   AFStanding,
   AFTeam,
+  MatchEventRow,
   MatchLiveUpdateRow,
   MatchRow,
+  PlayerRow,
   StandingRow,
   SyncMatchStatus,
   TeamRow,
@@ -87,5 +91,55 @@ export function mapStanding(standing: AFStanding): StandingRow {
     goals_for: standing.all.goals.for,
     goals_against: standing.all.goals.against,
     points: standing.points,
+  }
+}
+
+export function mapPlayer(player: AFSquadPlayer, teamCode: string): PlayerRow {
+  return {
+    api_id: player.id,
+    name: player.name,
+    team_code: teamCode,
+    position: player.position,
+    photo_url: player.photo,
+  }
+}
+
+export function mapMatchEvent(
+  event: AFMatchEvent,
+  matchId: string,
+  teamCodeMap: Map<number, string>,
+): MatchEventRow | null {
+  let type: MatchEventRow['type']
+
+  if (event.type === 'Goal') {
+    if (event.detail === 'Own Goal') {
+      type = 'OWN_GOAL'
+    } else if (event.detail === 'Penalty') {
+      type = 'PENALTY'
+    } else {
+      type = 'GOAL'
+    }
+  } else if (event.type === 'Card') {
+    if (event.detail === 'Yellow Card') {
+      type = 'YELLOW_CARD'
+    } else if (event.detail === 'Red Card' || event.detail === 'Second Yellow card') {
+      type = 'RED_CARD'
+    } else {
+      return null
+    }
+  } else {
+    return null
+  }
+
+  const playerIdPart = event.player.id !== null ? String(event.player.id) : 'unknown'
+  const id = `${matchId}-${event.time.elapsed}-${playerIdPart}-${type}`
+
+  return {
+    id,
+    match_id: matchId,
+    player_api_id: event.player.id,
+    team_code: teamCodeMap.get(event.team.id) ?? null,
+    type,
+    minute: event.time.elapsed,
   }
 }

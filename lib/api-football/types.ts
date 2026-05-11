@@ -164,3 +164,64 @@ export interface StandingRow {
   goals_against: number
   points: number
 }
+
+export interface AFSquadPlayer {
+  id: number
+  name: string
+  age: number
+  number: number | null
+  position: string
+  photo: string | null
+}
+
+export interface AFSquadItem {
+  team: AFTeam
+  players: AFSquadPlayer[]
+}
+
+export interface AFSquadResponse {
+  response: AFSquadItem[]
+}
+
+export interface AFMatchEventTeam {
+  id: number
+  name: string
+}
+
+export interface AFMatchEventPlayer {
+  id: number | null
+  name: string | null
+}
+
+export interface AFMatchEvent {
+  time: {
+    elapsed: number
+    extra: number | null
+  }
+  team: AFMatchEventTeam
+  player: AFMatchEventPlayer
+  assist: AFMatchEventPlayer
+  type: string
+  detail: string
+}
+
+export interface AFMatchEventsResponse {
+  response: AFMatchEvent[]
+}
+
+export interface PlayerRow {
+  api_id: number
+  name: string
+  team_code: string | null
+  position: string | null
+  photo_url: string | null
+}
+
+export interface MatchEventRow {
+  id: string
+  match_id: string
+  player_api_id: number | null
+  team_code: string | null
+  type: 'GOAL' | 'OWN_GOAL' | 'PENALTY' | 'YELLOW_CARD' | 'RED_CARD'
+  minute: number | null
+}

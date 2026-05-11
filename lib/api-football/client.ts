@@ -2,6 +2,8 @@ import type {
   APIFootballEnvelope,
   APIFootballErrorPayload,
   AFFixturesResponse,
+  AFMatchEventsResponse,
+  AFSquadResponse,
   AFStandingsResponse,
   AFTeamsResponse,
 } from '@/lib/api-football/types'
@@ -101,4 +103,12 @@ export function fetchLiveFixtures(leagueId: number): Promise<APIFootballEnvelope
 
 export function fetchStandings(leagueId: number, season: number): Promise<APIFootballEnvelope<AFStandingsResponse>> {
   return apiFetch<AFStandingsResponse>('/standings', { league: leagueId, season })
+}
+
+export function fetchSquad(teamId: number): Promise<APIFootballEnvelope<AFSquadResponse>> {
+  return apiFetch<AFSquadResponse>('/players/squads', { team: teamId })
+}
+
+export function fetchMatchEvents(fixtureId: string): Promise<APIFootballEnvelope<AFMatchEventsResponse>> {
+  return apiFetch<AFMatchEventsResponse>('/fixtures/events', { fixture: fixtureId })
 }

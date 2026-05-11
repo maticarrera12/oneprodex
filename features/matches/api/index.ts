@@ -129,7 +129,7 @@ export async function getMatches(supabase: SupabaseClient<Database>): Promise<Ma
 }
 
 export async function getLiveMatches(supabase: SupabaseClient<Database>): Promise<Match[]> {
-  const { data, error } = await supabase.from("matches").select("*").order("kickoff", { ascending: true })
+  const { data, error } = await supabase.from("matches").select("*").eq("status", "LIVE").order("kickoff", { ascending: true })
   if (error || !data) return []
   const now = getReferenceNow()
   const lookup = await getTeamsLookup(supabase)
@@ -145,6 +145,28 @@ export async function getUpcomingMatches(supabase: SupabaseClient<Database>): Pr
     .map((row) => mapMatchRow(row, null, now, lookup))
     .filter((match) => match.status === "UPCOMING")
     .slice(0, 3)
+}
+
+export async function getMatchById(
+  supabase: SupabaseClient<Database>,
+  matchId: string,
+  userId: string | null,
+): Promise<Match | null> {
+  const now = getReferenceNow()
+  const lookup = await getTeamsLookup(supabase)
+
+  if (userId) {
+    const [matchResult, predResult] = await Promise.all([
+      supabase.from("matches").select("*").eq("id", matchId).maybeSingle(),
+      supabase.from("predictions").select("*").eq("match_id", matchId).eq("user_id", userId).maybeSingle(),
+    ])
+    if (!matchResult.data) return null
+    return mapMatchRow(matchResult.data, predResult.data ?? null, now, lookup)
+  }
+
+  const { data } = await supabase.from("matches").select("*").eq("id", matchId).maybeSingle()
+  if (!data) return null
+  return mapMatchRow(data, null, now, lookup)
 }
 
 export async function getMatchesWithPredictions(

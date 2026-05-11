@@ -146,6 +146,41 @@ export type Database = {
           },
         ]
       }
+      match_events: {
+        Row: {
+          id: string
+          match_id: string
+          minute: number | null
+          player_api_id: number | null
+          team_code: string | null
+          type: string
+        }
+        Insert: {
+          id: string
+          match_id: string
+          minute?: number | null
+          player_api_id?: number | null
+          team_code?: string | null
+          type: string
+        }
+        Update: {
+          id?: string
+          match_id?: string
+          minute?: number | null
+          player_api_id?: number | null
+          team_code?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_events_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matches: {
         Row: {
           away_score: number | null
@@ -187,6 +222,113 @@ export type Database = {
           synced_at?: string | null
         }
         Relationships: []
+      }
+      players: {
+        Row: {
+          api_id: number
+          id: string
+          name: string
+          photo_url: string | null
+          position: string | null
+          team_code: string | null
+        }
+        Insert: {
+          api_id: number
+          id?: string
+          name: string
+          photo_url?: string | null
+          position?: string | null
+          team_code?: string | null
+        }
+        Update: {
+          api_id?: number
+          id?: string
+          name?: string
+          photo_url?: string | null
+          position?: string | null
+          team_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "players_team_code_fkey"
+            columns: ["team_code"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      prediction_clean_sheets: {
+        Row: {
+          match_id: string
+          team_code: string
+          user_id: string
+        }
+        Insert: {
+          match_id: string
+          team_code: string
+          user_id: string
+        }
+        Update: {
+          match_id?: string
+          team_code?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prediction_clean_sheets_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prediction_clean_sheets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prediction_players: {
+        Row: {
+          id: string
+          match_id: string
+          player_api_id: number
+          type: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          match_id: string
+          player_api_id: number
+          type: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          match_id?: string
+          player_api_id?: number
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prediction_players_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prediction_players_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       predictions: {
         Row: {
@@ -307,6 +449,41 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      tournament_predictions: {
+        Row: {
+          best_player_api_id: number | null
+          best_young_player_api_id: number | null
+          champion_code: string | null
+          top_scorer_api_id: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          best_player_api_id?: number | null
+          best_young_player_api_id?: number | null
+          champion_code?: string | null
+          top_scorer_api_id?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          best_player_api_id?: number | null
+          best_young_player_api_id?: number | null
+          champion_code?: string | null
+          top_scorer_api_id?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_predictions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       users: {
         Row: {

@@ -1,49 +1,78 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import { Flag } from "@/features/home/components/flag"
-import { TEAMS } from "@/features/matches/mock"
+import { CleanSheetToggle } from "@/features/predictions/components/clean-sheet-toggle"
+import { PointsBreakdown } from "@/features/predictions/components/points-breakdown"
+import { ScorePrediction } from "@/features/predictions/components/score-prediction"
+import { usePrediction } from "@/features/predictions/hooks/usePrediction"
+import type { MatchEvent, MatchPredictionState, PlayerDetail } from "@/features/predictions/types"
+import { MAX_RED_CARDS, MAX_SCORERS, MAX_YELLOW_CARDS } from "@/features/predictions/types"
 import type { Match } from "@/features/matches/types"
 
 type MatchDetailScreenProps = {
   match: Match
+  predictionState: MatchPredictionState
+  players: { home: PlayerDetail[]; away: PlayerDetail[] }
+  events: MatchEvent[]
 }
 
-const QUICK_PICKS: Array<[number, number]> = [
-  [1, 0],
-  [2, 1],
-  [2, 0],
-  [1, 1],
-  [0, 0],
-  [0, 1],
-  [1, 2],
-  [3, 1],
-]
+function formatKickoff(kickoff: string): { date: string; time: string } {
+  const parsed = new Date(kickoff)
+  if (Number.isNaN(parsed.getTime())) {
+    const fallback = kickoff.split(" · ")
+    return { date: fallback[0] ?? kickoff, time: fallback[1] ?? "" }
+  }
 
-const CONSENSUS = [
-  { label: "Gana local", pct: 42 },
-  { label: "Empate", pct: 28 },
-  { label: "Gana visita", pct: 30 },
-]
+  const date = new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+  }).format(parsed)
+  const time = new Intl.DateTimeFormat("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(parsed)
 
-const TOP_SCORERS = ["Messi", "Mbappé", "Julián Álvarez", "Vinicius"]
+  return { date, time }
+}
 
-export function MatchDetailScreen({ match }: MatchDetailScreenProps) {
-  const home = TEAMS[match.home]
-  const away = TEAMS[match.away]
+export function MatchDetailScreen({ match, predictionState, players, events }: MatchDetailScreenProps) {
   const isLive = match.status === "LIVE"
   const isFinished = match.status === "FINISHED"
-  const lockedByStatus = isLive || isFinished
+  const isLocked = match.status !== "UPCOMING"
+  const kickoff = formatKickoff(match.kickoff)
+  const [selectedSquad, setSelectedSquad] = useState<"home" | "away">("home")
 
-  const [homeScore, setHomeScore] = useState(match.pred?.hs ?? (match.hs ?? 1))
-  const [awayScore, setAwayScore] = useState(match.pred?.as ?? (match.as ?? 0))
-  const [confidence, setConfidence] = useState(70)
-  const [firstScorer, setFirstScorer] = useState(TOP_SCORERS[0])
-  const [locked, setLocked] = useState(Boolean(match.pred) || lockedByStatus)
+  const { optimistic, toggleScorer, toggleYellowCard, toggleRedCard, toggleCleanSheet, handleScoreSubmit } = usePrediction(
+    predictionState,
+    match.id,
+    isLocked,
+    match.home,
+    match.away,
+  )
 
-  const selectedOutcome = homeScore > awayScore ? "Gana local" : homeScore < awayScore ? "Gana visita" : "Empate"
+  const activePlayers = useMemo(
+    () => (selectedSquad === "home" ? players.home : players.away),
+    [players.away, players.home, selectedSquad],
+  )
+
+  const persistedHome = optimistic.score?.home_score ?? match.pred?.hs ?? 0
+  const persistedAway = optimistic.score?.away_score ?? match.pred?.as ?? 0
+  const [draftScore, setDraftScore] = useState({ home: persistedHome, away: persistedAway })
+
+  useEffect(() => {
+    setDraftScore({ home: persistedHome, away: persistedAway })
+  }, [match.id, persistedHome, persistedAway])
+
+  const cleanSheetCodes = useMemo(() => {
+    const next: string[] = []
+    if (draftScore.away === 0) next.push(match.home)
+    if (draftScore.home === 0) next.push(match.away)
+    return next
+  }, [draftScore.away, draftScore.home, match.away, match.home])
 
   return (
     <div className="space-y-4 pt-4 pb-28">
@@ -51,7 +80,7 @@ export function MatchDetailScreen({ match }: MatchDetailScreenProps) {
         <span
           className="pointer-events-none absolute inset-0 opacity-20"
           style={{
-            background: `linear-gradient(180deg, ${home?.c1 ?? "#84CC16"}33 0%, transparent 55%), linear-gradient(0deg, ${away?.c1 ?? "#84CC16"}2E 0%, transparent 55%)`,
+            background: `linear-gradient(180deg, #84CC1633 0%, transparent 55%), linear-gradient(0deg, #84CC162E 0%, transparent 55%)`,
           }}
         />
         <div className="relative">
@@ -92,20 +121,36 @@ export function MatchDetailScreen({ match }: MatchDetailScreenProps) {
               </span>
             ) : (
               <span className="rounded-full border border-(--color-border-hi) bg-(--color-bg2) px-3 py-1 font-mono text-xs text-(--color-text2)">
-                {isFinished ? "Final" : match.kickoff}
+                {isFinished ? "Final" : `${kickoff.date} · ${kickoff.time}`}
               </span>
             )}
           </div>
 
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
             <div className="flex flex-col items-center gap-2">
-              <Flag code={match.home} size={62} />
-              <p className="text-sm font-semibold">{home?.name ?? match.home}</p>
+              {match.homeLogo ? (
+                <img
+                  src={match.homeLogo}
+                  alt={match.home}
+                  className="size-[62px] rounded-full border border-white/20 object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.2)]"
+                />
+              ) : (
+                <Flag code={match.home} size={62} />
+              )}
+              <p className="text-sm font-semibold">{match.home}</p>
             </div>
             <p className="font-mono text-xs tracking-wider text-(--color-text3)">VS</p>
             <div className="flex flex-col items-center gap-2">
-              <Flag code={match.away} size={62} />
-              <p className="text-sm font-semibold">{away?.name ?? match.away}</p>
+              {match.awayLogo ? (
+                <img
+                  src={match.awayLogo}
+                  alt={match.away}
+                  className="size-[62px] rounded-full border border-white/20 object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.2)]"
+                />
+              ) : (
+                <Flag code={match.away} size={62} />
+              )}
+              <p className="text-sm font-semibold">{match.away}</p>
             </div>
           </div>
 
@@ -139,175 +184,211 @@ export function MatchDetailScreen({ match }: MatchDetailScreenProps) {
       </div>
 
       <section className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi)">
-        <div className="flex items-center justify-between p-4 pb-2">
-          <p className="font-mono text-[11px] tracking-wider text-(--color-text3) uppercase">Tu predicción</p>
-          <p className={`font-mono text-[11px] ${locked ? "text-(--color-lime-hi)" : "text-(--color-amber)"}`}>
-            {locked ? "BLOQUEADA" : "ABIERTA · 4h 12m"}
-          </p>
+        <ScorePrediction
+          matchId={match.id}
+          homeTeamCode={match.home}
+          awayTeamCode={match.away}
+          homeScore={draftScore.home}
+          awayScore={draftScore.away}
+          onChange={(home, away) => setDraftScore({ home, away })}
+          isLocked={isLocked}
+          onSubmit={handleScoreSubmit}
+        />
+      </section>
+
+      <section className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-3">
+        <div className="mb-3 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedSquad("home")}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+              selectedSquad === "home"
+                ? "border-primary/45 bg-primary/15 text-primary"
+                : "border-(--color-border-hi) bg-(--color-bg2) text-(--color-text2)"
+            }`}
+          >
+            {match.homeLogo ? (
+              <img
+                src={match.homeLogo}
+                alt={match.home}
+                className="size-5 rounded-full border border-white/20 object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.2)]"
+              />
+            ) : (
+              <Flag code={match.home} size={20} />
+            )}
+            <span>{match.home}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedSquad("away")}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+              selectedSquad === "away"
+                ? "border-primary/45 bg-primary/15 text-primary"
+                : "border-(--color-border-hi) bg-(--color-bg2) text-(--color-text2)"
+            }`}
+          >
+            {match.awayLogo ? (
+              <img
+                src={match.awayLogo}
+                alt={match.away}
+                className="size-5 rounded-full border border-white/20 object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.2)]"
+              />
+            ) : (
+              <Flag code={match.away} size={20} />
+            )}
+            <span>{match.away}</span>
+          </button>
         </div>
 
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 pb-4">
-          <Stepper value={homeScore} disabled={locked} onChange={setHomeScore} />
-          <span className="font-mono text-3xl text-(--color-text3)">·</span>
-          <Stepper value={awayScore} disabled={locked} onChange={setAwayScore} />
-        </div>
-
-        <div className="flex gap-2 overflow-x-auto px-4 pb-4 scrollbar-none">
-          {QUICK_PICKS.map(([hs, as]) => {
-            const selected = hs === homeScore && as === awayScore
-            return (
-              <button
-                key={`${hs}-${as}`}
-                type="button"
-                disabled={locked}
-                onClick={() => {
-                  setHomeScore(hs)
-                  setAwayScore(as)
-                }}
-                className={`rounded-lg border px-2.5 py-1.5 font-mono text-xs whitespace-nowrap transition ${
-                  selected
-                    ? "border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-lime-hi)"
-                    : "border-(--color-border-hi) bg-(--color-bg2) text-(--color-text2)"
-                } ${locked ? "opacity-60" : ""}`}
-              >
-                {hs}–{as}
-              </button>
-            )
-          })}
-        </div>
-
-        <div className="border-t border-(--color-border-hi) p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm text-(--color-text2)">Multiplicador de confianza</p>
-            <p className="font-mono text-sm font-semibold text-(--color-lime-hi)">×{(1 + confidence / 100).toFixed(1)}</p>
+        <div className="overflow-hidden rounded-xl border border-(--color-border-hi)">
+          <div className="grid grid-cols-[1fr_36px_36px_36px] items-center gap-2 border-b border-(--color-border-hi) bg-(--color-bg2) px-3 py-2">
+            <p className="font-mono text-[11px] tracking-wider text-(--color-text3) uppercase">
+              Jugadores · G {optimistic.scorerIds.length}/{MAX_SCORERS} · A {optimistic.yellowCardIds.length}/{MAX_YELLOW_CARDS} · R {optimistic.redCardIds.length}/{MAX_RED_CARDS}
+            </p>
+            <span className="inline-flex items-center justify-center text-primary" title="Gol">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.4" />
+                <path d="M8 3.8 10.9 5.5l-.2 3.3L8 10.6 5.3 8.8l-.2-3.3L8 3.8Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <span className="inline-flex items-center justify-center text-amber-400" title="Tarjeta amarilla">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <rect x="4" y="2.5" width="8" height="11" rx="1.3" fill="currentColor" />
+              </svg>
+            </span>
+            <span className="inline-flex items-center justify-center text-red-400" title="Tarjeta roja">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <rect x="4" y="2.5" width="8" height="11" rx="1.3" fill="currentColor" />
+              </svg>
+            </span>
           </div>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={confidence}
-            disabled={locked}
-            onChange={(event) => setConfidence(Number(event.target.value))}
-            className="accent-(--color-lime-hi) w-full"
-          />
-        </div>
 
-        <div className="border-t border-(--color-border-hi) p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="font-mono text-[11px] tracking-wider text-(--color-text3) uppercase">Primer goleador · +3 pts</p>
-            <button type="button" className="rounded-lg border border-(--color-border-hi) bg-(--color-bg2) px-2.5 py-1 text-xs">
-              Cambiar
-            </button>
-          </div>
-          <div className="flex gap-2">
-            {TOP_SCORERS.map((player) => (
-              <button
-                key={player}
-                type="button"
-                disabled={locked}
-                onClick={() => setFirstScorer(player)}
-                className={`rounded-lg border px-2.5 py-1 text-xs ${
-                  firstScorer === player
-                    ? "border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-lime-hi)"
-                    : "border-(--color-border-hi) bg-(--color-bg2) text-(--color-text2)"
-                }`}
-              >
-                {player}
-              </button>
-            ))}
-          </div>
+          {activePlayers.length === 0 ? (
+            <p className="px-3 py-3 text-xs text-(--color-text3)">Plantel no disponible</p>
+          ) : (
+            <div>
+              {activePlayers.map((player, idx) => {
+                const scorerSelected = optimistic.scorerIds.includes(player.api_id)
+                const yellowSelected = optimistic.yellowCardIds.includes(player.api_id)
+                const redSelected = optimistic.redCardIds.includes(player.api_id)
+                const blockScorer =
+                  isLocked || (!scorerSelected && optimistic.scorerIds.length >= MAX_SCORERS)
+                const blockYellow =
+                  isLocked || (!yellowSelected && optimistic.yellowCardIds.length >= MAX_YELLOW_CARDS)
+                const blockRed =
+                  isLocked || (!redSelected && optimistic.redCardIds.length >= MAX_RED_CARDS)
+
+                return (
+                  <div
+                    key={player.api_id}
+                    className={`grid grid-cols-[1fr_36px_36px_36px] items-center gap-2 px-3 py-2 ${
+                      idx < activePlayers.length - 1 ? "border-b border-(--color-border-hi)" : ""
+                    }`}
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      {player.photo_url ? (
+                        <img
+                          src={player.photo_url}
+                          alt={player.name}
+                          className="size-7 rounded-full border border-white/15 object-cover"
+                        />
+                      ) : (
+                        <span className="inline-flex size-7 items-center justify-center rounded-full border border-(--color-border-hi) bg-(--color-bg2) font-mono text-[10px] text-(--color-text2)">
+                          {player.name.slice(0, 2).toUpperCase()}
+                        </span>
+                      )}
+                      <p className="truncate text-sm text-foreground">{player.name}</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={blockScorer}
+                      onClick={() => toggleScorer(player.api_id)}
+                      className={`inline-flex size-8 items-center justify-center rounded-md border text-xs font-semibold transition ${
+                        scorerSelected
+                          ? "border-primary/45 bg-primary/20 text-primary"
+                          : "border-(--color-border-hi) bg-(--color-bg2) text-(--color-text3)"
+                      } ${blockScorer ? "opacity-50" : ""}`}
+                    >
+                      G
+                    </button>
+                    <button
+                      type="button"
+                      disabled={blockYellow}
+                      onClick={() => toggleYellowCard(player.api_id)}
+                      className={`inline-flex size-8 items-center justify-center rounded-md border text-xs font-semibold transition ${
+                        yellowSelected
+                          ? "border-amber-400/45 bg-amber-400/20 text-amber-400"
+                          : "border-(--color-border-hi) bg-(--color-bg2) text-(--color-text3)"
+                      } ${blockYellow ? "opacity-50" : ""}`}
+                    >
+                      A
+                    </button>
+                    <button
+                      type="button"
+                      disabled={blockRed}
+                      onClick={() => toggleRedCard(player.api_id)}
+                      className={`inline-flex size-8 items-center justify-center rounded-md border text-xs font-semibold transition ${
+                        redSelected
+                          ? "border-red-400/45 bg-red-400/20 text-red-400"
+                          : "border-(--color-border-hi) bg-(--color-bg2) text-(--color-text3)"
+                      } ${blockRed ? "opacity-50" : ""}`}
+                    >
+                      R
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <CleanSheetToggle
+        matchId={match.id}
+        homeTeamCode={match.home}
+        awayTeamCode={match.away}
+        homeGoalsPredicted={draftScore.home}
+        awayGoalsPredicted={draftScore.away}
+        selectedCodes={cleanSheetCodes}
+        onToggle={toggleCleanSheet}
+        isLocked={isLocked}
+      />
+
+      {isFinished && (
+        <PointsBreakdown
+          prediction={optimistic.score}
+          match={{ hs: match.hs, as: match.as, home: match.home, away: match.away }}
+          scorerIds={optimistic.scorerIds}
+          yellowCardIds={optimistic.yellowCardIds}
+          redCardIds={optimistic.redCardIds}
+          cleanSheetCodes={cleanSheetCodes}
+          events={events}
+        />
+      )}
+
+      <section>
+        <p className="mb-2 text-xs font-semibold tracking-wider text-(--color-text2) uppercase">Les Cracks · consenso</p>
+        <div className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-4">
+          <p className="text-sm text-(--color-text3)">Cargando consenso...</p>
         </div>
       </section>
 
       <button
         type="button"
-        onClick={() => setLocked(true)}
-        disabled={locked}
+        disabled={isLocked}
+        onClick={() => handleScoreSubmit(draftScore.home, draftScore.away)}
         className={`h-12 w-full rounded-xl font-semibold transition ${
-          locked
+          isLocked
             ? "border border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-lime-hi)"
             : "bg-(--color-lime-hi) text-black shadow-[0_8px_22px_rgba(163,230,53,0.35)]"
         }`}
       >
-        {locked ? `Bloqueada · ${homeScore}-${awayScore} · ×${(1 + confidence / 100).toFixed(1)}` : `Bloquear predicción · ${homeScore}-${awayScore}`}
+        {isLocked
+          ? `Bloqueada · ${draftScore.home}-${draftScore.away}`
+          : `Bloquear predicción · ${draftScore.home}-${draftScore.away}`}
       </button>
-
-      <section>
-        <p className="mb-2 text-xs font-semibold tracking-wider text-(--color-text2) uppercase">Les Cracks · consenso</p>
-        <div className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-4">
-          <div className="space-y-3">
-            {CONSENSUS.map((item) => {
-              const favorite = item.label === selectedOutcome
-              return (
-                <div key={item.label}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <p className={favorite ? "font-semibold text-(--color-lime-hi)" : "text-(--color-text2)"}>{item.label}</p>
-                    <p className={favorite ? "font-mono text-(--color-lime-hi)" : "font-mono text-(--color-text2)"}>{item.pct}%</p>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded bg-white/8">
-                    <span
-                      className={`block h-full rounded ${favorite ? "bg-(--color-lime-hi) shadow-[0_0_10px_rgba(163,230,53,0.4)]" : "bg-white/20"}`}
-                      style={{ width: `${item.pct}%` }}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
     </div>
   )
 }
 
 export default MatchDetailScreen
-
-function Stepper({
-  value,
-  disabled,
-  onChange,
-}: {
-  value: number
-  disabled: boolean
-  onChange: (value: number) => void
-}) {
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => onChange(Math.min(9, value + 1))}
-        className="inline-flex h-7 w-9 items-center justify-center rounded-lg border border-(--color-border-hi) bg-(--color-bg2)"
-      >
-        <svg width="11" height="7" viewBox="0 0 11 7">
-          <path
-            d="M1 6 5.5 1 10 6"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
-      <p className="w-14 text-center font-mono text-5xl font-semibold leading-none tracking-tight">{value}</p>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => onChange(Math.max(0, value - 1))}
-        className="inline-flex h-7 w-9 items-center justify-center rounded-lg border border-(--color-border-hi) bg-(--color-bg2)"
-      >
-        <svg width="11" height="7" viewBox="0 0 11 7" className="rotate-180">
-          <path
-            d="M1 6 5.5 1 10 6"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
-    </div>
-  )
-}
