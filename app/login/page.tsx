@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { signInWithDiscord, signInWithGoogle } from '@/features/auth/api'
 
@@ -7,10 +8,7 @@ function saveNextCookie(next: string) {
   document.cookie = `auth-next=${encodeURIComponent(next)}; path=/; max-age=600; SameSite=Lax`
 }
 
-export default function LoginPage() {
-  const searchParams = useSearchParams()
-  const next = searchParams.get('next') ?? undefined
-
+function LoginContent({ next }: { next?: string }) {
   function handleSignIn(fn: (next?: string) => Promise<unknown>) {
     if (next) saveNextCookie(next)
     fn(next)
@@ -66,6 +64,20 @@ export default function LoginPage() {
         </p>
       </div>
     </main>
+  )
+}
+
+function LoginContentWithSearchParams() {
+  const searchParams = useSearchParams()
+  const next = searchParams.get('next') ?? undefined
+  return <LoginContent next={next} />
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginContent />}>
+      <LoginContentWithSearchParams />
+    </Suspense>
   )
 }
 
