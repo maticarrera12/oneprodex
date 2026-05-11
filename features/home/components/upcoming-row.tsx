@@ -70,11 +70,11 @@ export function UpcomingRow({ match, teams }: UpcomingRowProps) {
             <p className="mt-0.5 font-mono text-sm font-semibold">{kickoff.time}</p>
           </div>
           {hasPrediction ? (
-            <span className="inline-flex rounded-[10px] border border-primary/35 bg-primary/10 px-2.5 py-1 font-mono text-[13px] font-semibold text-primary">
+            <span className="inline-flex min-w-[74px] justify-center rounded-[10px] border border-primary/35 bg-primary/10 px-2.5 py-1 font-mono text-[13px] font-semibold text-primary">
               {match.pred?.hs}–{match.pred?.as}
             </span>
           ) : (
-            <span className="inline-flex rounded-[10px] border border-border/80 bg-white/5 px-2.5 py-1 text-xs text-foreground/80">
+            <span className="inline-flex min-w-[74px] justify-center rounded-[10px] border border-border/80 bg-white/5 px-2.5 py-1 text-xs text-foreground/80">
               Predict
             </span>
           )}
