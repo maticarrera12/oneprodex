@@ -1,0 +1,28 @@
+import type { ProfileData } from "@/features/profile/api"
+import { ProfileAchievementsGrid } from "@/features/profile/components/profile-achievements-grid"
+import { ProfileFormBreakdown } from "@/features/profile/components/profile-form-breakdown"
+import { ProfileHeader } from "@/features/profile/components/profile-header"
+import { ProfileHeroStats } from "@/features/profile/components/profile-hero-stats"
+import { ProfileHistoryList } from "@/features/profile/components/profile-history-list"
+import { ProfileIdentity } from "@/features/profile/components/profile-identity"
+import { ProfileLevelProgress } from "@/features/profile/components/profile-level-progress"
+
+type ProfileScreenProps = {
+  data: ProfileData
+}
+
+export default function ProfileScreen({ data }: ProfileScreenProps) {
+  const userColor = "hsl(83 81% 62%)"
+
+  return (
+    <div className="space-y-5 pt-4 pb-8">
+      <ProfileHeader />
+      <ProfileIdentity user={data.user} accentColor={userColor} />
+      <ProfileHeroStats stats={data.heroStats} />
+      <ProfileLevelProgress user={data.user} />
+      <ProfileFormBreakdown values={data.formLast7} />
+      <ProfileAchievementsGrid achievements={data.achievements} />
+      <ProfileHistoryList entries={data.history} />
+    </div>
+  )
+}

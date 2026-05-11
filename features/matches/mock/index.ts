@@ -2,12 +2,22 @@ import type { Match, Team } from "@/features/matches/types"
 
 export const TEAMS: Record<string, Team> = {
   ARG: { code: "ARG", name: "Argentina", c1: "#6CCFF6", c2: "#FFFFFF", c3: "#6CCFF6" },
+  AUS: { code: "AUS", name: "Australia", c1: "#00843D", c2: "#FFCD00", c3: "#00843D" },
+  BEL: { code: "BEL", name: "Bélgica", c1: "#000000", c2: "#FAE042", c3: "#ED2939" },
   BRA: { code: "BRA", name: "Brasil", c1: "#009C3B", c2: "#FFDF00", c3: "#002776" },
+  CRO: { code: "CRO", name: "Croacia", c1: "#FF0000", c2: "#FFFFFF", c3: "#171796" },
   FRA: { code: "FRA", name: "Francia", c1: "#0055A4", c2: "#FFFFFF", c3: "#EF4135" },
   ESP: { code: "ESP", name: "España", c1: "#C60B1E", c2: "#FFC400", c3: "#C60B1E" },
   GER: { code: "GER", name: "Alemania", c1: "#111111", c2: "#DD0000", c3: "#FFCE00" },
+  JPN: { code: "JPN", name: "Japón", c1: "#FFFFFF", c2: "#BC002D", c3: "#FFFFFF" },
+  KOR: { code: "KOR", name: "Corea", c1: "#FFFFFF", c2: "#003478", c3: "#C60C30" },
+  MAR: { code: "MAR", name: "Marruecos", c1: "#C1272D", c2: "#006233", c3: "#C1272D" },
   NED: { code: "NED", name: "Países Bajos", c1: "#AE1C28", c2: "#FFFFFF", c3: "#21468B" },
+  POL: { code: "POL", name: "Polonia", c1: "#FFFFFF", c2: "#DC143C", c3: "#FFFFFF" },
   POR: { code: "POR", name: "Portugal", c1: "#046A38", c2: "#DA291C", c3: "#FFD100" },
+  SEN: { code: "SEN", name: "Senegal", c1: "#00853F", c2: "#FDEF42", c3: "#E31B23" },
+  SUI: { code: "SUI", name: "Suiza", c1: "#D52B1E", c2: "#FFFFFF", c3: "#D52B1E" },
+  USA: { code: "USA", name: "USA", c1: "#3C3B6E", c2: "#FFFFFF", c3: "#B22234" },
   MEX: { code: "MEX", name: "México", c1: "#006847", c2: "#FFFFFF", c3: "#CE1126" },
 }
 
@@ -23,6 +33,7 @@ export const MATCHES: Match[] = [
     minute: 67,
     kickoff: "Hoy · 21:00",
     stage: "Fase de grupos · Grupo A",
+    venue: "MetLife Stadium",
   },
   {
     id: "m-live-2",
@@ -35,6 +46,7 @@ export const MATCHES: Match[] = [
     minute: 42,
     kickoff: "Hoy · 18:00",
     stage: "Fase de grupos · Grupo B",
+    venue: "SoFi Stadium",
   },
   {
     id: "m-up-1",
@@ -47,6 +59,7 @@ export const MATCHES: Match[] = [
     minute: null,
     kickoff: "Mañana · 16:00",
     stage: "Fase de grupos · Grupo C",
+    venue: "Estadio Azteca",
   },
   {
     id: "m-up-2",
@@ -59,6 +72,7 @@ export const MATCHES: Match[] = [
     minute: null,
     kickoff: "Mañana · 19:00",
     stage: "Fase de grupos · Grupo D",
+    venue: "AT&T Stadium",
   },
   {
     id: "m-up-3",
@@ -71,6 +85,7 @@ export const MATCHES: Match[] = [
     minute: null,
     kickoff: "Miércoles · 21:00",
     stage: "Octavos de final",
+    venue: "BMO Field",
   },
   {
     id: "m-fin-1",
@@ -83,6 +98,7 @@ export const MATCHES: Match[] = [
     minute: null,
     kickoff: "Ayer · 21:00",
     stage: "Fase de grupos · Grupo A",
+    venue: "Lumen Field",
   },
   {
     id: "m-fin-2",
@@ -95,6 +111,7 @@ export const MATCHES: Match[] = [
     minute: null,
     kickoff: "Ayer · 18:00",
     stage: "Fase de grupos · Grupo B",
+    venue: "NRG Stadium",
   },
   {
     id: "m-fin-3",
@@ -107,5 +124,10 @@ export const MATCHES: Match[] = [
     minute: null,
     kickoff: "Anteayer · 16:00",
     stage: "Fase de grupos · Grupo C",
+    venue: "Hard Rock Stadium",
   },
 ]
+
+export function getMatchById(id: string) {
+  return MATCHES.find((match) => match.id === id) ?? null
+}

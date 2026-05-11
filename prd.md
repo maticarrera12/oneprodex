@@ -783,7 +783,7 @@ Las tablas cambian en tiempo real.
 
 ### Goleador por jugador acertado
 
-3 pts por jugador acertado
+3 pts por jugador acertado(puede marcar mas de un gol y si marca uno y anoto dos suma 3, si anoto dos y marca uno suma 3, si acierta suma gol*puntos)
 
 ---
 
@@ -795,7 +795,7 @@ Las tablas cambian en tiempo real.
 
 ### Tarjetas por jugador acertadas
 
-1 pt por tarjeta acertada
+1 pts por tarjeta acertada
 
 ---
 

@@ -1,9 +1,11 @@
 import type { ActivityItem, GroupInfo } from "@/features/groups/types"
 
 export const GROUP_INFO: GroupInfo = {
-  name: "Amigos del Mundial",
+  id: "mock-group-1",
+  name: "Les Cracks",
   members: 12,
   matchday: "Jornada 3",
+  invite_code: "MOCK01",
 }
 
 export const ACTIVITY: ActivityItem[] = [

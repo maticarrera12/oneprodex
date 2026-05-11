@@ -1,0 +1,164 @@
+export type SyncMatchStatus = 'UPCOMING' | 'LIVE' | 'FINISHED'
+
+export interface APIFootballEnvelope<T> {
+  data: T
+  remainingRequests: number | null
+}
+
+export interface APIFootballErrorPayload {
+  message?: string
+  errors?: unknown
+}
+
+export class APIFootballError extends Error {
+  readonly status: number
+  readonly detail: string
+
+  constructor(status: number, detail: string) {
+    super(`API-Football request failed with status ${status}`)
+    this.name = 'APIFootballError'
+    this.status = status
+    this.detail = detail
+  }
+}
+
+export interface AFTeamColors {
+  player?: {
+    primary?: string | null
+    number?: string | null
+    border?: string | null
+  } | null
+}
+
+export interface AFTeam {
+  id: number
+  name: string
+  code: string | null
+  colors?: AFTeamColors | null
+}
+
+export interface AFTeamsResponseItem {
+  team: AFTeam
+}
+
+export interface AFTeamsResponse {
+  response: AFTeamsResponseItem[]
+}
+
+export interface AFFixtureStatus {
+  short: string
+  elapsed: number | null
+}
+
+export interface AFFixtureVenue {
+  name: string | null
+}
+
+export interface AFFixtureInfo {
+  id: number
+  date: string
+  status: AFFixtureStatus
+  venue?: AFFixtureVenue | null
+}
+
+export interface AFFixtureTeam {
+  id: number
+  code: string | null
+  name?: string
+}
+
+export interface AFFixture {
+  fixture: AFFixtureInfo
+  league: {
+    round: string
+    group: string | null
+  }
+  teams: {
+    home: AFFixtureTeam
+    away: AFFixtureTeam
+  }
+  goals: {
+    home: number | null
+    away: number | null
+  }
+}
+
+export interface AFFixturesResponse {
+  response: AFFixture[]
+}
+
+export interface AFStanding {
+  rank: number
+  team: {
+    id: number
+    name: string
+    code: string | null
+  }
+  group: string
+  points: number
+  goalsDiff: number
+  all: {
+    played: number
+    win: number
+    draw: number
+    lose: number
+    goals: {
+      for: number
+      against: number
+    }
+  }
+}
+
+export interface AFStandingsLeague {
+  standings: AFStanding[][]
+}
+
+export interface AFStandingsResponseItem {
+  league: AFStandingsLeague
+}
+
+export interface AFStandingsResponse {
+  response: AFStandingsResponseItem[]
+}
+
+export interface TeamRow {
+  code: string
+  name: string
+  api_id: number
+  c1: string | null
+  c2: string | null
+  c3: string | null
+}
+
+export interface MatchRow {
+  id: string
+  home_team_code: string
+  away_team_code: string
+  home_score: number | null
+  away_score: number | null
+  status: SyncMatchStatus
+  minute: number | null
+  kickoff: string
+  stage: string
+  group_code: string | null
+}
+
+export interface MatchLiveUpdateRow {
+  id: string
+  home_score: number | null
+  away_score: number | null
+  minute: number | null
+  status: SyncMatchStatus
+}
+
+export interface StandingRow {
+  team_code: string
+  group_code: string
+  played: number
+  won: number
+  drawn: number
+  lost: number
+  goals_for: number
+  goals_against: number
+  points: number
+}

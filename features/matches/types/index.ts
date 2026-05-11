@@ -24,6 +24,7 @@ export interface Match {
   minute: number | null
   kickoff: string
   stage: string
+  venue?: string
 }
 
 export interface MatchPoints {

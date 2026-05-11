@@ -1,7 +1,6 @@
+import { BracketScreen } from "@/features/bracket/components/bracket-screen"
+import { BRACKET_ROUNDS, BRACKET_SCORE, CHAMPION_PICK } from "@/features/bracket/mock"
+
 export default function BracketPage() {
-  return (
-    <section className="py-8">
-      <p className="text-sm text-(--color-text2)">Bracket — proximamente</p>
-    </section>
-  )
+  return <BracketScreen rounds={BRACKET_ROUNDS} scoreStats={BRACKET_SCORE} champion={CHAMPION_PICK} />
 }
