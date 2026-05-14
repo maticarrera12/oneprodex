@@ -18,9 +18,10 @@ type BracketScreenProps = {
     name: string
     subtitle: string
   }
+  readOnly?: boolean
 }
 
-export function BracketScreen({ rounds, scoreStats, champion }: BracketScreenProps) {
+export function BracketScreen({ rounds, scoreStats, champion, readOnly = false }: BracketScreenProps) {
   const [tab, setTab] = useState<BracketViewTab>("Mis picks")
   const cardHeight = 110
   const baseGap = 12
@@ -44,6 +45,11 @@ export function BracketScreen({ rounds, scoreStats, champion }: BracketScreenPro
   return (
     <div className="space-y-4 py-4 pb-6">
       <BracketHeader />
+      {readOnly ? (
+        <div className="rounded-xl border border-primary/35 bg-primary/10 px-3 py-2 text-center text-xs text-primary">
+          Bracket enviado · solo lectura
+        </div>
+      ) : null}
       <BracketViewTabs active={tab} onChange={setTab} />
       <BracketChampionCard champion={champion} />
 

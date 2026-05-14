@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { supabasePublishableKey, supabaseUrl } from '@/lib/supabase/config'
 
 export async function proxy(request: NextRequest) {
+  const onboardingEnabled = process.env.NEXT_PUBLIC_ONBOARDING_ENABLED === 'true'
   let supabaseResponse = NextResponse.next({ request })
   const supabase = createServerClient(
     supabaseUrl,
@@ -28,6 +29,7 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
   const isAuthRoute = pathname === '/login'
+  const isOnboardingRoute = pathname === '/onboarding'
   const isPublicRoute = isAuthRoute || pathname.startsWith('/auth/') || pathname.startsWith('/api/')
 
   if (!user && !isPublicRoute) {
@@ -38,6 +40,24 @@ export async function proxy(request: NextRequest) {
 
   if (user && isAuthRoute) {
     return NextResponse.redirect(new URL('/', request.url))
+  }
+
+  if (user && onboardingEnabled) {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('bracket_submitted_at')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const hasSubmittedBracket = Boolean(profile?.bracket_submitted_at)
+
+    if (!hasSubmittedBracket && !isOnboardingRoute && !pathname.startsWith('/api/')) {
+      return NextResponse.redirect(new URL('/onboarding', request.url))
+    }
+
+    if (hasSubmittedBracket && isOnboardingRoute) {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
   }
 
   return supabaseResponse
