@@ -41,14 +41,29 @@ export interface BracketPick {
   team_code: string
 }
 
+export interface OnboardingTeam {
+  code: string
+  name: string
+  logo: string | null
+}
+
+export interface ThirdPlaceTeam {
+  group_code: GroupCode
+  team_code: string
+  name: string
+  logo: string | null
+}
+
+export interface AwardsSelection {
+  top_scorer_api_id: number | null
+  best_player_api_id: number | null
+  best_young_player_api_id: number | null
+}
+
 export interface OnboardingState {
   step: 1 | 2 | 3 | 4 | 'complete'
   groupRankings: GroupRankings | null
   bestThirds: string[] | null
   bracketPicks: BracketPick[] | null
-  tournamentPredictions: {
-    top_scorer_api_id: number | null
-    best_player_api_id: number | null
-    best_young_player_api_id: number | null
-  } | null
+  tournamentPredictions: AwardsSelection | null
 }
