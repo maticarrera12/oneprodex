@@ -78,6 +78,7 @@ describe('mapPlayer', () => {
     id: 42,
     name: 'Lionel Messi',
     age: 36,
+    date_of_birth: '1987-06-24',
     number: 10,
     position: 'Attacker',
     photo: 'https://example.com/messi.jpg',
@@ -90,6 +91,7 @@ describe('mapPlayer', () => {
       team_code: 'ARG',
       position: 'Attacker',
       photo_url: 'https://example.com/messi.jpg',
+      date_of_birth: '1987-06-24',
     })
   })
 
@@ -101,6 +103,7 @@ describe('mapPlayer', () => {
       team_code: 'ARG',
       position: 'Attacker',
       photo_url: null,
+      date_of_birth: '1987-06-24',
     })
   })
 })

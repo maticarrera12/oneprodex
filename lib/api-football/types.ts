@@ -169,6 +169,7 @@ export interface AFSquadPlayer {
   id: number
   name: string
   age: number
+  date_of_birth: string | null
   number: number | null
   position: string
   photo: string | null
@@ -215,6 +216,7 @@ export interface PlayerRow {
   team_code: string | null
   position: string | null
   photo_url: string | null
+  date_of_birth: string | null
 }
 
 export interface MatchEventRow {

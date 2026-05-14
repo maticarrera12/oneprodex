@@ -75,6 +75,45 @@ export type Database = {
           },
         ]
       }
+      group_picks: {
+        Row: {
+          advances_as_third: boolean
+          group_code: string
+          position: number
+          team_code: string
+          user_id: string
+        }
+        Insert: {
+          advances_as_third?: boolean
+          group_code: string
+          position: number
+          team_code: string
+          user_id: string
+        }
+        Update: {
+          advances_as_third?: boolean
+          group_code?: string
+          position?: number
+          team_code?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_picks_team_code_fkey"
+            columns: ["team_code"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "group_picks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_members: {
         Row: {
           group_id: string
@@ -226,6 +265,7 @@ export type Database = {
       players: {
         Row: {
           api_id: number
+          date_of_birth: string | null
           id: string
           name: string
           photo_url: string | null
@@ -234,6 +274,7 @@ export type Database = {
         }
         Insert: {
           api_id: number
+          date_of_birth?: string | null
           id?: string
           name: string
           photo_url?: string | null
@@ -242,6 +283,7 @@ export type Database = {
         }
         Update: {
           api_id?: number
+          date_of_birth?: string | null
           id?: string
           name?: string
           photo_url?: string | null

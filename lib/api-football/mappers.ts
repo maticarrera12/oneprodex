@@ -101,6 +101,7 @@ export function mapPlayer(player: AFSquadPlayer, teamCode: string): PlayerRow {
     team_code: teamCode,
     position: player.position,
     photo_url: player.photo,
+    date_of_birth: player.date_of_birth,
   }
 }
 
