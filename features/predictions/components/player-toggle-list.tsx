@@ -89,8 +89,8 @@ export function PlayerToggleList({
                 onClick={() => onToggle?.(player.api_id)}
                 className={`rounded-full border px-2.5 py-1 text-xs transition ${
                   selected
-                    ? 'border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-lime-hi)'
-                    : 'border-(--color-border-hi) bg-(--color-bg2) text-(--color-text2)'
+                    ? 'border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-primary)'
+                    : 'border-(--color-primary) bg-(--color-bg2) text-(--color-text2)'
                 } ${isLocked ? 'opacity-60' : ''}`}
               >
                 {player.name}

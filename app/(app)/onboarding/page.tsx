@@ -1,26 +1,21 @@
 import { redirect } from "next/navigation"
 import { getOnboardingState } from "@/features/onboarding/api"
 import { OnboardingScreen } from "@/features/onboarding/components/onboarding-screen"
+import { getStandingsByGroup } from "@/features/standings/api"
 import type { GroupCode, OnboardingTeam } from "@/features/onboarding/types"
 import { createServiceClient } from "@/lib/supabase/service"
 import { createClient } from "@/lib/supabase/server"
 
 const GROUPS: GroupCode[] = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]
 
-async function getTeamsByGroup() {
-  const supabase = createServiceClient()
-  const [standingsResult, teamsResult] = await Promise.all([
-    supabase
-      .from("standings")
-      .select("group_code,team_code,points,goals_for,goals_against")
-      .order("group_code", { ascending: true })
-      .order("points", { ascending: false })
-      .order("goals_for", { ascending: false })
-      .order("goals_against", { ascending: true }),
-    supabase.from("teams").select("code,name,logo"),
-  ])
+function normalizeGroupCode(value: string | null | undefined): GroupCode | null {
+  if (!value) return null
+  const normalized = value.trim().toUpperCase().replace(/^GROUP\s+/, '')
+  return GROUPS.includes(normalized as GroupCode) ? (normalized as GroupCode) : null
+}
 
-  const teamsByCode = new Map((teamsResult.data ?? []).map((team) => [team.code, team] as const))
+async function getTeamsByGroup(supabase: ReturnType<typeof createServiceClient>): Promise<Partial<Record<GroupCode, OnboardingTeam[]>>> {
+  const standingsGroups = await getStandingsByGroup(supabase)
   const map = GROUPS.reduce(
     (acc, group) => {
       acc[group] = []
@@ -29,15 +24,21 @@ async function getTeamsByGroup() {
     {} as Record<GroupCode, OnboardingTeam[]>
   )
 
-  for (const row of standingsResult.data ?? []) {
-    const group = row.group_code as GroupCode
-    if (!GROUPS.includes(group)) continue
-    const team = teamsByCode.get(row.team_code)
-    map[group].push({
-      code: row.team_code,
-      name: team?.name ?? row.team_code,
-      logo: team?.logo ?? null,
-    })
+  function pushIfMissing(group: GroupCode, team: OnboardingTeam) {
+    if (map[group].some((entry) => entry.code === team.code)) return
+    map[group].push(team)
+  }
+
+  for (const groupStanding of standingsGroups) {
+    const group = normalizeGroupCode(groupStanding.id)
+    if (!group) continue
+    for (const row of groupStanding.rows) {
+      pushIfMissing(group, {
+        code: row.team,
+        name: row.teamName ?? row.team,
+        logo: row.logo ?? null,
+      })
+    }
   }
 
   return map
@@ -59,7 +60,7 @@ export default async function OnboardingPage() {
     redirect("/")
   }
 
-  const teamsByGroup = await getTeamsByGroup()
+  const teamsByGroup = await getTeamsByGroup(serviceClient)
 
   return (
     <OnboardingScreen

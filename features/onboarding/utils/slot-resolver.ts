@@ -95,6 +95,44 @@ function resolveThirdPlaceTeam(
   return bestThirds[0] ?? rankings[allowedGroups[0]][2]
 }
 
+export function resolveR32Pairs(
+  groupRankings: GroupRankings,
+  bestThirds: string[]
+): Array<{ home: string; away: string }> {
+  const teamToGroup = buildThirdPlaceMap(groupRankings)
+  const picked = new Set(bestThirds)
+  const usedThirds = new Set<string>()
+
+  function pickThird(allowedGroups: GroupCode[]): string {
+    for (const group of allowedGroups) {
+      const third = groupRankings[group][2]
+      if (picked.has(third) && !usedThirds.has(third)) {
+        usedThirds.add(third)
+        return third
+      }
+    }
+    for (const team of bestThirds) {
+      if (usedThirds.has(team)) continue
+      const group = teamToGroup.get(team)
+      if (group && allowedGroups.includes(group)) {
+        usedThirds.add(team)
+        return team
+      }
+    }
+    const fallback = bestThirds.find((t) => !usedThirds.has(t)) ?? bestThirds[0] ?? ""
+    if (fallback) usedThirds.add(fallback)
+    return fallback
+  }
+
+  return Object.values(R32_SLOT_DEFS).map((definition) => ({
+    home: getRankedTeam(groupRankings, definition.home.group, definition.home.rank),
+    away:
+      definition.away.type === "fixed"
+        ? getRankedTeam(groupRankings, definition.away.group, definition.away.rank)
+        : pickThird(definition.away.groups),
+  }))
+}
+
 export function resolveSlots(groupRankings: GroupRankings, bestThirds: string[]): Record<SlotId, string> {
   const resolved = {} as Record<SlotId, string>
 

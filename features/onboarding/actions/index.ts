@@ -109,9 +109,8 @@ function parseAwardValue(formData: FormData, key: string): number | null {
 }
 
 function validateGroupPicks(picks: GroupPickInput[]): void {
-  if (picks.length !== 48) {
-    throw new Error("Expected 48 group picks")
-  }
+  if (picks.length === 0) throw new Error("No group picks provided")
+  if (picks.length % 4 !== 0) throw new Error("Each group must have exactly 4 picks")
 
   const byGroup = new Map<string, GroupPickInput[]>()
   for (const pick of picks) {
@@ -120,9 +119,8 @@ function validateGroupPicks(picks: GroupPickInput[]): void {
     byGroup.set(pick.group_code, list)
   }
 
-  for (const group of GROUPS) {
-    const picksInGroup = byGroup.get(group)
-    if (!picksInGroup || picksInGroup.length !== 4) {
+  for (const [group, picksInGroup] of byGroup) {
+    if (picksInGroup.length !== 4) {
       throw new Error(`Group ${group} incomplete`)
     }
 
@@ -291,6 +289,11 @@ export async function saveTournamentPredictions(formData: FormData): Promise<voi
   }
 
   const service = createServiceClient()
+  const lockResult = await service.from("users").select("bracket_submitted_at").eq("id", userId).maybeSingle()
+  if (lockResult.error) throw new Error(lockResult.error.message)
+  if (lockResult.data?.bracket_submitted_at) {
+    throw new Error("Forbidden: bracket already submitted")
+  }
   const upsertResult = await service.from("tournament_predictions").upsert(
     {
       user_id: userId,
@@ -302,11 +305,11 @@ export async function saveTournamentPredictions(formData: FormData): Promise<voi
   )
   if (upsertResult.error) throw new Error(upsertResult.error.message)
 
-  const lockResult = await service
+  const submitResult = await service
     .from("users")
     .update({ bracket_submitted_at: new Date().toISOString() })
     .eq("id", userId)
-  if (lockResult.error) throw new Error(lockResult.error.message)
+  if (submitResult.error) throw new Error(submitResult.error.message)
 
   revalidatePath("/onboarding")
   revalidatePath("/grupo")

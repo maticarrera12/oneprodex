@@ -25,7 +25,7 @@ export function GroupEmpty() {
           type="button"
           whileTap={{ scale: 0.97 }}
           onClick={() => open('create')}
-          className="w-full rounded-xl bg-(--color-lime-hi) py-3 text-sm font-semibold text-black"
+          className="w-full rounded-xl bg-(--color-primary) py-3 text-sm font-semibold text-black"
         >
           Crear grupo
         </motion.button>

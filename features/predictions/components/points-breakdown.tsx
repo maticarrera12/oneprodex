@@ -65,14 +65,14 @@ export function PointsBreakdown({
         {rows.map(({ label, pts }) => (
           <div key={label} className="flex items-center justify-between">
             <p className="text-sm text-(--color-text2)">{label}</p>
-            <p className={`font-mono text-sm font-semibold ${pts > 0 ? 'text-(--color-lime-hi)' : 'text-(--color-text3)'}`}>
+            <p className={`font-mono text-sm font-semibold ${pts > 0 ? 'text-(--color-primary)' : 'text-(--color-text3)'}`}>
               +{pts}
             </p>
           </div>
         ))}
         <div className="border-t border-(--color-border-hi) pt-2 flex items-center justify-between">
           <p className="font-semibold">Total</p>
-          <p className="font-mono text-lg font-semibold text-(--color-lime-hi)">+{total}</p>
+            <p className="font-mono text-lg font-semibold text-(--color-primary)">+{total}</p>
         </div>
       </div>
     </div>

@@ -17,7 +17,7 @@ export function ProfileFormBreakdown({ values }: ProfileFormBreakdownProps) {
               <span
                 className={`w-full min-h-1 rounded-t-sm ${
                   value === 5
-                    ? "bg-linear-to-b from-(--color-lime-hi) to-(--color-lime-deep) shadow-[0_0_8px_rgba(190,242,100,0.35)]"
+                    ? "bg-linear-to-b from-(--color-primary) to-(--color-lime-deep) shadow-[0_0_8px_rgba(190,242,100,0.35)]"
                     : value === 2
                       ? "bg-white/20"
                       : "bg-white/8"
@@ -29,7 +29,7 @@ export function ProfileFormBreakdown({ values }: ProfileFormBreakdownProps) {
           ))}
         </div>
         <div className="grid grid-cols-3 gap-2">
-          <SmallStat n={exact} label="Exact" toneClass="text-(--color-lime-hi)" />
+          <SmallStat n={exact} label="Exact" toneClass="text-(--color-primary)" />
           <SmallStat n={result} label="Result only" toneClass="text-(--color-amber)" />
           <SmallStat n={missed} label="Missed" toneClass="text-(--color-text3)" />
         </div>

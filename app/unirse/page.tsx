@@ -51,7 +51,7 @@ export default async function UnirsePage({ searchParams }: PageProps) {
     <div className="flex flex-col items-center gap-6 py-16 text-center">
       <div className="space-y-1">
         <h1 className="text-lg font-semibold text-foreground">¿Querés unirte al grupo?</h1>
-        <p className="text-2xl font-bold text-(--color-lime-hi)">{group.name}</p>
+        <p className="text-2xl font-bold text-(--color-primary)">{group.name}</p>
         <p className="text-sm text-(--color-text3)">
           {group.members} miembro{group.members !== 1 ? 's' : ''}
         </p>
@@ -59,7 +59,7 @@ export default async function UnirsePage({ searchParams }: PageProps) {
 
       <Link
         href={`/unirse?code=${code}&confirm=1`}
-        className="rounded-xl bg-(--color-lime-hi) px-8 py-3 text-sm font-semibold text-black"
+        className="rounded-xl bg-(--color-primary) px-8 py-3 text-sm font-semibold text-black"
       >
         Unirme al grupo
       </Link>

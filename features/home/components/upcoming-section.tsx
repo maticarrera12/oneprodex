@@ -15,7 +15,7 @@ export function UpcomingSection({ matches, teams }: UpcomingSectionProps) {
         <h2 className="text-sm font-semibold uppercase tracking-[0.04em] text-foreground/85">Predict next</h2>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">{matches.length} partidos</span>
-          <Link href="/matches" className="text-xs font-semibold text-(--color-lime-hi)">
+          <Link href="/matches" className="text-xs font-semibold text-(--color-primary)">
             Ver todo
           </Link>
         </div>

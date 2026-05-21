@@ -14,7 +14,7 @@ export function ProfileIdentity({ user, accentColor }: ProfileIdentityProps) {
       <div className="relative flex items-center gap-4">
         <div className="relative">
           <GroupAvatar name={user.name} color={accentColor} size={84} ring />
-          <span className="absolute -right-1 -bottom-1 rounded-lg bg-(--color-lime-hi) px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider text-black">
+          <span className="absolute -right-1 -bottom-1 rounded-lg bg-(--color-primary) px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider text-black">
             LV {user.level}
           </span>
         </div>
@@ -23,7 +23,7 @@ export function ProfileIdentity({ user, accentColor }: ProfileIdentityProps) {
           <p className="mt-0.5 font-mono text-xs text-(--color-text3)">
             {user.handle} · {user.joinedAt}
           </p>
-          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-(--color-lime-deep) bg-(--color-lime-bg) px-2 py-1 font-mono text-[10px] font-semibold tracking-wider text-(--color-lime-hi) uppercase">
+          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-(--color-lime-deep) bg-(--color-lime-bg) px-2 py-1 font-mono text-[10px] font-semibold tracking-wider text-(--color-primary) uppercase">
             <Flag code={user.championPick} size={14} />
             {user.championPick} champion pick
           </div>

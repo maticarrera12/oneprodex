@@ -13,7 +13,7 @@ export function ProfileHistoryList({ entries }: ProfileHistoryListProps) {
           const isLast = index === entries.length - 1
           const tone =
             entry.kind === "exact"
-              ? "bg-(--color-lime-hi)"
+              ? "bg-(--color-primary)"
               : entry.kind === "result"
                 ? "bg-(--color-amber)"
                 : "bg-(--color-text4)"
@@ -27,7 +27,7 @@ export function ProfileHistoryList({ entries }: ProfileHistoryListProps) {
                   You · {entry.mine} · {entry.kind === "exact" ? "Exact score" : entry.kind === "result" ? "Result only" : "Missed"}
                 </p>
               </div>
-              <p className={`font-mono text-sm font-semibold ${entry.pts > 0 ? "text-(--color-lime-hi)" : "text-(--color-text3)"}`}>
+              <p className={`font-mono text-sm font-semibold ${entry.pts > 0 ? "text-(--color-primary)" : "text-(--color-text3)"}`}>
                 {entry.pts > 0 ? "+" : ""}
                 {entry.pts}
               </p>

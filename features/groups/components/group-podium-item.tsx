@@ -12,7 +12,7 @@ export function GroupPodiumItem({ entry, position, isLeader = false }: GroupPodi
 
   const size = isLeader ? 120 : 82
   const ringColor = isLeader ? "var(--color-lime-mid)" : "rgba(148,148,170,0.55)"
-  const pointsColor = isLeader ? "text-(--color-lime-hi)" : "text-(--color-amber)"
+  const pointsColor = isLeader ? "text-(--color-primary)" : "text-(--color-amber)"
 
   return (
     <div className="flex flex-col items-center gap-1.5">
@@ -31,7 +31,7 @@ export function GroupPodiumItem({ entry, position, isLeader = false }: GroupPodi
         <span
           className={`absolute -bottom-3 inline-flex min-w-10 items-center justify-center rounded-full px-2 py-0.5 font-mono text-2xl font-bold leading-none ${
             isLeader
-              ? "bg-(--color-lime-hi) text-black"
+              ? "bg-(--color-primary) text-black"
               : "bg-(--color-card-hi) text-(--color-text2)"
           }`}
         >

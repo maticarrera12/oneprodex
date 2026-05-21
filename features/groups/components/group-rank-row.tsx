@@ -30,7 +30,7 @@ export function GroupRankRow({ entry, pulse, showBorder }: GroupRankRowProps) {
           className="pointer-events-none absolute inset-0 bg-(--color-lime-bg)"
         />
       ) : null}
-      <span className={`w-6 text-center font-mono text-sm font-semibold ${entry.rank <= 3 ? "text-(--color-lime-hi)" : "text-(--color-text3)"}`}>
+      <span className={`w-6 text-center font-mono text-sm font-semibold ${entry.rank <= 3 ? "text-(--color-primary)" : "text-(--color-text3)"}`}>
         {entry.rank}
       </span>
       <GroupAvatar name={entry.name} color={entry.color} size={36} ring={entry.isYou} />
@@ -45,7 +45,7 @@ export function GroupRankRow({ entry, pulse, showBorder }: GroupRankRowProps) {
       </div>
       <GroupTrend delta={entry.delta} />
       <div className="min-w-10 text-right">
-        <p className={`font-mono text-[17px] font-semibold leading-none ${entry.rank === 1 ? "text-(--color-lime-hi)" : "text-foreground"}`}>
+        <p className={`font-mono text-[17px] font-semibold leading-none ${entry.rank === 1 ? "text-(--color-primary)" : "text-foreground"}`}>
           {entry.pts}
         </p>
         <p className="font-mono text-[9px] uppercase tracking-wider text-(--color-text3)">PTS</p>

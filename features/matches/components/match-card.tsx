@@ -62,7 +62,7 @@ export function MatchCard({ match, teams, index }: MatchCardProps) {
             <span
               className={
                 points?.exact
-                  ? "font-semibold text-(--color-lime-hi)"
+                  ? "font-semibold text-(--color-primary)"
                   : points?.winner
                     ? "font-semibold text-(--color-amber)"
                     : "font-semibold text-(--color-text4)"
@@ -80,7 +80,7 @@ export function MatchCard({ match, teams, index }: MatchCardProps) {
         ) : null}
 
         {match.status === "UPCOMING" && !match.pred ? (
-          <p className="mt-4 text-sm font-semibold text-(--color-lime-hi)">Predecir →</p>
+          <p className="mt-4 text-sm font-semibold text-(--color-primary)">Predecir →</p>
         ) : null}
       </motion.article>
     </Link>

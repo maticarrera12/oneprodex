@@ -39,7 +39,7 @@ export function GroupSwitcher({ groups, activeId, open, onClose }: GroupSwitcher
               onClick={() => navigate(group.id)}
               className={`w-full px-4 py-2.5 text-left text-sm ${
                 isActive
-                  ? 'bg-(--color-lime-bg) font-semibold text-(--color-lime-hi)'
+                  ? 'bg-(--color-lime-bg) font-semibold text-(--color-primary)'
                   : 'text-foreground'
               }`}
             >

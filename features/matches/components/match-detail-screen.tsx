@@ -116,7 +116,7 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
 
           <div className="mb-4 flex justify-center">
             {isLive ? (
-              <span className="rounded-full border border-(--color-lime-deep) bg-(--color-lime-bg) px-3 py-1 font-mono text-xs font-semibold text-(--color-lime-hi)">
+              <span className="rounded-full border border-(--color-lime-deep) bg-(--color-lime-bg) px-3 py-1 font-mono text-xs font-semibold text-(--color-primary)">
                 EN VIVO · {match.minute ?? 0}&apos;
               </span>
             ) : (
@@ -174,7 +174,7 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
             key={tab}
             className={`rounded-full border px-3 py-1.5 text-xs whitespace-nowrap ${
               index === 0
-                ? "border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-lime-hi)"
+                ? "border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-primary)"
                 : "border-(--color-border-hi) bg-(--color-card-hi) text-(--color-text3)"
             }`}
           >
@@ -379,8 +379,8 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
         onClick={() => handleScoreSubmit(draftScore.home, draftScore.away)}
         className={`h-12 w-full rounded-xl font-semibold transition ${
           isLocked
-            ? "border border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-lime-hi)"
-            : "bg-(--color-lime-hi) text-black shadow-[0_8px_22px_rgba(163,230,53,0.35)]"
+            ? "border border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-primary)"
+            : "bg-(--color-primary) text-black shadow-[0_8px_22px_rgba(163,230,53,0.35)]"
         }`}
       >
         {isLocked

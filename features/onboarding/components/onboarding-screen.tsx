@@ -20,37 +20,26 @@ type OnboardingScreenProps = {
   teamsByGroup?: Partial<Record<GroupCode, OnboardingTeam[]>>
 }
 
-const GROUPS: GroupCode[] = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]
-
-function buildFallbackTeams(group: GroupCode): OnboardingTeam[] {
-  return Array.from({ length: 4 }, (_, index) => {
-    const code = `${group}${index + 1}`
-    return {
-      code,
-      name: `Equipo ${code}`,
-      logo: null,
-    }
-  })
-}
+const ALL_GROUPS: GroupCode[] = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]
 
 function normalizeTeamsByGroup(
   source: Partial<Record<GroupCode, OnboardingTeam[]>> | undefined,
-  rankings: OnboardingState["groupRankings"]
+  rankings: OnboardingState["groupRankings"],
+  groups: GroupCode[]
 ): Record<GroupCode, OnboardingTeam[]> {
-  return GROUPS.reduce(
+  return groups.reduce(
     (acc, group) => {
       const existing = source?.[group]
       if (existing && existing.length > 0) {
         acc[group] = existing
         return acc
       }
-
       const fromRanking = (rankings?.[group] ?? []).filter(Boolean).map((code) => ({
         code,
         name: code,
         logo: null,
       }))
-      acc[group] = fromRanking.length > 0 ? fromRanking : buildFallbackTeams(group)
+      acc[group] = fromRanking
       return acc
     },
     {} as Record<GroupCode, OnboardingTeam[]>
@@ -59,11 +48,12 @@ function normalizeTeamsByGroup(
 
 function deriveThirdPlaceTeams(
   groupRankings: OnboardingState["groupRankings"],
-  teamsByGroup: Record<GroupCode, OnboardingTeam[]>
+  teamsByGroup: Record<GroupCode, OnboardingTeam[]>,
+  groups: GroupCode[]
 ): ThirdPlaceTeam[] {
-  return GROUPS.map((group) => {
+  return groups.map((group) => {
     const teamCode = groupRankings?.[group]?.[2] ?? teamsByGroup[group]?.[2]?.code ?? `${group}3`
-    const teamMeta = teamsByGroup[group].find((team) => team.code === teamCode)
+    const teamMeta = teamsByGroup[group]?.find((team) => team.code === teamCode)
     return {
       group_code: group,
       team_code: teamCode,
@@ -75,11 +65,22 @@ function deriveThirdPlaceTeams(
 
 export function OnboardingScreen({ step, savedData, teamsByGroup }: OnboardingScreenProps) {
   const normalizedTeams = useMemo(
-    () => normalizeTeamsByGroup(teamsByGroup, savedData.groupRankings),
+    () => normalizeTeamsByGroup(teamsByGroup, savedData.groupRankings, ALL_GROUPS),
     [savedData.groupRankings, teamsByGroup]
   )
+  const logoByCode = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const group of ALL_GROUPS) {
+      for (const team of normalizedTeams[group]) {
+        if (team.logo) {
+          map.set(team.code.trim().toUpperCase(), team.logo)
+        }
+      }
+    }
+    return map
+  }, [normalizedTeams])
   const thirdPlaceTeams = useMemo(
-    () => deriveThirdPlaceTeams(savedData.groupRankings, normalizedTeams),
+    () => deriveThirdPlaceTeams(savedData.groupRankings, normalizedTeams, ALL_GROUPS),
     [normalizedTeams, savedData.groupRankings]
   )
 
@@ -88,7 +89,7 @@ export function OnboardingScreen({ step, savedData, teamsByGroup }: OnboardingSc
       <ProgressBar currentStep={step} />
 
       {step === 1 ? (
-        <GroupPicksStep teamsByGroup={normalizedTeams} initialRankings={savedData.groupRankings} onContinue={saveGroupPicks} />
+        <GroupPicksStep groups={ALL_GROUPS} teamsByGroup={normalizedTeams} initialRankings={savedData.groupRankings} onContinue={saveGroupPicks} />
       ) : null}
 
       {step === 2 ? (
@@ -100,6 +101,7 @@ export function OnboardingScreen({ step, savedData, teamsByGroup }: OnboardingSc
           groupRankings={savedData.groupRankings}
           bestThirds={savedData.bestThirds ?? []}
           initialPicks={savedData.bracketPicks}
+          logoByCode={logoByCode}
           onContinue={saveBracketPicks}
         />
       ) : null}

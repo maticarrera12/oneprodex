@@ -20,7 +20,7 @@ export function BracketMatchCard({ match, final = false }: BracketMatchCardProps
       <div className="flex items-center justify-between border-b border-(--color-border-hi) px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-(--color-text3)">
         <span>{match.done ? "Final" : match.kickoff ?? "TBD"}</span>
         {match.pen ? <span className="text-(--color-amber)">PEN</span> : null}
-        {!match.done && !empty ? <span className="text-(--color-lime-hi)">abierto</span> : null}
+        {!match.done && !empty ? <span className="text-(--color-primary)">abierto</span> : null}
       </div>
 
       <BracketTeam code={match.a} score={match.sa} pen={match.sap} won={aWon} dimmed={bWon || empty} />
@@ -56,13 +56,13 @@ function BracketTeam({
         <Flag code={code} size={22} />
       )}
 
-      <span className={`flex-1 text-sm font-semibold ${empty ? "text-(--color-text3)" : won ? "text-(--color-lime-hi)" : "text-foreground"}`}>
+      <span className={`flex-1 text-sm font-semibold ${empty ? "text-(--color-text3)" : won ? "text-(--color-primary)" : "text-foreground"}`}>
         {empty ? "TBD" : code}
       </span>
 
       {score !== null ? (
         <span className="inline-flex items-baseline gap-1 font-mono">
-          <span className={`text-base font-semibold ${won ? "text-(--color-lime-hi)" : "text-foreground"}`}>{score}</span>
+          <span className={`text-base font-semibold ${won ? "text-(--color-primary)" : "text-foreground"}`}>{score}</span>
           {pen !== null ? <span className="text-[10px] text-(--color-amber)">({pen})</span> : null}
         </span>
       ) : (

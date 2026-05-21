@@ -13,7 +13,7 @@ export function BracketChampionCard({ champion }: BracketChampionCardProps) {
     <section className="relative overflow-hidden rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-4">
       <span className="pointer-events-none absolute -top-8 -right-8 size-32 rounded-full bg-(--color-lime-mid) opacity-15 blur-3xl" />
       <div className="relative flex items-center gap-3">
-        <span className="inline-flex size-11 items-center justify-center rounded-xl bg-linear-to-br from-(--color-lime-hi) to-(--color-lime-deep)">
+        <span className="inline-flex size-11 items-center justify-center rounded-xl bg-linear-to-br from-(--color-primary) to-(--color-lime-deep)">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
             <path d="M6 4h12v3a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V4Z" stroke="#0A0A0C" strokeWidth="1.6" strokeLinejoin="round" />
             <path d="M6 4H4v2a3 3 0 0 0 2 3M18 4h2v2a3 3 0 0 1-2 3" stroke="#0A0A0C" strokeWidth="1.6" strokeLinejoin="round" />
@@ -21,7 +21,7 @@ export function BracketChampionCard({ champion }: BracketChampionCardProps) {
           </svg>
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[10px] uppercase tracking-wider text-(--color-lime-hi)">Tu campeón</p>
+          <p className="font-mono text-[10px] uppercase tracking-wider text-(--color-primary)">Tu campeón</p>
           <p className="text-lg font-bold">{champion.name}</p>
           <p className="text-sm text-(--color-text2)">{champion.subtitle}</p>
         </div>

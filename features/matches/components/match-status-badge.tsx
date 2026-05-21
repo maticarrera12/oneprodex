@@ -9,7 +9,7 @@ type MatchStatusBadgeProps = {
 export function MatchStatusBadge({ status, minute, kickoff }: MatchStatusBadgeProps) {
   if (status === "LIVE") {
     return (
-      <span className="inline-flex items-center rounded-full border border-(--color-lime-deep) bg-(--color-lime-bg) px-2 py-1 text-xs font-semibold text-(--color-lime-hi)">
+      <span className="inline-flex items-center rounded-full border border-(--color-lime-deep) bg-(--color-lime-bg) px-2 py-1 text-xs font-semibold text-(--color-primary)">
         EN VIVO · {minute ?? 0}&apos;
       </span>
     )

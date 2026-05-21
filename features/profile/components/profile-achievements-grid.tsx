@@ -24,7 +24,7 @@ export function ProfileAchievementsGrid({ achievements }: ProfileAchievementsGri
             <div
               className={`mx-auto mb-2 inline-flex size-9 items-center justify-center rounded-lg ${
                 achievement.got
-                  ? "bg-linear-to-br from-(--color-lime-hi) to-(--color-lime-deep) text-black"
+                  ? "bg-linear-to-br from-(--color-primary) to-(--color-lime-deep) text-black"
                   : "bg-white/7 text-(--color-text3)"
               }`}
             >

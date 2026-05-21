@@ -33,7 +33,7 @@ export function ScorePrediction({
     <>
       <div className="flex items-center justify-between p-4 pb-2">
         <p className="font-mono text-[11px] tracking-wider text-(--color-text3) uppercase">Tu predicción</p>
-        <p className={`font-mono text-[11px] ${isLocked ? 'text-(--color-lime-hi)' : 'text-(--color-amber)'}`}>
+        <p className={`font-mono text-[11px] ${isLocked ? 'text-(--color-primary)' : 'text-(--color-amber)'}`}>
           {isLocked ? 'BLOQUEADA' : 'ABIERTA'}
         </p>
       </div>
@@ -65,7 +65,7 @@ export function ScorePrediction({
               }}
               className={`rounded-lg border px-2.5 py-1.5 font-mono text-xs whitespace-nowrap transition ${
                 selected
-                  ? 'border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-lime-hi)'
+                  ? 'border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-primary)'
                   : 'border-(--color-border-hi) bg-(--color-bg2) text-(--color-text2)'
               } ${isLocked ? 'opacity-60' : ''}`}
             >
@@ -80,7 +80,7 @@ export function ScorePrediction({
           <button
             type="button"
             onClick={() => onSubmit(homeScore, awayScore)}
-            className="h-10 w-full rounded-xl bg-(--color-lime-hi) font-semibold text-black text-sm shadow-[0_8px_22px_rgba(163,230,53,0.35)] transition"
+            className="h-10 w-full rounded-xl bg-(--color-primary) font-semibold text-black text-sm shadow-[0_8px_22px_rgba(163,230,53,0.35)] transition"
           >
             Guardar {homeScore}–{awayScore}
           </button>

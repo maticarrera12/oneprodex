@@ -66,7 +66,7 @@ export default function StandingsScreen({ groups }: StandingsScreenProps) {
                   : "border-transparent bg-transparent"
               }`}
             >
-              <p className={`text-center text-xs font-bold ${active ? "text-(--color-lime-hi)" : "text-foreground"}`}>
+              <p className={`text-center text-xs font-bold ${active ? "text-(--color-primary)" : "text-foreground"}`}>
                 {group.id}
               </p>
             </button>
@@ -119,7 +119,7 @@ export default function StandingsScreen({ groups }: StandingsScreenProps) {
       <section className="rounded-2xl border border-(--color-lime-deep) bg-(--color-lime-bg) p-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-wider text-(--color-lime-hi)">Tus predicciones</p>
+            <p className="font-mono text-[10px] uppercase tracking-wider text-(--color-primary)">Tus predicciones</p>
             <p className="mt-1 text-base font-semibold">{selected.insight.title}</p>
             <p className="mt-1 text-sm text-(--color-text2)">{selected.insight.subtitle}</p>
           </div>
@@ -129,7 +129,7 @@ export default function StandingsScreen({ groups }: StandingsScreenProps) {
               background: `conic-gradient(var(--color-lime-mid) 0% ${selected.insight.pct}%, rgba(255,255,255,0.08) ${selected.insight.pct}% 100%)`,
             }}
           >
-            <span className="inline-flex size-12 items-center justify-center rounded-full bg-background font-mono text-sm font-semibold text-(--color-lime-hi)">
+            <span className="inline-flex size-12 items-center justify-center rounded-full bg-background font-mono text-sm font-semibold text-(--color-primary)">
               {selected.insight.pct}%
             </span>
           </div>
@@ -153,7 +153,7 @@ function FixtureRow({ fixture }: { fixture: GroupFixture }) {
     <div className="flex items-center gap-3 rounded-xl border border-(--color-border-hi) bg-(--color-card-hi) px-3 py-2.5">
       <div className="w-16 font-mono text-[10px] text-(--color-text3)">
         {fixture.status === "LIVE" ? (
-          <span className="inline-flex items-center gap-1 text-(--color-lime-hi)">
+          <span className="inline-flex items-center gap-1 text-(--color-primary)">
             <LiveDot />
             {fixture.minute ?? 0}&apos;
           </span>

@@ -48,7 +48,7 @@ export function StandingsRow({ row, position, index, showBorder }: StandingsRowP
       <span className="text-center font-mono text-xs text-(--color-text2)">{row.g}</span>
       <span className="text-center font-mono text-xs text-(--color-text2)">{row.e}</span>
       <span className="text-center font-mono text-xs text-(--color-text2)">{row.p}</span>
-      <span className={`text-center font-mono text-xs ${row.gd > 0 ? "text-(--color-lime-hi)" : row.gd < 0 ? "text-(--color-amber)" : "text-(--color-text2)"}`}>
+      <span className={`text-center font-mono text-xs ${row.gd > 0 ? "text-(--color-primary)" : row.gd < 0 ? "text-(--color-amber)" : "text-(--color-text2)"}`}>
         {row.gd > 0 ? `+${row.gd}` : row.gd}
       </span>
       <span className="text-center font-mono text-sm font-semibold text-foreground">{row.pts}</span>

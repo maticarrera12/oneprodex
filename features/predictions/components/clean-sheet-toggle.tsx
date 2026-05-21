@@ -37,7 +37,7 @@ export function CleanSheetToggle({
               onClick={() => onToggle(code)}
               className={`rounded-full border px-4 py-1.5 text-sm font-mono transition ${
                 selected
-                  ? 'border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-lime-hi)'
+                  ? 'border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-primary)'
                   : 'border-(--color-border-hi) bg-(--color-bg2) text-(--color-text2)'
               } ${disabled ? 'opacity-60' : ''}`}
             >

@@ -19,11 +19,11 @@ export function BracketScoreCard({ stats }: BracketScoreCardProps) {
                   : "border-(--color-border-hi) bg-white/3"
               }`}
             >
-              <p className={`font-mono text-[10px] uppercase tracking-wider ${stat.hot ? "text-(--color-lime-hi)" : "text-(--color-text3)"}`}>
+              <p className={`font-mono text-[10px] uppercase tracking-wider ${stat.hot ? "text-(--color-primary)" : "text-(--color-text3)"}`}>
                 {stat.label}
               </p>
               <p className="mt-1 font-mono text-[15px] font-semibold tracking-tight text-foreground">{stat.got}</p>
-              <p className={`mt-0.5 font-mono text-xs font-semibold ${stat.hot ? "text-(--color-lime-hi)" : "text-(--color-text3)"}`}>
+              <p className={`mt-0.5 font-mono text-xs font-semibold ${stat.hot ? "text-(--color-primary)" : "text-(--color-text3)"}`}>
                 {stat.pts}
               </p>
             </article>

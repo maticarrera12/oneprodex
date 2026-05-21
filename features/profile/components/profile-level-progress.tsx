@@ -17,13 +17,13 @@ export function ProfileLevelProgress({ user }: ProfileLevelProgressProps) {
           </p>
           <p className="mt-1 text-sm">{missing} pts para Level {user.level + 1} · {user.nextLevelTitle}</p>
         </div>
-        <p className="font-mono text-xs font-semibold text-(--color-lime-hi)">
+        <p className="font-mono text-xs font-semibold text-(--color-primary)">
           {user.levelCurrent} / {user.levelTarget}
         </p>
       </div>
       <div className="h-2 overflow-hidden rounded bg-white/6">
         <div
-          className="h-full rounded bg-linear-to-r from-(--color-lime-deep) to-(--color-lime-hi) shadow-[0_0_10px_rgba(190,242,100,0.4)]"
+          className="h-full rounded bg-linear-to-r from-(--color-lime-deep) to-(--color-primary) shadow-[0_0_10px_rgba(190,242,100,0.4)]"
           style={{ width: `${pct}%` }}
         />
       </div>

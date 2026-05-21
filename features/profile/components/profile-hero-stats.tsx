@@ -20,7 +20,7 @@ export function ProfileHeroStats({ stats }: ProfileHeroStatsProps) {
               </span>
             ) : null}
           </div>
-          {stat.delta ? <p className="mt-0.5 font-mono text-[10px] font-semibold text-(--color-lime-hi)">{stat.delta}</p> : null}
+          {stat.delta ? <p className="mt-0.5 font-mono text-[10px] font-semibold text-(--color-primary)">{stat.delta}</p> : null}
           {stat.sub ? <p className="mt-0.5 font-mono text-[10px] text-(--color-text3)">{stat.sub}</p> : null}
         </article>
       ))}

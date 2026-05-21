@@ -19,7 +19,7 @@ export function GroupYouSticky({ you }: GroupYouStickyProps) {
             </p>
           </div>
           <div className="text-right">
-            <p className="font-mono text-lg font-semibold text-(--color-lime-hi) leading-none">{you.pts}</p>
+            <p className="font-mono text-lg font-semibold text-(--color-primary) leading-none">{you.pts}</p>
             <p className="font-mono text-[10px] text-(--color-text3) uppercase">pts</p>
           </div>
         </div>
