@@ -12,7 +12,7 @@ export function HeroHeader({ matchday, you }: HeroHeaderProps) {
   return (
     <section
       className="-mx-4 mb-4 px-5 py-4"
-      style={{ background: "radial-gradient(120% 110% at 0% 0%, rgba(132,204,22,0.17) 0%, rgba(13,13,18,0) 62%)" }}
+      style={{ background: "radial-gradient(120% 110% at 0% 0%, rgba(132,204,22,0.17) 0%, color-mix(in oklch, var(--background) 0%, transparent) 62%)" }}
     >
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-3">

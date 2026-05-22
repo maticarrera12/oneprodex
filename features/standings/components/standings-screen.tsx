@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import { useMemo, useState } from "react"
 
 import { Flag } from "@/features/home/components/flag"
@@ -23,33 +22,13 @@ export default function StandingsScreen({ groups }: StandingsScreenProps) {
 
   return (
     <div className="space-y-4 py-4 pb-6">
-      <header className="grid grid-cols-[40px_1fr_40px] items-center gap-3">
-        <Link
-          href="/"
-          className="inline-flex size-10 items-center justify-center rounded-xl border border-(--color-border-hi) bg-(--color-card-hi)"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16">
-            <path
-              d="M10 3 5 8l5 5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </Link>
-        <div className="text-center">
-          <h1 className="text-base font-semibold">Fase de grupos</h1>
-          <p className="font-mono text-[10px] text-(--color-text3)">
-            {selected.matchdayLabel} · {selected.played} / {selected.total} jugados
-          </p>
-        </div>
-        <span className="inline-flex size-10 items-center justify-center rounded-xl border border-(--color-border-hi) bg-(--color-card-hi)">
-          <svg width="16" height="16" viewBox="0 0 16 16">
-            <path d="M3 5h10M3 8h10M3 11h6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-        </span>
+      <header>
+        <h2 className="pl-2 text-7xl font-extrabold uppercase tracking-[0.01em] text-foreground/85">
+          GRUPOS{" "}
+          <span className="bg-linear-to-r from-primary via-primary/60 to-black/10 bg-clip-text text-transparent">
+            WC 2026
+          </span>
+        </h2>
       </header>
 
       <div className="scrollbar-none -mx-1 flex gap-2 overflow-x-auto px-1">
@@ -80,8 +59,8 @@ export default function StandingsScreen({ groups }: StandingsScreenProps) {
         <LegendItem colorClass="bg-(--color-text4)" label="Eliminado" />
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi)">
-        <div className="grid grid-cols-[24px_28px_26px_26px_26px_26px_34px_34px_54px] items-center gap-1.5 border-b border-(--color-border-hi) px-3 py-2 font-mono text-[10px] tracking-wider text-(--color-text3) uppercase">
+      <section className="mx-auto w-fit max-w-full overflow-hidden rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi)">
+        <div className="grid grid-cols-[24px_28px_26px_26px_26px_26px_34px_34px] items-center gap-1.5 border-b border-(--color-border-hi) px-3 py-2 font-mono text-[10px] tracking-wider text-(--color-text3) uppercase">
           <span />
           <span />
           <span className="text-center">PJ</span>
@@ -90,7 +69,6 @@ export default function StandingsScreen({ groups }: StandingsScreenProps) {
           <span className="text-center">P</span>
           <span className="text-center">GD</span>
           <span className="text-center">Pts</span>
-          <span className="text-center">Forma</span>
         </div>
         <div>
           {selected.rows.map((row, index) => (
@@ -105,21 +83,10 @@ export default function StandingsScreen({ groups }: StandingsScreenProps) {
         </div>
       </section>
 
-      <section>
-        <h2 className="mb-2 font-mono text-xs uppercase tracking-wider text-(--color-text3)">
-          Fixtures {selected.name}
-        </h2>
-        <div className="space-y-2">
-          {selected.fixtures.map((fixture) => (
-            <FixtureRow key={fixture.id} fixture={fixture} />
-          ))}
-        </div>
-      </section>
-
       <section className="rounded-2xl border border-(--color-lime-deep) bg-(--color-lime-bg) p-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-wider text-(--color-primary)">Tus predicciones</p>
+            <p className="font-mono text-[10px] uppercase tracking-wider text-(--color-primary)">Actividad</p>
             <p className="mt-1 text-base font-semibold">{selected.insight.title}</p>
             <p className="mt-1 text-sm text-(--color-text2)">{selected.insight.subtitle}</p>
           </div>
@@ -134,6 +101,21 @@ export default function StandingsScreen({ groups }: StandingsScreenProps) {
             </span>
           </div>
         </div>
+      </section>
+
+      <section>
+        <h2 className="mb-2 font-mono text-xs uppercase tracking-wider text-(--color-text3)">
+          Partidos · Grupo {selected.id}
+        </h2>
+        {selected.fixtures.length > 0 ? (
+          <div className="space-y-2">
+            {selected.fixtures.map((fixture) => (
+              <FixtureRow key={fixture.id} fixture={fixture} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No hay partidos cargados para este grupo.</p>
+        )}
       </section>
     </div>
   )

@@ -24,7 +24,7 @@ export function StandingsRow({ row, position, index, showBorder }: StandingsRowP
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, delay: index * 0.05, ease: "easeOut" }}
-      className={`relative grid grid-cols-[24px_28px_26px_26px_26px_26px_34px_34px_54px] items-center gap-1.5 px-3 py-2.5 ${
+      className={`relative grid grid-cols-[24px_28px_26px_26px_26px_26px_34px_34px] items-center gap-1.5 px-3 py-2.5 ${
         showBorder ? "border-b border-(--color-border-hi)" : ""
       }`}
     >
@@ -52,22 +52,6 @@ export function StandingsRow({ row, position, index, showBorder }: StandingsRowP
         {row.gd > 0 ? `+${row.gd}` : row.gd}
       </span>
       <span className="text-center font-mono text-sm font-semibold text-foreground">{row.pts}</span>
-      <div className="flex items-center justify-center gap-1">
-        {row.form.map((value, formIndex) => (
-          <span
-            key={`${row.team}-${formIndex}`}
-            className={`inline-flex size-3.5 items-center justify-center rounded-[4px] font-mono text-[8px] font-semibold ${
-              value === "W"
-                ? "bg-(--color-lime-mid) text-black"
-                : value === "D"
-                  ? "bg-(--color-text3) text-black/80"
-                  : "bg-red-400 text-black"
-            }`}
-          >
-            {value}
-          </span>
-        ))}
-      </div>
     </motion.div>
   )
 }

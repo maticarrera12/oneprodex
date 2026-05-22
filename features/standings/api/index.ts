@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type { StandingGroup, StandingQualification, StandingRow } from "@/features/standings/types"
+import { getMatches } from "@/features/matches/api"
+import { formatKickoffParts } from "@/features/matches/utils/kickoff"
+import type { Match } from "@/features/matches/types"
+import type { GroupFixture, StandingGroup, StandingQualification, StandingRow } from "@/features/standings/types"
 import type { Database } from "@/lib/supabase/database.types"
 
 type StandingDbRow = Database["public"]["Tables"]["standings"]["Row"]
@@ -51,14 +54,50 @@ function mapStandingRow(
   }
 }
 
+function mapMatchToGroupFixture(match: Match): GroupFixture {
+  const { date, time } = formatKickoffParts(match.kickoff)
+
+  return {
+    id: match.id,
+    home: match.home,
+    away: match.away,
+    hs: match.hs,
+    as: match.as,
+    status: match.status === "FINISHED" ? "FT" : match.status,
+    minute: match.minute,
+    when: `${date} · ${time}`,
+  }
+}
+
+function normalizeGroupCode(code: string | null | undefined): string {
+  return code?.trim().toUpperCase() ?? ""
+}
+
 export async function getStandingsByGroup(supabase: SupabaseClient<Database>): Promise<StandingGroup[]> {
-  const { data, error } = await supabase
-    .from("standings")
-    .select("*")
-    .order("group_code", { ascending: true })
-    .order("points", { ascending: false })
+  const [{ data, error }, allMatches, matchMetaResult] = await Promise.all([
+    supabase
+      .from("standings")
+      .select("*")
+      .order("group_code", { ascending: true })
+      .order("points", { ascending: false }),
+    getMatches(supabase),
+    supabase.from("matches").select("id, group_code"),
+  ])
 
   if (error || !data || data.length === 0) return []
+
+  const groupCodeByMatchId = new Map(
+    (matchMetaResult.data ?? []).map((row) => [row.id, normalizeGroupCode(row.group_code)] as const)
+  )
+
+  const fixturesByGroup = allMatches.reduce<Record<string, GroupFixture[]>>((acc, match) => {
+    const groupCode = groupCodeByMatchId.get(match.id)
+    if (!groupCode) return acc
+
+    acc[groupCode] = acc[groupCode] ?? []
+    acc[groupCode].push(mapMatchToGroupFixture(match))
+    return acc
+  }, {})
 
   const { data: teams } = await supabase.from("teams").select("api_id,code,logo,name,c1,c2,c3")
   const teamsByCode = new Map((teams ?? []).map((team) => [normalizeTeamCode(team.code), team] as const))
@@ -84,7 +123,7 @@ export async function getStandingsByGroup(supabase: SupabaseClient<Database>): P
     rows: [...rows]
       .sort((a, b) => b.points - a.points)
       .map((row, index) => mapStandingRow(row, index, teamsByCode, teamsByApiId)),
-    fixtures: [],
+    fixtures: fixturesByGroup[groupCode] ?? [],
     insight: {
       title: "Sin actividad reciente",
       subtitle: "Todavía no hay predicciones para mostrar",

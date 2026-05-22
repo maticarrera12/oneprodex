@@ -11,8 +11,8 @@ type UpcomingSectionProps = {
 export function UpcomingSection({ matches, teams }: UpcomingSectionProps) {
   return (
     <section className="space-y-3">
-      <header className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.04em] text-foreground/85">Predict next</h2>
+      <header className="flex items-center justify-between mb-8">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.04em] border-l-4 border-primary pl-2 text-foreground/85">Proximas Predicciones</h2>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">{matches.length} partidos</span>
           <Link href="/matches" className="text-xs font-semibold text-(--color-primary)">

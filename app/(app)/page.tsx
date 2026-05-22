@@ -1,5 +1,4 @@
-import { GroupSection } from "@/features/home/components/group-section"
-import { HeroHeader } from "@/features/home/components/hero-header"
+import { HomeDashboard } from "@/features/home/components/home-dashboard"
 import { LiveSection } from "@/features/home/components/live-section"
 import { MatchdayStats } from "@/features/home/components/matchday-stats"
 import { UpcomingSection } from "@/features/home/components/upcoming-section"
@@ -18,16 +17,16 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
-      <HeroHeader matchday={data?.groupInfo?.matchday ?? "Sin jornada"} you={data?.you} />
+      <HomeDashboard
+        matchday={data?.groupInfo?.matchday ?? "Jornada actual"}
+        group={data?.groupInfo ?? null}
+        you={data?.you}
+        ptsFallback={data?.stats.pts}
+      />
       {data && data.liveMatches.length > 0 ? (
         <LiveSection liveMatches={data.liveMatches} teams={TEAMS} />
       ) : (
         <EmptyState message="No hay partidos en vivo" />
-      )}
-      {data?.groupInfo ? (
-        <GroupSection group={data.groupInfo} top3={data.top3} activity={data.activity} />
-      ) : (
-        <EmptyState message="No pertenecés a ningún grupo" />
       )}
       {data && data.upcomingMatches.length > 0 ? (
         <UpcomingSection matches={data.upcomingMatches} teams={TEAMS} />
