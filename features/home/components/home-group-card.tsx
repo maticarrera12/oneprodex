@@ -7,10 +7,11 @@ import type { RankingEntry } from "@/features/rankings/types"
 
 type HomeGroupCardProps = {
   group: GroupInfo | null
+  allGroups: GroupInfo[]
   you: RankingEntry | undefined
 }
 
-export function HomeGroupCard({ group, you }: HomeGroupCardProps) {
+export function HomeGroupCard({ group, allGroups, you }: HomeGroupCardProps) {
   if (!group) {
     return (
       <article className="flex min-h-[200px] flex-col justify-center rounded-3xl border border-(--color-border-hi) bg-(--color-card-hi) p-5">
@@ -39,20 +40,44 @@ export function HomeGroupCard({ group, you }: HomeGroupCardProps) {
     isYou: true,
   }
 
+  const currentIndex = allGroups.findIndex((g) => g.id === group.id)
+  const prevGroup = allGroups[currentIndex - 1]
+  const nextGroup = allGroups[currentIndex + 1]
+
   return (
     <article className="rounded-3xl border border-(--color-border-hi) bg-(--color-card-hi) p-5">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-primary">Tu grupo</p>
-          <h2 className="mt-1 text-sm font-bold uppercase tracking-[0.06em] text-foreground">
-            Group · {group.name}
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-primary">Tu grupo</p>
+            {allGroups.length > 1 && (
+              <div className="flex items-center gap-1">
+                <Link
+                  href={prevGroup ? `/?group=${prevGroup.id}` : "#"}
+                  aria-disabled={!prevGroup}
+                  className={`inline-flex size-5 items-center justify-center rounded-md text-xs ${prevGroup ? "text-foreground hover:text-primary" : "pointer-events-none text-muted-foreground/30"}`}
+                >
+                  ‹
+                </Link>
+                <Link
+                  href={nextGroup ? `/?group=${nextGroup.id}` : "#"}
+                  aria-disabled={!nextGroup}
+                  className={`inline-flex size-5 items-center justify-center rounded-md text-xs ${nextGroup ? "text-foreground hover:text-primary" : "pointer-events-none text-muted-foreground/30"}`}
+                >
+                  ›
+                </Link>
+              </div>
+            )}
+          </div>
+          <h2 className="mt-1 truncate text-sm font-bold uppercase tracking-[0.06em] text-foreground">
+            {group.name}
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
             {group.members} {group.members === 1 ? "miembro" : "miembros"}
           </p>
         </div>
         <Link
-          href="/grupo"
+          href={`/grupo?group=${group.id}`}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-(--color-border-hi) px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:border-primary/40 hover:text-primary"
         >
           Ver grupo

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { getActiveGroupId, getGroupInfo, getGroupLeaderboard } from "@/features/groups/api"
+import { getActiveGroupId, getGroupInfo, getGroupLeaderboard, getUserGroups } from "@/features/groups/api"
 import type { ActivityItem, GroupInfo } from "@/features/groups/types"
 import { getLiveMatches, getUpcomingMatches } from "@/features/matches/api"
 import type { Match } from "@/features/matches/types"
@@ -13,6 +13,7 @@ export type HomeData = {
   liveMatches: Match[]
   upcomingMatches: Match[]
   groupInfo: GroupInfo | null
+  allGroups: GroupInfo[]
   top3: RankingEntry[]
   you: RankingEntry | undefined
   activity: ActivityItem[]
@@ -96,14 +97,18 @@ async function mergeUpcomingPredictions(
   }))
 }
 
-export async function getHomeData(supabase: SupabaseClient<Database>, userId: string): Promise<HomeData> {
-  const [liveMatches, upcomingBase, groupId, userStats, deltas] = await Promise.all([
+export async function getHomeData(supabase: SupabaseClient<Database>, userId: string, preferredGroupId?: string): Promise<HomeData> {
+  const [liveMatches, upcomingBase, allGroups, userStats, deltas] = await Promise.all([
     getLiveMatches(supabase),
     getUpcomingMatches(supabase),
-    getActiveGroupId(supabase, userId),
+    getUserGroups(supabase, userId),
     getUserStats(supabase, userId),
     getStatDeltas(supabase, userId),
   ])
+
+  const groupId = preferredGroupId && allGroups.some((g) => g.id === preferredGroupId)
+    ? preferredGroupId
+    : allGroups[0]?.id ?? null
   const upcomingMatches = await mergeUpcomingPredictions(supabase, userId, upcomingBase)
 
   if (!groupId) {
@@ -111,6 +116,7 @@ export async function getHomeData(supabase: SupabaseClient<Database>, userId: st
       liveMatches,
       upcomingMatches,
       groupInfo: null,
+      allGroups,
       top3: [],
       you: undefined,
       activity: [],
@@ -131,6 +137,7 @@ export async function getHomeData(supabase: SupabaseClient<Database>, userId: st
     liveMatches,
     upcomingMatches,
     groupInfo,
+    allGroups,
     top3: leaderboard.slice(0, 3),
     you: leaderboard.find((entry) => entry.isYou),
     activity: [],

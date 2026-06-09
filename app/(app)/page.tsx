@@ -8,19 +8,23 @@ import { TEAMS } from "@/features/matches/mock"
 import { EmptyState } from "@/features/shared/components/empty-state"
 import { createClient } from "@/lib/supabase/server"
 
-export default async function HomePage() {
+type PageProps = { searchParams: Promise<{ group?: string }> }
+
+export default async function HomePage({ searchParams }: PageProps) {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const data = user ? await getHomeData(supabase, user.id) : null
+  const { group: preferredGroupId } = await searchParams
+  const data = user ? await getHomeData(supabase, user.id, preferredGroupId) : null
 
   return (
     <div className="space-y-6">
       <HomeDashboard
         matchday={data?.groupInfo?.matchday ?? "Jornada actual"}
         group={data?.groupInfo ?? null}
+        allGroups={data?.allGroups ?? []}
         you={data?.you}
         ptsFallback={data?.stats.pts}
       />
