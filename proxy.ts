@@ -30,7 +30,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const isAuthRoute = pathname === '/login'
   const isOnboardingRoute = pathname === '/onboarding'
-  const isPublicRoute = isAuthRoute || pathname.startsWith('/auth/') || pathname.startsWith('/api/')
+  const isPublicRoute = isAuthRoute || pathname.startsWith('/auth/') || pathname.startsWith('/api/') || pathname.startsWith('/opengraph-image') || pathname.startsWith('/twitter-image')
 
   if (!user && !isPublicRoute) {
     const loginUrl = new URL('/login', request.url)

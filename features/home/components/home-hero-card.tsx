@@ -47,12 +47,13 @@ export function HomeHeroCard({ matchday, weekday }: HomeHeroCardProps) {
       <div className="relative flex h-full min-h-[340px] flex-col md:min-h-[360px] md:flex-row">
         <div className="flex flex-1 flex-col justify-between p-5 md:p-7">
           <div className="flex items-center gap-3">
-            <span
-              className="inline-flex size-9 shrink-0 items-center justify-center rounded-[10px] shadow-[0_6px_20px_rgba(190,242,100,0.35)]"
-              style={{ background: "linear-gradient(135deg, var(--color-primary), var(--color-lime-deep))" }}
-            >
-              <span className="size-3.5 rotate-45 rounded-[3px] bg-background" />
-            </span>
+            <Image
+              src="/oneprodex_fondo.png"
+              alt="OneProdex"
+              width={44}
+              height={44}
+              className="shrink-0 rounded-[10px] shadow-[0_6px_20px_rgba(190,242,100,0.35)]"
+            />
             <div>
               <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
                 {matchday.toUpperCase()}

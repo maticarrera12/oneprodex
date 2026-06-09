@@ -20,9 +20,9 @@ export function HeroHeader({ matchday, you }: HeroHeaderProps) {
           <Image
             src="/oneprodex_fondo.png"
             alt="OneProdex"
-            width={32}
-            height={32}
-            className="rounded-[9px] shadow-[0_6px_18px_rgba(190,242,100,0.35)]"
+            width={44}
+            height={44}
+            className="rounded-xl shadow-[0_6px_18px_rgba(190,242,100,0.35)]"
           />
           <div>
             <p className="text-sm font-semibold text-foreground">Sunday</p>
