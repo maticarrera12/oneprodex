@@ -1,0 +1,35 @@
+name: World Cup Sync
+
+on:
+  schedule:
+    # Every 5 minutes during World Cup 2026 (Jun 11 – Jul 19 UTC)
+    - cron: "*/5 * 11-30 6 *"
+    - cron: "*/5 * 1-19 7 *"
+  workflow_dispatch:
+    inputs:
+      run_events:
+        description: "Force run events scoring"
+        type: boolean
+        default: false
+
+jobs:
+  sync:
+    name: Sync live scores and score predictions
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+
+    steps:
+      - name: Sync live match scores
+        id: live
+        run: |
+          STATUS=$(curl -s -o /tmp/live_response.json -w "%{http_code}" \
+            -X GET "${{ secrets.APP_URL }}/api/sync/live" \
+            -H "Authorization: Bearer ${{ secrets.SYNC_SECRET }}")
+          cat /tmp/live_response.json
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+      - name: Score finished matches and trigger achievements
+        run: |
+          curl -s -f \
+            -X POST "${{ secrets.APP_URL }}/api/sync/events" \
+            -H "Authorization: Bearer ${{ secrets.SYNC_SECRET }}" | cat
