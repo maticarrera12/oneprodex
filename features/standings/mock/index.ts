@@ -14,10 +14,10 @@ export const STANDINGS_GROUPS: StandingGroup[] = [
       { team: "POR", pj: 3, g: 0, e: 0, p: 3, gd: -5, pts: 0, form: ["L", "L", "L"], qualification: "out" },
     ],
     fixtures: [
-      { id: "a-fx-1", home: "ARG", away: "ESP", hs: 2, as: 1, status: "FT", minute: null, when: "Ayer · 21:00" },
-      { id: "a-fx-2", home: "MEX", away: "POR", hs: 1, as: 1, status: "FT", minute: null, when: "Ayer · 18:00" },
-      { id: "a-fx-3", home: "ARG", away: "MEX", hs: 2, as: 1, status: "LIVE", minute: 73, when: "Hoy · 21:00" },
-      { id: "a-fx-4", home: "ESP", away: "POR", hs: null, as: null, status: "UPCOMING", minute: null, when: "Mañana · 21:00" },
+      { id: "a-fx-1", home: "ARG", away: "ESP", hs: 2, as: 1, logoHome: null, logoAway: null, status: "FT", minute: null, when: "Ayer · 21:00" },
+      { id: "a-fx-2", home: "MEX", away: "POR", hs: 1, as: 1, logoHome: null, logoAway: null, status: "FT", minute: null, when: "Ayer · 18:00" },
+      { id: "a-fx-3", home: "ARG", away: "MEX", hs: 2, as: 1, logoHome: null, logoAway: null, status: "LIVE", minute: 73, when: "Hoy · 21:00" },
+      { id: "a-fx-4", home: "ESP", away: "POR", hs: null, as: null, logoHome: null, logoAway: null, status: "UPCOMING", minute: null, when: "Mañana · 21:00" },
     ],
     insight: {
       title: "3 de 4 predicciones correctas",
@@ -38,10 +38,10 @@ export const STANDINGS_GROUPS: StandingGroup[] = [
       { team: "NED", pj: 3, g: 0, e: 1, p: 2, gd: -4, pts: 1, form: ["L", "D", "L"], qualification: "out" },
     ],
     fixtures: [
-      { id: "b-fx-1", home: "FRA", away: "BRA", hs: 0, as: 0, status: "FT", minute: null, when: "Ayer · 18:00" },
-      { id: "b-fx-2", home: "GER", away: "NED", hs: 3, as: 1, status: "FT", minute: null, when: "Anteayer · 16:00" },
-      { id: "b-fx-3", home: "BRA", away: "GER", hs: 1, as: 1, status: "LIVE", minute: 42, when: "Hoy · 18:00" },
-      { id: "b-fx-4", home: "FRA", away: "NED", hs: null, as: null, status: "UPCOMING", minute: null, when: "Mañana · 20:00" },
+      { id: "b-fx-1", home: "FRA", away: "BRA", hs: 0, as: 0, logoHome: null, logoAway: null, status: "FT", minute: null, when: "Ayer · 18:00" },
+      { id: "b-fx-2", home: "GER", away: "NED", hs: 3, as: 1, logoHome: null, logoAway: null, status: "FT", minute: null, when: "Anteayer · 16:00" },
+      { id: "b-fx-3", home: "BRA", away: "GER", hs: 1, as: 1, logoHome: null, logoAway: null, status: "LIVE", minute: 42, when: "Hoy · 18:00" },
+      { id: "b-fx-4", home: "FRA", away: "NED", hs: null, as: null, logoHome: null, logoAway: null, status: "UPCOMING", minute: null, when: "Mañana · 20:00" },
     ],
     insight: {
       title: "2 de 4 predicciones correctas",

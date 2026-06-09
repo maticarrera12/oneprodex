@@ -73,7 +73,12 @@ export async function joinGroup(formData: FormData) {
     .maybeSingle()
 
   if (!existing) {
-    await supabase.from('group_members').insert({ group_id: group.id, user_id: user.id })
+    // invited_by = group owner (the person who created and shared the invite code)
+    await supabase.from('group_members').insert({
+      group_id: group.id,
+      user_id: user.id,
+      invited_by: group.owner_id,
+    })
   }
 
   revalidatePath('/grupo')

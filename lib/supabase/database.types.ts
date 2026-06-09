@@ -39,6 +39,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      achievements: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          type: 'progressive' | 'one_shot'
+          tiers: { bronze: number; silver: number; gold: number } | null
+          points: { bronze?: number; silver?: number; gold?: number; value?: number }
+        }
+        Insert: {
+          id: string
+          name: string
+          description?: string | null
+          type: 'progressive' | 'one_shot'
+          tiers?: { bronze: number; silver: number; gold: number } | null
+          points: { bronze?: number; silver?: number; gold?: number; value?: number }
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          type?: 'progressive' | 'one_shot'
+          tiers?: { bronze: number; silver: number; gold: number } | null
+          points?: { bronze?: number; silver?: number; gold?: number; value?: number }
+        }
+        Relationships: []
+      }
       bracket_picks: {
         Row: {
           points: number | null
@@ -119,16 +146,19 @@ export type Database = {
           group_id: string
           joined_at: string | null
           user_id: string
+          invited_by: string | null
         }
         Insert: {
           group_id: string
           joined_at?: string | null
           user_id: string
+          invited_by?: string | null
         }
         Update: {
           group_id?: string
           joined_at?: string | null
           user_id?: string
+          invited_by?: string | null
         }
         Relationships: [
           {
@@ -492,6 +522,45 @@ export type Database = {
         }
         Relationships: []
       }
+      user_achievements: {
+        Row: {
+          user_id: string
+          achievement_id: string
+          tier: 'bronze' | 'silver' | 'gold' | null
+          earned_at: string
+          progress_json: Record<string, unknown> | null
+        }
+        Insert: {
+          user_id: string
+          achievement_id: string
+          tier?: 'bronze' | 'silver' | 'gold' | null
+          earned_at?: string
+          progress_json?: Record<string, unknown> | null
+        }
+        Update: {
+          user_id?: string
+          achievement_id?: string
+          tier?: 'bronze' | 'silver' | 'gold' | null
+          earned_at?: string
+          progress_json?: Record<string, unknown> | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_achievements_achievement_id_fkey"
+            columns: ["achievement_id"]
+            isOneToOne: false
+            referencedRelation: "achievements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tournament_predictions: {
         Row: {
           best_player_api_id: number | null
@@ -535,6 +604,7 @@ export type Database = {
           display_name: string
           handle: string
           id: string
+          achievement_points: number
         }
         Insert: {
           avatar_url?: string | null
@@ -543,6 +613,7 @@ export type Database = {
           display_name: string
           handle: string
           id: string
+          achievement_points?: number
         }
         Update: {
           avatar_url?: string | null
@@ -551,6 +622,7 @@ export type Database = {
           display_name?: string
           handle?: string
           id?: string
+          achievement_points?: number
         }
         Relationships: []
       }

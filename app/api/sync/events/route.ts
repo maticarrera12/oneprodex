@@ -68,6 +68,20 @@ export async function POST(request: Request) {
       }
     }
 
+    // Fire-and-forget achievements evaluation after scoring loop
+    // Failure must not fail events sync
+    fetch(
+      new URL(
+        '/api/sync/achievements',
+        process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
+      ).toString(),
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.SYNC_SECRET}` },
+        signal: AbortSignal.timeout(10_000),
+      },
+    ).catch(() => {})
+
     return NextResponse.json({ updated, failed }, { status: 200 })
   } catch (error) {
     if (error instanceof APIFootballError) {

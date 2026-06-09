@@ -1,4 +1,4 @@
-const BRACKET_VIEW_TABS = ["Mis picks", "Actual", "Comparar"] as const
+const BRACKET_VIEW_TABS = ["Mis picks", "Actual"] as const
 
 export type BracketViewTab = (typeof BRACKET_VIEW_TABS)[number]
 

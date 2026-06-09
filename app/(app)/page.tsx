@@ -1,4 +1,5 @@
 import { HomeDashboard } from "@/features/home/components/home-dashboard"
+import { LivePoller } from "@/features/home/components/live-poller"
 import { LiveSection } from "@/features/home/components/live-section"
 import { MatchdayStats } from "@/features/home/components/matchday-stats"
 import { UpcomingSection } from "@/features/home/components/upcoming-section"
@@ -24,7 +25,10 @@ export default async function HomePage() {
         ptsFallback={data?.stats.pts}
       />
       {data && data.liveMatches.length > 0 ? (
-        <LiveSection liveMatches={data.liveMatches} teams={TEAMS} />
+        <>
+          <LivePoller />
+          <LiveSection liveMatches={data.liveMatches} teams={TEAMS} />
+        </>
       ) : (
         <EmptyState message="No hay partidos en vivo" />
       )}

@@ -1,3 +1,4 @@
+import Image from "next/image"
 import Link from "next/link"
 
 import { Trend } from "@/features/home/components/trend"
@@ -16,12 +17,13 @@ export function HeroHeader({ matchday, you }: HeroHeaderProps) {
     >
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span
-            className="inline-flex size-8 items-center justify-center rounded-[9px] shadow-[0_6px_18px_rgba(190,242,100,0.35)]"
-            style={{ background: "linear-gradient(135deg, var(--color-primary), var(--color-lime-deep))" }}
-          >
-            <span className="size-3.5 rotate-45 rounded-[3px] bg-background" />
-          </span>
+          <Image
+            src="/oneprodex_fondo.png"
+            alt="OneProdex"
+            width={32}
+            height={32}
+            className="rounded-[9px] shadow-[0_6px_18px_rgba(190,242,100,0.35)]"
+          />
           <div>
             <p className="text-sm font-semibold text-foreground">Sunday</p>
             <p className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-muted-foreground">{matchday}</p>

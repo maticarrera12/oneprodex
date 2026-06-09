@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { usePathname } from "next/navigation"
@@ -31,16 +32,16 @@ export function TopNav() {
       aria-label="Navegacion principal desktop"
     >
       <div className="mx-auto flex w-full max-w-[1080px] items-center justify-between px-6 py-3">
-        <div className="flex items-center gap-2">
-          <svg
-            viewBox="0 0 24 24"
-            className="size-5 fill-primary"
-            aria-hidden="true"
-          >
-            <path d="M6 3h12l6 9-6 9H6L0 12z" />
-          </svg>
+        <Link href="/" className="flex items-center gap-2.5">
+          <Image
+            src="/oneprodex_fondo.png"
+            alt="OneProdex"
+            width={32}
+            height={32}
+            className="rounded-lg"
+          />
           <span className="font-semibold tracking-wide">OneProdex</span>
-        </div>
+        </Link>
 
         <div className="flex items-center gap-6">
           {navItems.map(({ href, label }) => {

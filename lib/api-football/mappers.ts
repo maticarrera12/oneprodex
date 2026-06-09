@@ -95,13 +95,14 @@ export function mapStanding(standing: AFStanding): StandingRow {
 }
 
 export function mapPlayer(player: AFSquadPlayer, teamCode: string): PlayerRow {
+  const dob = player.date_of_birth ?? (player.age ? `${new Date().getFullYear() - player.age}-07-01` : null)
   return {
     api_id: player.id,
     name: player.name,
     team_code: teamCode,
     position: player.position,
     photo_url: player.photo,
-    date_of_birth: player.date_of_birth,
+    date_of_birth: dob,
   }
 }
 

@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion"
 
+import { TeamLogo } from "@/features/shared/components/team-logo"
 import type { StandingRow as StandingRowType } from "@/features/standings/types"
 
 type StandingsRowProps = {
@@ -19,39 +20,41 @@ export function StandingsRow({ row, position, index, showBorder }: StandingsRowP
         ? "bg-(--color-amber)"
         : "bg-(--color-text4)"
 
+  const teamLabel = row.teamName ?? row.team
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, delay: index * 0.05, ease: "easeOut" }}
-      className={`relative grid grid-cols-[24px_28px_26px_26px_26px_26px_34px_34px] items-center gap-1.5 px-3 py-2.5 ${
+      className={`relative grid grid-cols-[28px_minmax(0,1fr)_repeat(6,32px)] items-center gap-x-2 px-3 py-3 ${
         showBorder ? "border-b border-(--color-border-hi)" : ""
       }`}
     >
-      <span className={`absolute top-1.5 bottom-1.5 left-0 w-1 rounded-r-sm ${markerClass}`} />
-      <span className="pl-1 font-mono text-xs text-(--color-text3)">{position}</span>
-      <div className="flex items-center justify-center">
-        {row.logo ? (
-          <img
-            src={row.logo}
-            alt={row.team}
-            className="size-[22px] rounded-full border border-white/20 object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.2)]"
-            onError={(event) => {
-              event.currentTarget.style.display = "none"
-            }}
-          />
-        ) : (
-          <span className="inline-flex size-[22px]" />
-        )}
+      <span className={`absolute top-2 bottom-2 left-0 w-1 rounded-r-sm ${markerClass}`} />
+      <span className="pl-1 text-center font-mono text-xs text-(--color-text3)">{position}</span>
+
+      <div className="flex min-w-0 items-center gap-2">
+        <TeamLogo code={row.team} logo={row.logo} size={24} />
+        <span className="truncate text-sm font-semibold text-foreground">{teamLabel}</span>
       </div>
+
       <span className="text-center font-mono text-xs text-(--color-text2)">{row.pj}</span>
       <span className="text-center font-mono text-xs text-(--color-text2)">{row.g}</span>
       <span className="text-center font-mono text-xs text-(--color-text2)">{row.e}</span>
       <span className="text-center font-mono text-xs text-(--color-text2)">{row.p}</span>
-      <span className={`text-center font-mono text-xs ${row.gd > 0 ? "text-(--color-primary)" : row.gd < 0 ? "text-(--color-amber)" : "text-(--color-text2)"}`}>
+      <span
+        className={`text-center font-mono text-xs ${
+          row.gd > 0 ? "text-(--color-primary)" : row.gd < 0 ? "text-red-400" : "text-(--color-text2)"
+        }`}
+      >
         {row.gd > 0 ? `+${row.gd}` : row.gd}
       </span>
-      <span className="text-center font-mono text-sm font-semibold text-foreground">{row.pts}</span>
+      <span className="flex justify-center">
+        <span className="inline-flex size-8 items-center justify-center rounded-full bg-background font-mono text-sm font-semibold text-foreground ring-1 ring-(--color-border-hi)">
+          {row.pts}
+        </span>
+      </span>
     </motion.div>
   )
 }

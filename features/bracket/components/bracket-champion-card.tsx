@@ -1,9 +1,10 @@
-import { Flag } from "@/features/home/components/flag"
+import { TeamLogo } from "@/features/shared/components/team-logo"
 
 type BracketChampionCardProps = {
   champion: {
     code: string
     name: string
+    logo: string | null
     subtitle: string
   }
 }
@@ -25,7 +26,7 @@ export function BracketChampionCard({ champion }: BracketChampionCardProps) {
           <p className="text-lg font-bold">{champion.name}</p>
           <p className="text-sm text-(--color-text2)">{champion.subtitle}</p>
         </div>
-        <Flag code={champion.code} size={44} />
+        <TeamLogo code={champion.code} logo={champion.logo} size={44} />
       </div>
     </section>
   )

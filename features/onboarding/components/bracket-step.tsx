@@ -150,10 +150,6 @@ export function BracketStep({ groupRankings, bestThirds, initialPicks, logoByCod
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const matchesByRound = useMemo(() => buildMatches(picks, groupRankings, bestThirds), [bestThirds, groupRankings, picks])
-  const bracketHeight = useMemo(() => {
-    const maxMatches = Math.max(...ROUND_CONFIG.map((round) => matchesByRound.get(round.id)?.length ?? 0), 1)
-    return maxMatches * 122
-  }, [matchesByRound])
 
   function setWinner(slot: SlotId, winner: string) {
     setPicks((current) => {
@@ -181,6 +177,75 @@ export function BracketStep({ groupRankings, bestThirds, initialPicks, logoByCod
     })
   }
 
+  const mainRoundConfigs = ROUND_CONFIG.filter((r) => r.id !== "THIRD" && r.id !== "FINAL")
+  const thirdConfig = ROUND_CONFIG.find((r) => r.id === "THIRD")!
+  const finalConfig = ROUND_CONFIG.find((r) => r.id === "FINAL")!
+  const halfBracketHeight = 8 * 122
+
+  function renderMatchCard(match: Match) {
+    const winner = picks.get(match.slot)
+    const isLockedByUpstream = match.left === "---" || match.right === "---"
+    return (
+      <article key={match.slot} className="rounded-lg border border-(--color-border-hi) bg-background p-2">
+        <p className="mb-1 font-mono text-[10px] tracking-wide text-(--color-text3)">{match.slot}</p>
+        <div className="space-y-1.5">
+          {[match.left, match.right].map((teamCode, teamIndex) => (
+            <button
+              key={`${match.slot}-${teamIndex}-${teamCode}`}
+              type="button"
+              disabled={teamCode === "---"}
+              onClick={() => setWinner(match.slot, teamCode)}
+              className={cn(
+                "flex w-full items-center justify-between rounded-md border px-2 py-1.5 text-xs font-medium transition",
+                winner === teamCode
+                  ? "border-primary/50 bg-primary/15 text-primary"
+                  : "border-(--color-border-hi) bg-(--color-card-hi) text-foreground",
+                teamCode === "---" && "cursor-not-allowed opacity-45"
+              )}
+            >
+              <span className="flex items-center gap-1.5">
+                {teamCode !== "---" ? (
+                  logoByCode.get(teamCode.trim().toUpperCase()) ? (
+                    <img
+                      src={logoByCode.get(teamCode.trim().toUpperCase())}
+                      alt={teamCode}
+                      className="size-4 rounded-full border border-white/20 object-cover"
+                      onError={(event) => { event.currentTarget.style.display = "none" }}
+                    />
+                  ) : (
+                    <Flag code={teamCode} size={16} />
+                  )
+                ) : (
+                  <span className="inline-flex size-4" />
+                )}
+                <span>{teamCode}</span>
+              </span>
+              {winner === teamCode ? <span className="text-[10px]">✓</span> : null}
+            </button>
+          ))}
+        </div>
+        {isLockedByUpstream ? (
+          <p className="mt-1 text-[10px] text-(--color-text4)">Completá cruces previos</p>
+        ) : null}
+      </article>
+    )
+  }
+
+  function renderHalfColumn(round: RoundConfig, halfMatches: Match[], key: string) {
+    const picked = halfMatches.filter((m) => picks.has(m.slot)).length
+    return (
+      <div key={key} className="w-[220px] shrink-0 rounded-xl border border-(--color-border-hi) bg-(--color-bg2) p-2">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs font-semibold text-(--color-text2)">{round.title}</p>
+          <span className="font-mono text-[10px] text-(--color-text3)">{picked}/{halfMatches.length}</span>
+        </div>
+        <div className="flex flex-col justify-around gap-2" style={{ minHeight: halfBracketHeight }}>
+          {halfMatches.map(renderMatchCard)}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <section className="space-y-3 rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-3">
       <div className="flex items-center justify-between">
@@ -195,70 +260,41 @@ export function BracketStep({ groupRankings, bestThirds, initialPicks, logoByCod
 
       <div className="scrollbar-none -mx-3 overflow-x-auto px-3">
         <div className="flex min-w-max items-start gap-3 pr-1">
-          {ROUND_CONFIG.map((round) => {
-            const matches = matchesByRound.get(round.id) ?? []
+          {/* Left side: R32→SF */}
+          {mainRoundConfigs.map((round) => {
+            const all = matchesByRound.get(round.id) ?? []
+            return renderHalfColumn(round, all.slice(0, Math.ceil(all.length / 2)), `left-${round.id}`)
+          })}
+
+          {/* Center: Final + Third place */}
+          {(() => {
+            const finalMatches = matchesByRound.get(finalConfig.id) ?? []
+            const thirdMatches = matchesByRound.get(thirdConfig.id) ?? []
             return (
-              <div key={round.id} className="w-[220px] shrink-0 rounded-xl border border-(--color-border-hi) bg-(--color-bg2) p-2">
+              <div className="w-[220px] shrink-0 rounded-xl border border-(--color-border-hi) bg-(--color-bg2) p-2">
                 <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs font-semibold text-(--color-text2)">{round.title}</p>
+                  <p className="text-xs font-semibold text-(--color-text2)">{finalConfig.title}</p>
                   <span className="font-mono text-[10px] text-(--color-text3)">
-                    {matches.filter((match) => picks.has(match.slot)).length}/{matches.length}
+                    {finalMatches.filter((m) => picks.has(m.slot)).length}/{finalMatches.length}
                   </span>
                 </div>
-                <div className="flex flex-col justify-around gap-2" style={{ minHeight: bracketHeight }}>
-                  {matches.map((match) => {
-                    const winner = picks.get(match.slot)
-                    const isLockedByUpstream = match.left === "---" || match.right === "---"
-                    return (
-                      <article key={match.slot} className="rounded-lg border border-(--color-border-hi) bg-background p-2">
-                        <p className="mb-1 font-mono text-[10px] tracking-wide text-(--color-text3)">{match.slot}</p>
-                        <div className="space-y-1.5">
-                          {[match.left, match.right].map((teamCode, teamIndex) => (
-                            <button
-                              key={`${match.slot}-${teamIndex}-${teamCode}`}
-                              type="button"
-                              disabled={teamCode === "---"}
-                              onClick={() => setWinner(match.slot, teamCode)}
-                              className={cn(
-                                "flex w-full items-center justify-between rounded-md border px-2 py-1.5 text-xs font-medium transition",
-                                winner === teamCode
-                                  ? "border-primary/50 bg-primary/15 text-primary"
-                                  : "border-(--color-border-hi) bg-(--color-card-hi) text-foreground",
-                                teamCode === "---" && "cursor-not-allowed opacity-45"
-                              )}
-                            >
-                              <span className="flex items-center gap-1.5">
-                                {teamCode !== "---" ? (
-                                  logoByCode.get(teamCode.trim().toUpperCase()) ? (
-                                    <img
-                                      src={logoByCode.get(teamCode.trim().toUpperCase())}
-                                      alt={teamCode}
-                                      className="size-4 rounded-full border border-white/20 object-cover"
-                                      onError={(event) => {
-                                        event.currentTarget.style.display = "none"
-                                      }}
-                                    />
-                                  ) : (
-                                    <Flag code={teamCode} size={16} />
-                                  )
-                                ) : (
-                                  <span className="inline-flex size-4" />
-                                )}
-                                <span>{teamCode}</span>
-                              </span>
-                              {winner === teamCode ? <span className="text-[10px]">✓</span> : null}
-                            </button>
-                          ))}
-                        </div>
-                        {isLockedByUpstream ? (
-                          <p className="mt-1 text-[10px] text-(--color-text4)">Completá cruces previos</p>
-                        ) : null}
-                      </article>
-                    )
-                  })}
+                <div className="flex flex-col gap-4" style={{ minHeight: halfBracketHeight }}>
+                  <div className="flex flex-1 flex-col justify-center gap-2">
+                    {finalMatches.map(renderMatchCard)}
+                  </div>
+                  <div>
+                    <p className="mb-2 text-xs font-semibold text-(--color-text2)">{thirdConfig.title}</p>
+                    {thirdMatches.map(renderMatchCard)}
+                  </div>
                 </div>
               </div>
             )
+          })()}
+
+          {/* Right side: SF→R32 (reversed) */}
+          {[...mainRoundConfigs].reverse().map((round) => {
+            const all = matchesByRound.get(round.id) ?? []
+            return renderHalfColumn(round, all.slice(Math.ceil(all.length / 2)), `right-${round.id}`)
           })}
         </div>
       </div>

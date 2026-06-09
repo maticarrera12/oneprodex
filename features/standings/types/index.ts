@@ -23,6 +23,8 @@ export interface GroupFixture {
   id: string
   home: string
   away: string
+  logoHome: string | null
+  logoAway: string | null
   hs: number | null
   as: number | null
   status: "LIVE" | "FT" | "UPCOMING"

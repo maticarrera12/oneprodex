@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { GroupHeader } from '@/features/groups/components/group-header'
-import { GroupLeaderboardTabs, type LeaderboardTab } from '@/features/groups/components/group-leaderboard-tabs'
 import { GroupModal } from '@/features/groups/components/group-modal'
 import { GroupPodiumHero } from '@/features/groups/components/group-podium-hero'
 import { GroupRankList } from '@/features/groups/components/group-rank-list'
@@ -17,7 +16,6 @@ type GroupLeaderboardScreenProps = {
 }
 
 export function GroupLeaderboardScreen({ group, leaderboard, groups }: GroupLeaderboardScreenProps) {
-  const [tab, setTab] = useState<LeaderboardTab>('Esta semana')
   const [pulseHandle, setPulseHandle] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
@@ -47,8 +45,7 @@ export function GroupLeaderboardScreen({ group, leaderboard, groups }: GroupLead
           groups={groups}
           activeId={group.id}
         />
-        <GroupPodiumHero podium={podium} />
-        <GroupLeaderboardTabs active={tab} onChange={setTab} />
+        <GroupPodiumHero podium={podium} you={you} totalMembers={group.members} />
         <GroupRankList leaderboard={leaderboard} pulseHandle={pulseHandle} />
 
         {you ? <GroupYouSticky you={you} /> : null}

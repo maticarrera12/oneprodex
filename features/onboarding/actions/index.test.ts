@@ -118,7 +118,7 @@ describe("onboarding actions", () => {
       const incomplete = buildGroupPicksPayload().slice(0, 47)
       mocks.createServiceClient.mockReturnValue({ from: vi.fn() })
 
-      await expect(saveGroupPicks(buildFormData("picks", incomplete))).rejects.toThrow("Expected 48 group picks")
+      await expect(saveGroupPicks(buildFormData("picks", incomplete))).rejects.toThrow("Each group must have exactly 4 picks")
     })
 
     it("rejects duplicate team inside same group", async () => {

@@ -2,6 +2,8 @@ export interface BracketMatch {
   id: string
   a: string
   b: string
+  logoA: string | null
+  logoB: string | null
   sa: number | null
   sb: number | null
   done: boolean

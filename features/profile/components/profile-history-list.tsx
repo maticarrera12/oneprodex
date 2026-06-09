@@ -1,40 +1,169 @@
-import type { ProfileHistoryEntry } from "@/features/profile/types"
+"use client"
+
+import { useState } from "react"
+import { Flag } from "@/features/home/components/flag"
+import type { ProfileHistoryEntry, ProfileHistoryPhase } from "@/features/profile/types"
 
 type ProfileHistoryListProps = {
   entries: ProfileHistoryEntry[]
 }
 
+type TabId = "todas" | ProfileHistoryPhase
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: "todas", label: "Todas" },
+  { id: "grupos", label: "Fase de Grupos" },
+  { id: "octavos", label: "Octavos" },
+  { id: "cuartos", label: "Cuartos" },
+  { id: "semis", label: "Semifinales" },
+  { id: "final", label: "Final" },
+]
+
 export function ProfileHistoryList({ entries }: ProfileHistoryListProps) {
+  const [activeTab, setActiveTab] = useState<TabId>("todas")
+
+  const exact = entries.filter((e) => e.kind === "exact").length
+  const result = entries.filter((e) => e.kind === "result").length
+  const missed = entries.filter((e) => e.kind === "miss").length
+
+  const filtered = activeTab === "todas" ? entries : entries.filter((e) => e.phase === activeTab)
+
   return (
     <section>
-      <h2 className="mb-2 text-xs font-semibold tracking-wider text-(--color-text2) uppercase">Recent predictions</h2>
-      <div className="overflow-hidden rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi)">
-        {entries.map((entry, index) => {
-          const isLast = index === entries.length - 1
-          const tone =
-            entry.kind === "exact"
-              ? "bg-(--color-primary)"
-              : entry.kind === "result"
-                ? "bg-(--color-amber)"
-                : "bg-(--color-text4)"
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <h2 className="text-xs font-semibold tracking-wider text-(--color-text2) uppercase">
+          Predicciones Realizadas
+        </h2>
+        <div className="flex items-center gap-2 text-[10px] font-mono shrink-0">
+          <span className="flex items-center gap-1">
+            <span className="size-2 rounded-full bg-(--color-primary)" />
+            <span className="text-(--color-text3)">Exactos {exact}</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="size-2 rounded-full bg-(--color-amber)" />
+            <span className="text-(--color-text3)">Solo Resultado {result}</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="size-2 rounded-full bg-white/20" />
+            <span className="text-(--color-text3)">Fallados {missed}</span>
+          </span>
+        </div>
+      </div>
 
-          return (
-            <article key={`${entry.match}-${index}`} className={`flex items-center gap-3 px-3.5 py-3 ${isLast ? "" : "border-b border-(--color-border-hi)"}`}>
-              <span className={`h-7 w-1 rounded-full ${tone} ${entry.kind === "miss" ? "opacity-50" : ""}`} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-mono text-sm font-semibold">{entry.match}</p>
-                <p className="mt-0.5 font-mono text-[11px] text-(--color-text3)">
-                  You · {entry.mine} · {entry.kind === "exact" ? "Exact score" : entry.kind === "result" ? "Result only" : "Missed"}
-                </p>
-              </div>
-              <p className={`font-mono text-sm font-semibold ${entry.pts > 0 ? "text-(--color-primary)" : "text-(--color-text3)"}`}>
-                {entry.pts > 0 ? "+" : ""}
-                {entry.pts}
-              </p>
-            </article>
-          )
-        })}
+      <div className="mb-3 flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`shrink-0 rounded-full px-3 py-1 font-mono text-[10px] font-semibold tracking-wide uppercase transition-colors ${
+              activeTab === tab.id
+                ? "bg-(--color-primary) text-black"
+                : "border border-(--color-border-hi) bg-(--color-card-hi) text-(--color-text3)"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi)">
+        <div className="grid grid-cols-[40px_1fr_72px_52px_36px_32px] items-center gap-2 border-b border-(--color-border-hi) px-3 py-2">
+          <span className="font-mono text-[9px] tracking-wider text-(--color-text4) uppercase">Fecha</span>
+          <span className="font-mono text-[9px] tracking-wider text-(--color-text4) uppercase">Partido</span>
+          <span className="font-mono text-[9px] tracking-wider text-(--color-text4) uppercase text-center">Tu pred.</span>
+          <span className="font-mono text-[9px] tracking-wider text-(--color-text4) uppercase text-center">Result.</span>
+          <span className="font-mono text-[9px] tracking-wider text-(--color-text4) uppercase text-center">Pts</span>
+          <span />
+        </div>
+
+        {filtered.map((entry, index) => (
+          <HistoryRow key={`${entry.date}-${index}`} entry={entry} isLast={index === filtered.length - 1} />
+        ))}
+
+        {filtered.length === 0 && (
+          <p className="px-4 py-6 text-center font-mono text-xs text-(--color-text4)">Sin predicciones en esta fase</p>
+        )}
+      </div>
+
+      <div className="mt-3 flex justify-center">
+        <button
+          type="button"
+          className="rounded-xl border border-(--color-border-hi) bg-(--color-card-hi) px-4 py-2.5 font-mono text-xs font-semibold text-(--color-text2) tracking-wide"
+        >
+          Ver todas mis predicciones →
+        </button>
       </div>
     </section>
+  )
+}
+
+function HistoryRow({ entry, isLast }: { entry: ProfileHistoryEntry; isLast: boolean }) {
+  const predPillClass =
+    entry.kind === "exact"
+      ? "border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-primary)"
+      : entry.kind === "result"
+        ? "border-(--color-amber)/40 bg-(--color-amber)/10 text-(--color-amber)"
+        : "border-white/10 bg-white/6 text-(--color-text3)"
+
+  const ptsClass =
+    entry.pts >= 3
+      ? "text-(--color-primary)"
+      : entry.pts > 0
+        ? "text-(--color-amber)"
+        : "text-(--color-text4)"
+
+  return (
+    <article className={`grid grid-cols-[40px_1fr_72px_52px_36px_32px] items-center gap-2 px-3 py-2.5 ${isLast ? "" : "border-b border-(--color-border-hi)"}`}>
+      <span className="font-mono text-[10px] text-(--color-text4)">{entry.date}</span>
+
+      <div className="flex min-w-0 items-center gap-1">
+        <Flag code={entry.homeFlag} size={14} />
+        <span className="font-mono text-[10px] text-(--color-text3) truncate">{entry.homeTeam}</span>
+        <span className="font-mono text-[9px] text-(--color-text4) shrink-0">vs</span>
+        <Flag code={entry.awayFlag} size={14} />
+        <span className="font-mono text-[10px] text-(--color-text3) truncate">{entry.awayTeam}</span>
+      </div>
+
+      <span className={`inline-flex justify-center rounded-full border px-2 py-0.5 font-mono text-[10px] font-semibold ${predPillClass}`}>
+        {entry.myPrediction}
+      </span>
+
+      <span className="text-center font-mono text-[10px] text-(--color-text2)">{entry.result}</span>
+
+      <span className={`text-center font-mono text-[11px] font-semibold ${ptsClass}`}>
+        {entry.pts > 0 ? "+" : ""}{entry.pts}
+      </span>
+
+      <KindIcon kind={entry.kind} />
+    </article>
+  )
+}
+
+function KindIcon({ kind }: { kind: ProfileHistoryEntry["kind"] }) {
+  if (kind === "exact") {
+    return (
+      <span className="inline-flex size-6 items-center justify-center rounded-full bg-(--color-lime-bg) text-(--color-primary)">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+    )
+  }
+  if (kind === "result") {
+    return (
+      <span className="inline-flex size-6 items-center justify-center rounded-full bg-(--color-amber)/10 text-(--color-amber)">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M3 6h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex size-6 items-center justify-center rounded-full bg-white/6 text-(--color-text4)">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    </span>
   )
 }

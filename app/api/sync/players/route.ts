@@ -32,27 +32,40 @@ export async function POST(request: Request) {
 
     const teams = (teamsData ?? []).filter((t) => t.api_id !== null) as { api_id: number; code: string }[]
 
-    const results = await Promise.allSettled(
-      teams.map(async (team) => {
-        const { data } = await fetchSquad(team.api_id)
-        const players = data.response.flatMap((item) =>
-          item.players.map((p) => mapPlayer(p, team.code))
-        )
-        if (players.length === 0) return 0
-        const { error } = await supabase
-          .from('players')
-          .upsert(players, { onConflict: 'api_id', ignoreDuplicates: false })
-        if (error) throw new Error(error.message)
-        return players.length
-      })
-    )
+    const BATCH_SIZE = 6
+    const BATCH_DELAY_MS = 1200
+
+    const results: PromiseSettledResult<number>[] = []
+    for (let i = 0; i < teams.length; i += BATCH_SIZE) {
+      const batch = teams.slice(i, i + BATCH_SIZE)
+      const batchResults = await Promise.allSettled(
+        batch.map(async (team) => {
+          const { data } = await fetchSquad(team.api_id)
+          const players = data.response.flatMap((item) =>
+            item.players.map((p) => mapPlayer(p, team.code))
+          )
+          if (players.length === 0) return 0
+          const { error } = await supabase
+            .from('players')
+            .upsert(players, { onConflict: 'api_id', ignoreDuplicates: false })
+          if (error) throw new Error(error.message)
+          return players.length
+        })
+      )
+      results.push(...batchResults)
+      if (i + BATCH_SIZE < teams.length) {
+        await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY_MS))
+      }
+    }
 
     const updated = results
       .filter((r): r is PromiseFulfilledResult<number> => r.status === 'fulfilled')
       .reduce((sum, r) => sum + r.value, 0)
-    const failed = results.filter((r) => r.status === 'rejected').length
+    const errors = results
+      .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+      .map((r) => String(r.reason))
 
-    return NextResponse.json({ updated, failed }, { status: failed > 0 ? 500 : 200 })
+    return NextResponse.json({ updated, failed: errors.length, errors }, { status: errors.length > 0 ? 500 : 200 })
   } catch (error) {
     if (error instanceof APIFootballError) {
       return NextResponse.json({ error: error.detail }, { status: error.status })

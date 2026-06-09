@@ -1,4 +1,4 @@
-import { Flag } from "@/features/home/components/flag"
+import { TeamLogo } from "@/features/shared/components/team-logo"
 import type { BracketMatch } from "@/features/bracket/types"
 
 type BracketMatchCardProps = {
@@ -23,21 +23,23 @@ export function BracketMatchCard({ match, final = false }: BracketMatchCardProps
         {!match.done && !empty ? <span className="text-(--color-primary)">abierto</span> : null}
       </div>
 
-      <BracketTeam code={match.a} score={match.sa} pen={match.sap} won={aWon} dimmed={bWon || empty} />
+      <BracketTeam code={match.a} logo={match.logoA} score={match.sa} pen={match.sap} won={aWon} dimmed={bWon || empty} />
       <div className="h-px bg-(--color-border-hi)" />
-      <BracketTeam code={match.b} score={match.sb} pen={match.sbp} won={bWon} dimmed={aWon || empty} />
+      <BracketTeam code={match.b} logo={match.logoB} score={match.sb} pen={match.sbp} won={bWon} dimmed={aWon || empty} />
     </article>
   )
 }
 
 function BracketTeam({
   code,
+  logo,
   score,
   pen,
   won,
   dimmed,
 }: {
   code: string
+  logo: string | null
   score: number | null
   pen: number | null
   won: boolean
@@ -53,7 +55,7 @@ function BracketTeam({
       {empty ? (
         <span className="inline-flex size-[22px] rounded-full border border-dashed border-(--color-border-hi)" />
       ) : (
-        <Flag code={code} size={22} />
+        <TeamLogo code={code} logo={logo} size={22} />
       )}
 
       <span className={`flex-1 text-sm font-semibold ${empty ? "text-(--color-text3)" : won ? "text-(--color-primary)" : "text-foreground"}`}>
