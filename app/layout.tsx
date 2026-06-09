@@ -1,9 +1,27 @@
 import { Bebas_Neue, Geist, Geist_Mono } from "next/font/google"
-import type { Viewport } from "next"
+import type { Metadata, Viewport } from "next"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
+
+export const metadata: Metadata = {
+  title: "OneProdex",
+  description: "Predicciones, grupos y puntos del Mundial 2026 — en vivo.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  openGraph: {
+    title: "OneProdex",
+    description: "Predicciones, grupos y puntos del Mundial 2026 — en vivo.",
+    siteName: "OneProdex",
+    locale: "es_AR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "OneProdex",
+    description: "Predicciones, grupos y puntos del Mundial 2026 — en vivo.",
+  },
+}
 
 const fontSans = Geist({
   subsets: ["latin"],
