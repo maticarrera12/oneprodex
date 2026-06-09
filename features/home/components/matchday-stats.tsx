@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button"
+import Link from "next/link"
 import { Trend } from "@/features/home/components/trend"
 
 type MatchdayStatsProps = {
@@ -14,7 +14,7 @@ export function MatchdayStats({ pts, ptsDelta, acc, accDelta, streak, streakDelt
   return (
     <section className="rounded-2xl border border-border/80 bg-card/95 p-4">
       <header className="mb-3">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.04em] text-foreground/85">This matchday</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-[0.04em] text-foreground/85">Esta jornada</h2>
       </header>
 
       <div className="grid grid-cols-3 gap-2">
@@ -45,13 +45,12 @@ export function MatchdayStats({ pts, ptsDelta, acc, accDelta, streak, streakDelt
 
       <div className="my-3 h-px bg-border" />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-semibold text-foreground">3 predictions left</p>
-          <p className="text-xs text-muted-foreground">Lock by 21:00 today</p>
-        </div>
-        <Button size="sm">Predict →</Button>
-      </div>
+      <Link
+        href="/partidos"
+        className="inline-flex w-full items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
+      >
+        Predecí los partidos →
+      </Link>
     </section>
   )
 }

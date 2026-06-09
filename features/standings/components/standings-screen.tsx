@@ -2,6 +2,7 @@
 
 import { Activity, CircleDot } from "lucide-react"
 import Image from "next/image"
+import Link from "next/link"
 import { useMemo, useState } from "react"
 
 import { LiveDot } from "@/features/home/components/live-dot"
@@ -168,7 +169,7 @@ function LegendItem({ colorClass, label }: { colorClass: string; label: string }
 
 function FixtureRow({ fixture }: { fixture: GroupFixture }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-(--color-border-hi) bg-(--color-bg2) px-3 py-2.5">
+    <Link href={`/partidos/${fixture.id}`} className="flex items-center gap-3 rounded-xl border border-(--color-border-hi) bg-(--color-bg2) px-3 py-2.5 transition-colors hover:border-(--color-lime-deep)/50 hover:bg-(--color-card-hi)">
       <div className="w-16 shrink-0 font-mono text-[10px] text-(--color-text3)">
         {fixture.status === "LIVE" ? (
           <span className="inline-flex items-center gap-1 text-(--color-primary)">
@@ -195,6 +196,6 @@ function FixtureRow({ fixture }: { fixture: GroupFixture }) {
         <span className="text-sm font-semibold">{fixture.away}</span>
         <TeamLogo code={fixture.away} logo={fixture.logoAway} size={22} />
       </div>
-    </div>
+    </Link>
   )
 }

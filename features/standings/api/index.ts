@@ -213,5 +213,27 @@ export async function getStandingsByGroup(supabase: SupabaseClient<Database>): P
     })
   }
 
-  return groups.sort((a, b) => a.id.localeCompare(b.id))
+  return applyBestThirdsRule(groups.sort((a, b) => a.id.localeCompare(b.id)))
+}
+
+// FIFA 2026: best 8 of 12 third-place teams advance. Rank by pts → gd → gf.
+function applyBestThirdsRule(groups: StandingGroup[]): StandingGroup[] {
+  const thirds = groups
+    .filter((g) => g.rows.length >= 3)
+    .map((g) => ({ groupId: g.id, row: g.rows[2] }))
+    .sort((a, b) =>
+      b.row.pts - a.row.pts ||
+      (b.row.gd) - (a.row.gd) ||
+      b.row.pj - a.row.pj  // more games played = further along
+    )
+
+  const top8 = new Set(thirds.slice(0, 8).map((t) => t.groupId))
+
+  return groups.map((g) => ({
+    ...g,
+    rows: g.rows.map((row, i) => {
+      if (i !== 2) return row
+      return { ...row, qualification: top8.has(g.id) ? "playoff" : "out" } as typeof row
+    }),
+  }))
 }

@@ -64,8 +64,8 @@ export function HomeHeroCard({ matchday, weekday }: HomeHeroCardProps) {
 
           <div className="mt-8 max-w-md space-y-4 md:mt-0">
             <h1 className="text-[clamp(1.75rem,4vw,2.35rem)] leading-[1.05] font-bold tracking-[-0.03em]">
-              Your World Cup,{" "}
-              <span className="text-primary">live.</span>
+              Viví tu Mundial,{" "}
+              <span className="text-primary">en vivo.</span>
             </h1>
             <p className="text-sm leading-relaxed text-muted-foreground">
               Seguí todos los partidos en vivo y sumá puntos.

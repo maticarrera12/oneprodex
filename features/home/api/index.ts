@@ -20,7 +20,51 @@ export type HomeData = {
     pts: number
     acc: number
     streak: number
+    ptsDelta: number
+    accDelta: number
+    streakDelta: number
   }
+}
+
+async function getStatDeltas(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+): Promise<{ ptsDelta: number; accDelta: number; streak: number; streakDelta: number }> {
+  const { data } = await supabase
+    .from("predictions")
+    .select("points")
+    .eq("user_id", userId)
+    .not("points", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(20)
+
+  if (!data || data.length === 0) return { ptsDelta: 0, accDelta: 0, streak: 0, streakDelta: 0 }
+
+  // Streak: consecutive correct predictions from most recent
+  let streak = 0
+  for (const row of data) {
+    if ((row.points ?? 0) > 0) streak++
+    else break
+  }
+
+  // streakDelta: +1 if last was correct, -1 if it broke the streak
+  const streakDelta = (data[0].points ?? 0) > 0 ? 1 : -1
+
+  if (data.length < 2) return { ptsDelta: 0, accDelta: 0, streak, streakDelta }
+
+  const half = Math.ceil(data.length / 2)
+  const recent = data.slice(0, half)
+  const previous = data.slice(half)
+
+  const avgRecent = recent.reduce((s, r) => s + (r.points ?? 0), 0) / recent.length
+  const avgPrevious = previous.reduce((s, r) => s + (r.points ?? 0), 0) / previous.length
+  const ptsDelta = Math.round((avgRecent - avgPrevious) * 10) / 10
+
+  const hitRecent = recent.filter((r) => (r.points ?? 0) > 0).length / recent.length
+  const hitPrevious = previous.filter((r) => (r.points ?? 0) > 0).length / previous.length
+  const accDelta = Math.round((hitRecent - hitPrevious) * 100)
+
+  return { ptsDelta, accDelta, streak, streakDelta }
 }
 
 async function mergeUpcomingPredictions(
@@ -53,11 +97,12 @@ async function mergeUpcomingPredictions(
 }
 
 export async function getHomeData(supabase: SupabaseClient<Database>, userId: string): Promise<HomeData> {
-  const [liveMatches, upcomingBase, groupId, userStats] = await Promise.all([
+  const [liveMatches, upcomingBase, groupId, userStats, deltas] = await Promise.all([
     getLiveMatches(supabase),
     getUpcomingMatches(supabase),
     getActiveGroupId(supabase, userId),
     getUserStats(supabase, userId),
+    getStatDeltas(supabase, userId),
   ])
   const upcomingMatches = await mergeUpcomingPredictions(supabase, userId, upcomingBase)
 
@@ -72,7 +117,7 @@ export async function getHomeData(supabase: SupabaseClient<Database>, userId: st
       stats: {
         pts: userStats.totalPts,
         acc: Math.round((userStats.accuracy ?? 0) * 100),
-        streak: 0,
+        ...deltas,
       },
     }
   }
@@ -92,7 +137,7 @@ export async function getHomeData(supabase: SupabaseClient<Database>, userId: st
     stats: {
       pts: userStats.totalPts,
       acc: Math.round((userStats.accuracy ?? 0) * 100),
-      streak: 0,
+      ...deltas,
     },
   }
 }

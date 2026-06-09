@@ -39,11 +39,11 @@ export default async function HomePage() {
       )}
       <MatchdayStats
         pts={data?.stats.pts ?? 0}
-        ptsDelta={0}
+        ptsDelta={data?.stats.ptsDelta ?? 0}
         acc={data?.stats.acc ?? 0}
-        accDelta={1}
+        accDelta={data?.stats.accDelta ?? 0}
         streak={data?.stats.streak ?? 0}
-        streakDelta={0}
+        streakDelta={data?.stats.streakDelta ?? 0}
       />
     </div>
   )
