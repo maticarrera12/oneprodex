@@ -331,13 +331,17 @@ export async function evalArrancamos(
   userId: string,
   supabase: SupabaseClient,
 ): Promise<EvalResult | null> {
+  // Arrancamos fires when the user completes the awards step, regardless of
+  // onboarding_mode or whether bracket_submitted_at is set.
+  // evaluateUser is only called from saveTournamentPredictions (awards completion),
+  // so reaching this evaluator is sufficient signal that awards were completed.
   const { data, error } = await supabase
     .from('users')
     .select('bracket_submitted_at')
     .eq('id', userId)
     .maybeSingle()
 
-  if (error || !data || !data.bracket_submitted_at) return null
+  if (error || !data) return null
 
   return { achievement_id: 'arrancamos', tier: 'bronze', progress_json: null }
 }

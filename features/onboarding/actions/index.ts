@@ -290,11 +290,21 @@ export async function saveTournamentPredictions(formData: FormData): Promise<voi
   }
 
   const service = createServiceClient()
-  const lockResult = await service.from("users").select("bracket_submitted_at").eq("id", userId).maybeSingle()
-  if (lockResult.error) throw new Error(lockResult.error.message)
-  if (lockResult.data?.bracket_submitted_at) {
-    throw new Error("Forbidden: bracket already submitted")
+
+  // Check if awards were already submitted by looking for an existing row with
+  // all three awards filled. bracket_submitted_at is not a reliable gate here
+  // because prode-mode users have it set before they reach the awards step.
+  const awardsLockResult = await service
+    .from("tournament_predictions")
+    .select("top_scorer_api_id,best_player_api_id,best_young_player_api_id")
+    .eq("user_id", userId)
+    .maybeSingle()
+  if (awardsLockResult.error) throw new Error(awardsLockResult.error.message)
+  const existing = awardsLockResult.data
+  if (existing?.top_scorer_api_id && existing?.best_player_api_id && existing?.best_young_player_api_id) {
+    throw new Error("Forbidden: awards already submitted")
   }
+
   const upsertResult = await service.from("tournament_predictions").upsert(
     {
       user_id: userId,
