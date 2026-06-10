@@ -26,6 +26,7 @@ export default async function GroupPage({ searchParams }: PageProps) {
   const activeGroup = groups.find((g) => g.id === groupId) ?? groups[0]
 
   const leaderboard = await getGroupLeaderboard(supabase, activeGroup.id, user.id)
+  const isOwner = activeGroup.owner_id === user.id
 
-  return <GroupLeaderboardScreen group={activeGroup} leaderboard={leaderboard} groups={groups} />
+  return <GroupLeaderboardScreen group={activeGroup} leaderboard={leaderboard} groups={groups} isOwner={isOwner} />
 }

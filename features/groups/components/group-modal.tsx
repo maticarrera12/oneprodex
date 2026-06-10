@@ -2,26 +2,36 @@
 
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState } from 'react'
-import { createGroup, joinGroup } from '@/features/groups/actions'
+import { createGroup, joinGroup, deleteGroup, leaveGroup } from '@/features/groups/actions'
 
-type Tab = 'create' | 'join'
+type Tab = 'create' | 'join' | 'manage'
 
 type GroupModalProps = {
   open: boolean
   onClose: () => void
-  defaultTab?: Tab
+  defaultTab?: 'create' | 'join'
+  groupId?: string
+  isOwner?: boolean
 }
 
 const spring = { type: 'spring' as const, damping: 30, stiffness: 300 }
 
-export function GroupModal({ open, onClose, defaultTab = 'create' }: GroupModalProps) {
+export function GroupModal({ open, onClose, defaultTab = 'create', groupId, isOwner }: GroupModalProps) {
   const [tab, setTab] = useState<Tab>(defaultTab)
   const [preview, setPreview] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (file) setPreview(URL.createObjectURL(file))
   }
+
+  function handleClose() {
+    setConfirming(false)
+    onClose()
+  }
+
+  const hasManage = Boolean(groupId)
 
   return (
     <AnimatePresence>
@@ -33,7 +43,7 @@ export function GroupModal({ open, onClose, defaultTab = 'create' }: GroupModalP
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={handleClose}
           />
           <motion.div
             key="sheet"
@@ -42,7 +52,7 @@ export function GroupModal({ open, onClose, defaultTab = 'create' }: GroupModalP
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={spring}
-            onClick={onClose}
+            onClick={handleClose}
           >
             <div
               className="w-full max-w-md rounded-3xl bg-background px-4 pb-10 pt-4"
@@ -50,10 +60,10 @@ export function GroupModal({ open, onClose, defaultTab = 'create' }: GroupModalP
             >
               <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-(--color-border-hi)" />
 
-              <div className="mb-6 flex gap-2 rounded-xl border border-(--color-border-hi) bg-(--color-card-hi) p-1">
+              <div className={`mb-6 flex gap-2 rounded-xl border border-(--color-border-hi) bg-(--color-card-hi) p-1`}>
                 <button
                   type="button"
-                  onClick={() => setTab('create')}
+                  onClick={() => { setTab('create'); setConfirming(false) }}
                   className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors ${
                     tab === 'create' ? 'bg-primary text-primary-foreground' : 'text-(--color-text3)'
                   }`}
@@ -62,13 +72,24 @@ export function GroupModal({ open, onClose, defaultTab = 'create' }: GroupModalP
                 </button>
                 <button
                   type="button"
-                  onClick={() => setTab('join')}
+                  onClick={() => { setTab('join'); setConfirming(false) }}
                   className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors ${
                     tab === 'join' ? 'bg-primary text-primary-foreground' : 'text-(--color-text3)'
                   }`}
                 >
                   Unirme
                 </button>
+                {hasManage ? (
+                  <button
+                    type="button"
+                    onClick={() => { setTab('manage'); setConfirming(false) }}
+                    className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors ${
+                      tab === 'manage' ? 'bg-primary text-primary-foreground' : 'text-(--color-text3)'
+                    }`}
+                  >
+                    Gestionar
+                  </button>
+                ) : null}
               </div>
 
               {tab === 'create' ? (
@@ -116,7 +137,7 @@ export function GroupModal({ open, onClose, defaultTab = 'create' }: GroupModalP
                     Crear grupo
                   </button>
                 </form>
-              ) : (
+              ) : tab === 'join' ? (
                 <form action={joinGroup} className="space-y-3">
                   <input
                     name="code"
@@ -132,6 +153,46 @@ export function GroupModal({ open, onClose, defaultTab = 'create' }: GroupModalP
                     Unirme al grupo
                   </button>
                 </form>
+              ) : (
+                <div className="space-y-3">
+                  {confirming ? (
+                    <div className="rounded-2xl border border-red-500/30 bg-red-500/8 p-4 space-y-3">
+                      <p className="text-sm font-semibold text-foreground text-center">
+                        {isOwner ? '¿Eliminar el grupo?' : '¿Salir del grupo?'}
+                      </p>
+                      <p className="text-xs text-(--color-text3) text-center leading-relaxed">
+                        {isOwner
+                          ? 'Se eliminará el grupo y todos los miembros perderán el acceso. Esta acción no se puede deshacer.'
+                          : 'Vas a salir del grupo. Podés volver a unirte con el código de invitación.'}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setConfirming(false)}
+                          className="rounded-xl border border-(--color-border-hi) py-3 text-sm font-semibold text-foreground"
+                        >
+                          Cancelar
+                        </button>
+                        <form action={isOwner ? deleteGroup.bind(null, groupId!) : leaveGroup.bind(null, groupId!)}>
+                          <button
+                            type="submit"
+                            className="w-full rounded-xl bg-red-500 py-3 text-sm font-semibold text-white"
+                          >
+                            {isOwner ? 'Eliminar' : 'Salir'}
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirming(true)}
+                      className="w-full rounded-xl border border-red-500/30 bg-red-500/8 py-3 text-sm font-semibold text-red-400"
+                    >
+                      {isOwner ? 'Eliminar grupo' : 'Salir del grupo'}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </motion.div>

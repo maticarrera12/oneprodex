@@ -635,6 +635,7 @@ export type Database = {
         Args: { p_group_id: string }
         Returns: {
           avatar_url: string
+          correct_count: number
           display_name: string
           handle: string
           total_pts: number

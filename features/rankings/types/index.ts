@@ -4,6 +4,7 @@ export interface RankingEntry {
   name: string
   color: string
   pts: number
+  hits: number
   acc: number
   streak: number
   delta: number

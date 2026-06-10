@@ -13,7 +13,7 @@ export function GroupRankList({ leaderboard, pulseHandle }: GroupRankListProps) 
         <span className="text-center">#</span>
         <span>Participante</span>
         <span className="text-center">Precisión</span>
-        <span className="text-center">Acertos</span>
+        <span className="text-center">Aciertos</span>
         <span className="text-right">Puntos</span>
       </div>
       {leaderboard.map((entry, index) => (

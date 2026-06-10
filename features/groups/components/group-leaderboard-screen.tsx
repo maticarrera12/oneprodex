@@ -13,9 +13,10 @@ type GroupLeaderboardScreenProps = {
   group: GroupInfo
   leaderboard: RankingEntry[]
   groups: GroupInfo[]
+  isOwner: boolean
 }
 
-export function GroupLeaderboardScreen({ group, leaderboard, groups }: GroupLeaderboardScreenProps) {
+export function GroupLeaderboardScreen({ group, leaderboard, groups, isOwner }: GroupLeaderboardScreenProps) {
   const [pulseHandle, setPulseHandle] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
@@ -51,7 +52,7 @@ export function GroupLeaderboardScreen({ group, leaderboard, groups }: GroupLead
         {you ? <GroupYouSticky you={you} /> : null}
       </div>
 
-      <GroupModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      <GroupModal open={modalOpen} onClose={() => setModalOpen(false)} groupId={group.id} isOwner={isOwner} />
     </>
   )
 }

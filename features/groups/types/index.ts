@@ -12,6 +12,7 @@ export interface ActivityItem {
 export interface GroupInfo {
   id: string
   name: string
+  owner_id: string
   members: number
   matchday: string
   invite_code: string

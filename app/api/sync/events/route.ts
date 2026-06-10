@@ -3,6 +3,7 @@ import { mapMatchEvent } from '@/lib/api-football/mappers'
 import { APIFootballError } from '@/lib/api-football/types'
 import { createServiceClient } from '@/lib/supabase/service'
 import { calcCardPts, calcCleanSheetPts, calcPlayerScorerPts, calcScorePts } from '@/features/predictions/utils/scoring'
+import { evaluateAllUsers } from '@/lib/achievements/evaluate'
 import { NextResponse } from 'next/server'
 
 function guardAuth(request: Request): NextResponse | null {
@@ -68,19 +69,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Fire-and-forget achievements evaluation after scoring loop
-    // Failure must not fail events sync
-    fetch(
-      new URL(
-        '/api/sync/achievements',
-        process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
-      ).toString(),
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${process.env.SYNC_SECRET}` },
-        signal: AbortSignal.timeout(10_000),
-      },
-    ).catch(() => {})
+    await evaluateAllUsers(supabase)
 
     return NextResponse.json({ updated, failed }, { status: 200 })
   } catch (error) {

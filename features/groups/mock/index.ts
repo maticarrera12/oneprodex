@@ -3,6 +3,7 @@ import type { ActivityItem, GroupInfo } from "@/features/groups/types"
 export const GROUP_INFO: GroupInfo = {
   id: "mock-group-1",
   name: "Les Cracks",
+  owner_id: "mock-owner-1",
   members: 12,
   matchday: "Jornada 3",
   invite_code: "MOCK01",

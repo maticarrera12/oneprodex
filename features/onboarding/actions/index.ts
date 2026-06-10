@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import type { SlotId } from "@/features/onboarding/types"
 import { createServiceClient } from "@/lib/supabase/service"
 import { createClient } from "@/lib/supabase/server"
+import { evaluateUser } from "@/lib/achievements/evaluate"
 
 type GroupPickInput = {
   group_code: string
@@ -310,6 +311,8 @@ export async function saveTournamentPredictions(formData: FormData): Promise<voi
     .update({ bracket_submitted_at: new Date().toISOString() })
     .eq("id", userId)
   if (submitResult.error) throw new Error(submitResult.error.message)
+
+  await evaluateUser(userId, service)
 
   revalidatePath("/onboarding")
   revalidatePath("/grupo")

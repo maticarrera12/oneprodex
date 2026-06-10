@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
-// Must be mocked before importing route so supabase config.ts doesn't throw at load time
+// Must be mocked before importing so supabase config.ts doesn't throw at load time
 vi.mock("@/lib/supabase/service", () => ({
   createServiceClient: vi.fn(),
 }))
@@ -11,7 +11,7 @@ import {
   evalDeTaquito,
   evalJuegaDavid,
   evalFuaElDiego,
-} from "@/app/api/sync/achievements/route"
+} from "@/lib/achievements/evaluate"
 
 // ─── computeMaxStreak ─────────────────────────────────────────────────────────
 

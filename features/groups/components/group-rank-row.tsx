@@ -45,12 +45,8 @@ function rankRowClass(rank: number) {
   return ""
 }
 
-function estimateHits(entry: RankingEntry) {
-  return Math.max(1, Math.round(entry.pts / 14))
-}
-
 export function GroupRankRow({ entry, pulse, showBorder }: GroupRankRowProps) {
-  const hits = estimateHits(entry)
+  const hits = entry.hits
 
   return (
     <motion.article

@@ -10,6 +10,7 @@ function mapGroupToInfo(group: GroupRow, membersCount: number): GroupInfo {
   return {
     id: group.id,
     name: group.name,
+    owner_id: group.owner_id,
     members: membersCount,
     matchday: "Jornada actual",
     invite_code: group.invite_code,
@@ -25,6 +26,7 @@ function mapLeaderboardRow(row: LeaderboardRpcRow, rank: number, userId: string)
     name: row.display_name,
     color: "hsl(83 81% 62%)",
     pts: row.total_pts,
+    hits: row.correct_count,
     acc: 0,
     streak: 0,
     delta: 0,

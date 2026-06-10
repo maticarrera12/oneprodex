@@ -2,6 +2,7 @@ import { getGroupByInviteCode } from '@/features/groups/api'
 import { EmptyState } from '@/features/shared/components/empty-state'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { evaluateUser } from '@/lib/achievements/evaluate'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
@@ -34,7 +35,15 @@ export default async function UnirsePage({ searchParams }: PageProps) {
         .maybeSingle()
 
       if (!existing) {
-        await supabase.from('group_members').insert({ group_id: group.id, user_id: user.id })
+        await supabase.from('group_members').insert({
+          group_id: group.id,
+          user_id: user.id,
+          invited_by: group.owner_id,
+        })
+        await Promise.all([
+          evaluateUser(user.id, supabase),
+          evaluateUser(group.owner_id, supabase),
+        ])
       }
 
       redirect(`/grupo?group=${group.id}&joined=true`)

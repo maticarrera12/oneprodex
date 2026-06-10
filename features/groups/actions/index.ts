@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { evaluateUser } from '@/lib/achievements/evaluate'
 
 function generateInviteCode(): string {
   return Math.random().toString(36).slice(2, 8).toUpperCase()
@@ -79,8 +80,49 @@ export async function joinGroup(formData: FormData) {
       user_id: user.id,
       invited_by: group.owner_id,
     })
+    await Promise.all([
+      evaluateUser(user.id, supabase),
+      evaluateUser(group.owner_id, supabase),
+    ])
   }
 
   revalidatePath('/grupo')
   redirect(`/grupo?group=${group.id}&joined=true`)
+}
+
+export async function deleteGroup(groupId: string) {
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) return
+
+  const supabase = createServiceClient()
+  const { data: group } = await supabase
+    .from('groups')
+    .select('owner_id')
+    .eq('id', groupId)
+    .maybeSingle()
+
+  if (!group || group.owner_id !== user.id) return
+
+  await supabase.from('group_members').delete().eq('group_id', groupId)
+  await supabase.from('groups').delete().eq('id', groupId)
+
+  revalidatePath('/grupo')
+  redirect('/grupo')
+}
+
+export async function leaveGroup(groupId: string) {
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) return
+
+  const supabase = createServiceClient()
+  await supabase
+    .from('group_members')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+
+  revalidatePath('/grupo')
+  redirect('/grupo')
 }

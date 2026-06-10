@@ -51,7 +51,8 @@ export async function proxy(request: NextRequest) {
 
     const hasSubmittedBracket = Boolean(profile?.bracket_submitted_at)
 
-    if (!hasSubmittedBracket && !isOnboardingRoute && !pathname.startsWith('/api/')) {
+    const isUnirseRoute = pathname.startsWith('/unirse')
+    if (!hasSubmittedBracket && !isOnboardingRoute && !isUnirseRoute && !pathname.startsWith('/api/')) {
       return NextResponse.redirect(new URL('/onboarding', request.url))
     }
 
