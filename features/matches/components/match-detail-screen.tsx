@@ -272,7 +272,9 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
                 const yellowSelected = optimistic.yellowCardIds.includes(player.api_id)
                 const redSelected = optimistic.redCardIds.includes(player.api_id)
                 const blockScorer =
-                  isLocked || (!scorerSelected && optimistic.scorerIds.length >= MAX_SCORERS)
+                  isLocked ||
+                  (!scorerSelected && optimistic.scorerIds.length >= MAX_SCORERS) ||
+                  (draftScore.home === 0 && draftScore.away === 0)
                 const blockYellow =
                   isLocked || (!yellowSelected && optimistic.yellowCardIds.length >= MAX_YELLOW_CARDS)
                 const blockRed =
