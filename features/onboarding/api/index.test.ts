@@ -2,63 +2,174 @@ import { describe, expect, it } from "vitest"
 import { deriveOnboardingStep } from "@/features/onboarding/api"
 
 describe("deriveOnboardingStep", () => {
+  // --- existing quick-mode tests (backward compat) ---
+
   it("returns complete when bracket is submitted", () => {
     const step = deriveOnboardingStep({
       submittedAt: "2026-05-14T12:00:00.000Z",
+      onboardingMode: "quick",
       groupPickCount: 48,
       bestThirdCount: 8,
       bracketPickCount: 32,
       hasTournamentPrediction: true,
       hasAllAwards: true,
+      prodePickCount: 0,
+      groupStageMatchCount: 72,
     })
-    expect(step).toBe("complete")
+    expect(step).toEqual({ status: "complete" })
   })
 
-  it("returns step 1 when group picks are incomplete", () => {
+  it("returns mode_select when onboardingMode is null", () => {
     const step = deriveOnboardingStep({
       submittedAt: null,
+      onboardingMode: null,
+      groupPickCount: 0,
+      bestThirdCount: 0,
+      bracketPickCount: 0,
+      hasTournamentPrediction: false,
+      hasAllAwards: false,
+      prodePickCount: 0,
+      groupStageMatchCount: 72,
+    })
+    expect(step).toEqual({ status: "mode_select" })
+  })
+
+  // --- quick mode ---
+
+  it("returns quick_step 1 when group picks are incomplete (quick mode)", () => {
+    const step = deriveOnboardingStep({
+      submittedAt: null,
+      onboardingMode: "quick",
       groupPickCount: 47,
       bestThirdCount: 0,
       bracketPickCount: 0,
       hasTournamentPrediction: false,
       hasAllAwards: false,
+      prodePickCount: 0,
+      groupStageMatchCount: 72,
     })
-    expect(step).toBe(1)
+    expect(step).toEqual({ status: "quick_step", step: 1 })
   })
 
-  it("returns step 2 when best thirds are incomplete", () => {
+  it("returns quick_step 2 when best thirds are incomplete (quick mode)", () => {
     const step = deriveOnboardingStep({
       submittedAt: null,
+      onboardingMode: "quick",
       groupPickCount: 48,
       bestThirdCount: 7,
       bracketPickCount: 0,
       hasTournamentPrediction: false,
       hasAllAwards: false,
+      prodePickCount: 0,
+      groupStageMatchCount: 72,
     })
-    expect(step).toBe(2)
+    expect(step).toEqual({ status: "quick_step", step: 2 })
   })
 
-  it("returns step 3 when bracket picks are incomplete", () => {
+  it("returns quick_step 3 when bracket picks are incomplete (quick mode)", () => {
     const step = deriveOnboardingStep({
       submittedAt: null,
+      onboardingMode: "quick",
       groupPickCount: 48,
       bestThirdCount: 8,
       bracketPickCount: 31,
       hasTournamentPrediction: false,
       hasAllAwards: false,
+      prodePickCount: 0,
+      groupStageMatchCount: 72,
     })
-    expect(step).toBe(3)
+    expect(step).toEqual({ status: "quick_step", step: 3 })
   })
 
-  it("returns step 4 when awards are missing", () => {
+  it("returns quick_step 4 when awards are missing (quick mode)", () => {
     const step = deriveOnboardingStep({
       submittedAt: null,
+      onboardingMode: "quick",
       groupPickCount: 48,
       bestThirdCount: 8,
       bracketPickCount: 32,
       hasTournamentPrediction: false,
       hasAllAwards: false,
+      prodePickCount: 0,
+      groupStageMatchCount: 72,
     })
-    expect(step).toBe(4)
+    expect(step).toEqual({ status: "quick_step", step: 4 })
+  })
+
+  // --- prode mode ---
+
+  it("returns prode_picks when prode picks are incomplete (prode mode)", () => {
+    const step = deriveOnboardingStep({
+      submittedAt: null,
+      onboardingMode: "prode",
+      groupPickCount: 0,
+      bestThirdCount: 0,
+      bracketPickCount: 0,
+      hasTournamentPrediction: false,
+      hasAllAwards: false,
+      prodePickCount: 20,
+      groupStageMatchCount: 72,
+    })
+    expect(step).toEqual({ status: "prode_picks", filled: 20, total: 72 })
+  })
+
+  it("returns prode_picks with filled=0 when no prode picks exist", () => {
+    const step = deriveOnboardingStep({
+      submittedAt: null,
+      onboardingMode: "prode",
+      groupPickCount: 0,
+      bestThirdCount: 0,
+      bracketPickCount: 0,
+      hasTournamentPrediction: false,
+      hasAllAwards: false,
+      prodePickCount: 0,
+      groupStageMatchCount: 72,
+    })
+    expect(step).toEqual({ status: "prode_picks", filled: 0, total: 72 })
+  })
+
+  it("returns bracket when all prode picks done but bracket incomplete (prode mode)", () => {
+    const step = deriveOnboardingStep({
+      submittedAt: null,
+      onboardingMode: "prode",
+      groupPickCount: 0,
+      bestThirdCount: 0,
+      bracketPickCount: 10,
+      hasTournamentPrediction: false,
+      hasAllAwards: false,
+      prodePickCount: 72,
+      groupStageMatchCount: 72,
+    })
+    expect(step).toEqual({ status: "bracket" })
+  })
+
+  it("returns awards when prode picks done and bracket done but awards missing (prode mode)", () => {
+    const step = deriveOnboardingStep({
+      submittedAt: null,
+      onboardingMode: "prode",
+      groupPickCount: 0,
+      bestThirdCount: 0,
+      bracketPickCount: 32,
+      hasTournamentPrediction: false,
+      hasAllAwards: false,
+      prodePickCount: 72,
+      groupStageMatchCount: 72,
+    })
+    expect(step).toEqual({ status: "awards" })
+  })
+
+  it("returns complete for prode mode when bracket is submitted", () => {
+    const step = deriveOnboardingStep({
+      submittedAt: "2026-05-14T12:00:00.000Z",
+      onboardingMode: "prode",
+      groupPickCount: 0,
+      bestThirdCount: 0,
+      bracketPickCount: 32,
+      hasTournamentPrediction: true,
+      hasAllAwards: true,
+      prodePickCount: 72,
+      groupStageMatchCount: 72,
+    })
+    expect(step).toEqual({ status: "complete" })
   })
 })

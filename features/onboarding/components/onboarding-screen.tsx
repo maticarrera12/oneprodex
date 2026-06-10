@@ -12,10 +12,10 @@ import { BracketStep } from "@/features/onboarding/components/bracket-step"
 import { GroupPicksStep } from "@/features/onboarding/components/group-picks-step"
 import { ProgressBar } from "@/features/onboarding/components/progress-bar"
 import { AwardsStep } from "@/features/onboarding/components/awards-step"
-import type { GroupCode, OnboardingState, OnboardingTeam, ThirdPlaceTeam } from "@/features/onboarding/types"
+import type { GroupCode, OnboardingState, OnboardingStep, OnboardingTeam, ThirdPlaceTeam } from "@/features/onboarding/types"
 
 type OnboardingScreenProps = {
-  step: 1 | 2 | 3 | 4
+  step: OnboardingStep
   savedData: Omit<OnboardingState, "step">
   teamsByGroup?: Partial<Record<GroupCode, OnboardingTeam[]>>
 }
@@ -84,19 +84,22 @@ export function OnboardingScreen({ step, savedData, teamsByGroup }: OnboardingSc
     [normalizedTeams, savedData.groupRankings]
   )
 
+  // Derive numeric step for ProgressBar (quick mode only)
+  const quickStep = step.status === "quick_step" ? step.step : null
+
   return (
     <div className="mx-auto w-full max-w-5xl space-y-4 py-4 pb-28">
-      <ProgressBar currentStep={step} />
+      {quickStep !== null && <ProgressBar currentStep={quickStep} />}
 
-      {step === 1 ? (
+      {step.status === "quick_step" && step.step === 1 ? (
         <GroupPicksStep groups={ALL_GROUPS} teamsByGroup={normalizedTeams} initialRankings={savedData.groupRankings} onContinue={saveGroupPicks} />
       ) : null}
 
-      {step === 2 ? (
+      {step.status === "quick_step" && step.step === 2 ? (
         <BestThirdsStep teams={thirdPlaceTeams} initialSelected={savedData.bestThirds} onContinue={saveBestThirds} />
       ) : null}
 
-      {step === 3 && savedData.groupRankings ? (
+      {step.status === "quick_step" && step.step === 3 && savedData.groupRankings ? (
         <BracketStep
           groupRankings={savedData.groupRankings}
           bestThirds={savedData.bestThirds ?? []}
@@ -106,7 +109,21 @@ export function OnboardingScreen({ step, savedData, teamsByGroup }: OnboardingSc
         />
       ) : null}
 
-      {step === 4 ? (
+      {step.status === "quick_step" && step.step === 4 ? (
+        <AwardsStep initialSelection={savedData.tournamentPredictions} onContinue={saveTournamentPredictions} />
+      ) : null}
+
+      {step.status === "bracket" && savedData.groupRankings ? (
+        <BracketStep
+          groupRankings={savedData.groupRankings}
+          bestThirds={savedData.bestThirds ?? []}
+          initialPicks={savedData.bracketPicks}
+          logoByCode={logoByCode}
+          onContinue={saveBracketPicks}
+        />
+      ) : null}
+
+      {step.status === "awards" ? (
         <AwardsStep initialSelection={savedData.tournamentPredictions} onContinue={saveTournamentPredictions} />
       ) : null}
     </div>

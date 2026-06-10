@@ -56,7 +56,7 @@ export default async function OnboardingPage() {
 
   const serviceClient = createServiceClient()
   const state = await getOnboardingState(serviceClient, user.id)
-  if (state.step === "complete") {
+  if (state.step.status === "complete") {
     redirect("/")
   }
 
