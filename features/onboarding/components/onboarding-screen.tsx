@@ -8,6 +8,7 @@ import {
   saveTournamentPredictions,
   setOnboardingMode,
   saveMatchScorePick,
+  continueFromProdePicks,
 } from "@/features/onboarding/actions"
 import { BestThirdsStep } from "@/features/onboarding/components/best-thirds-step"
 import { BracketStep } from "@/features/onboarding/components/bracket-step"
@@ -107,6 +108,8 @@ export function OnboardingScreen({ step, savedData, teamsByGroup, matchesByGroup
           filled={step.filled}
           total={step.total}
           onSave={saveMatchScorePick}
+          onSaveAndExit={continueFromProdePicks}
+          logoByCode={logoByCode}
         />
       ) : null}
 

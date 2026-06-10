@@ -221,10 +221,7 @@ export async function commitScorerEdits(formData: FormData): Promise<{ error?: s
 
   if (!storedPrediction) return { error: 'no_prediction' }
 
-  // 0-0 guard runs FIRST (spec edge case E3)
-  if (storedPrediction.home_score === 0 && storedPrediction.away_score === 0) {
-    return { error: 'zero_zero' }
-  }
+  const scoreIsZeroZero = storedPrediction.home_score === 0 && storedPrediction.away_score === 0
 
   // Atomic CAS: lock the prediction only if it's not already locked
   // UPDATE predictions SET edit_locked = true WHERE match_id = $1 AND user_id = $2 AND edit_locked = false RETURNING id
@@ -247,7 +244,7 @@ export async function commitScorerEdits(formData: FormData): Promise<{ error?: s
     .eq('user_id', user.id)
     .eq('match_id', matchId)
 
-  const rows = [...scorers, ...cards]
+  const rows = [...(scoreIsZeroZero ? [] : scorers), ...cards]
   if (rows.length > 0) {
     await serviceClient.from('prediction_players').insert(
       rows.map((row) => ({

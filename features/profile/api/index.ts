@@ -11,6 +11,11 @@ import type { Database } from "@/lib/supabase/database.types"
 
 type UserRow = Database["public"]["Tables"]["users"]["Row"]
 type PredictionRow = Database["public"]["Tables"]["predictions"]["Row"]
+type ChampionPick = {
+  code: string
+  name: string | null
+  logo: string | null
+}
 
 type UserAchievementJoinRow = {
   user_id: string
@@ -147,8 +152,11 @@ const earnedMap = new Map(
 
 export type UserStats = {
   totalPts: number
+  predictionPts: number
+  achievementPts: number
   predictionCount: number
   accuracy: number | null
+  streak: number
 }
 
 export type ProfileData = {
@@ -159,7 +167,7 @@ export type ProfileData = {
   history: ProfileHistoryEntry[]
 }
 
-function mapUserProfile(user: UserRow, stats: UserStats): ProfileUser {
+export function mapUserProfile(user: UserRow, stats: UserStats, championPick: ChampionPick | null): ProfileUser {
   return {
     name: user.display_name,
     handle: user.handle,
@@ -169,12 +177,14 @@ function mapUserProfile(user: UserRow, stats: UserStats): ProfileUser {
     nextLevelTitle: "Tactician",
     levelCurrent: stats.totalPts,
     levelTarget: Math.max(stats.totalPts + 50, 100),
-    championPick: "ARG",
+    championPick: championPick?.code ?? null,
+    championPickName: championPick?.name ?? null,
+    championPickLogo: championPick?.logo ?? null,
     points: stats.totalPts,
     rank: 1,
     rankOf: 1,
     accuracy: Math.round((stats.accuracy ?? 0) * 100),
-    streak: 0,
+    streak: stats.streak,
   }
 }
 
@@ -194,21 +204,58 @@ export async function getUserProfile(supabase: SupabaseClient<Database>, userId:
 }
 
 export async function getUserStats(supabase: SupabaseClient<Database>, userId: string): Promise<UserStats> {
-  const { data, error } = await supabase.from("predictions").select("*").eq("user_id", userId)
-  if (error || !data || data.length === 0) {
-    return { totalPts: 0, predictionCount: 0, accuracy: null }
+  const [predictionsResult, userResult] = await Promise.all([
+    supabase.from("predictions").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+    supabase.from("users").select("achievement_points").eq("id", userId).maybeSingle(),
+  ])
+  const data = predictionsResult.data ?? []
+  const achievementPts = userResult.data?.achievement_points ?? 0
+
+  if (predictionsResult.error || data.length === 0) {
+    return { totalPts: achievementPts, predictionPts: 0, achievementPts, predictionCount: 0, accuracy: null, streak: 0 }
   }
 
-  const totalPts = data.reduce((sum, row) => sum + (row.points ?? 0), 0)
+  const predictionPts = data.reduce((sum, row) => sum + (row.points ?? 0), 0)
   const scoredPredictions = data.filter((row) => row.points !== null)
   const hitPredictions = scoredPredictions.filter((row) => (row.points ?? 0) > 0)
   const accuracy =
     scoredPredictions.length > 0 ? hitPredictions.length / scoredPredictions.length : null
+  let streak = 0
+  for (const row of scoredPredictions) {
+    if ((row.points ?? 0) <= 0) break
+    streak++
+  }
 
   return {
-    totalPts,
+    totalPts: predictionPts + achievementPts,
+    predictionPts,
+    achievementPts,
     predictionCount: data.length,
     accuracy,
+    streak,
+  }
+}
+
+async function getChampionPick(supabase: SupabaseClient<Database>, userId: string): Promise<ChampionPick | null> {
+  const { data: pick } = await supabase
+    .from("bracket_picks")
+    .select("team_code")
+    .eq("user_id", userId)
+    .eq("slot", "FINAL")
+    .maybeSingle()
+
+  if (!pick?.team_code) return null
+
+  const { data: team } = await supabase
+    .from("teams")
+    .select("code,name,logo")
+    .eq("code", pick.team_code)
+    .maybeSingle()
+
+  return {
+    code: team?.code ?? pick.team_code,
+    name: team?.name ?? pick.team_code,
+    logo: team?.logo ?? null,
   }
 }
 
@@ -312,16 +359,17 @@ async function getProfileHistory(
 }
 
 export async function getProfileData(supabase: SupabaseClient<Database>, userId: string): Promise<ProfileData | null> {
-  const [user, stats, achievements, formLast7, history] = await Promise.all([
+  const [user, stats, achievements, formLast7, history, championPick] = await Promise.all([
     getUserProfile(supabase, userId),
     getUserStats(supabase, userId),
     getProfileAchievements(supabase, userId),
     getFormLast7(supabase, userId),
     getProfileHistory(supabase, userId),
+    getChampionPick(supabase, userId),
   ])
   if (!user) return null
 
-  const profileUser = mapUserProfile(user, stats)
+  const profileUser = mapUserProfile(user, stats, championPick)
 
   return {
     user: profileUser,

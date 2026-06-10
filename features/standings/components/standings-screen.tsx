@@ -9,7 +9,7 @@ import { LiveDot } from "@/features/home/components/live-dot"
 import { TeamLogo } from "@/features/shared/components/team-logo"
 import { StandingsHeader } from "@/features/standings/components/standings-header"
 import { StandingsRow } from "@/features/standings/components/standings-row"
-import type { GroupFixture, StandingGroup } from "@/features/standings/types"
+import type { GroupFixture, StandingGroup, StandingRow as StandingRowType } from "@/features/standings/types"
 
 type StandingsScreenProps = {
   groups: StandingGroup[]
@@ -62,29 +62,22 @@ export default function StandingsScreen({ groups }: StandingsScreenProps) {
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,1fr)]">
-        <section className="overflow-hidden rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi)">
-          <div className="grid grid-cols-[28px_minmax(0,1fr)_repeat(6,32px)] items-center gap-x-2 border-b border-(--color-border-hi) px-3 py-2.5 font-mono text-[10px] tracking-wider text-(--color-text3) uppercase">
-            <span className="text-center">#</span>
-            <span>Equipo</span>
-            <span className="text-center">PJ</span>
-            <span className="text-center">G</span>
-            <span className="text-center">E</span>
-            <span className="text-center">P</span>
-            <span className="text-center">GD</span>
-            <span className="text-center">Pts</span>
-          </div>
-          <div>
-            {selected.rows.map((row, index) => (
-              <StandingsRow
-                key={`${selected.id}-${row.team}`}
-                row={row}
-                position={index + 1}
-                index={index}
-                showBorder={index < selected.rows.length - 1}
-              />
-            ))}
-          </div>
-        </section>
+        <div className="space-y-4">
+          <StandingsTable
+            title="Tabla real"
+            subtitle="Resultados oficiales y partidos en vivo"
+            groupId={selected.id}
+            rows={selected.rows}
+          />
+          {selected.projectedRows ? (
+            <StandingsTable
+              title="Tu proyección"
+              subtitle="Calculada con los resultados que fuiste prediciendo"
+              groupId={`${selected.id}-projected`}
+              rows={selected.projectedRows}
+            />
+          ) : null}
+        </div>
 
         <aside className="space-y-4">
           <section className="relative min-h-[168px] overflow-hidden rounded-2xl border border-(--color-border-hi)">
@@ -155,6 +148,48 @@ export default function StandingsScreen({ groups }: StandingsScreenProps) {
         </aside>
       </div>
     </div>
+  )
+}
+
+function StandingsTable({
+  title,
+  subtitle,
+  groupId,
+  rows,
+}: {
+  title: string
+  subtitle: string
+  groupId: string
+  rows: StandingRowType[]
+}) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi)">
+      <div className="border-b border-(--color-border-hi) px-3 py-3">
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <p className="mt-0.5 text-xs text-(--color-text3)">{subtitle}</p>
+      </div>
+      <div className="grid grid-cols-[28px_minmax(0,1fr)_repeat(6,32px)] items-center gap-x-2 border-b border-(--color-border-hi) px-3 py-2.5 font-mono text-[10px] tracking-wider text-(--color-text3) uppercase">
+        <span className="text-center">#</span>
+        <span>Equipo</span>
+        <span className="text-center">PJ</span>
+        <span className="text-center">G</span>
+        <span className="text-center">E</span>
+        <span className="text-center">P</span>
+        <span className="text-center">GD</span>
+        <span className="text-center">Pts</span>
+      </div>
+      <div>
+        {rows.map((row, index) => (
+          <StandingsRow
+            key={`${groupId}-${row.team}`}
+            row={row}
+            position={index + 1}
+            index={index}
+            showBorder={index < rows.length - 1}
+          />
+        ))}
+      </div>
+    </section>
   )
 }
 

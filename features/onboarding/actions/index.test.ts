@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   createServiceClient: vi.fn(),
   revalidatePath: vi.fn(),
   redirect: vi.fn(),
+  evaluateUser: vi.fn(),
 }))
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -23,7 +24,11 @@ vi.mock("next/navigation", () => ({
   redirect: mocks.redirect,
 }))
 
-import { saveBestThirds, saveBracketPicks, saveGroupPicks, setOnboardingMode, saveMatchScorePick, deriveAndPersistGroupRankings, saveTournamentPredictions } from "@/features/onboarding/actions"
+vi.mock("@/lib/achievements/evaluate", () => ({
+  evaluateUser: mocks.evaluateUser,
+}))
+
+import { saveBestThirds, saveBracketPicks, saveGroupPicks, setOnboardingMode, saveMatchScorePick, deriveAndPersistGroupRankings, saveTournamentPredictions, continueFromProdePicks } from "@/features/onboarding/actions"
 
 const ALL_SLOTS = [
   "R32_P1",
@@ -266,6 +271,26 @@ describe("onboarding actions", () => {
     })
   })
 
+  describe("continueFromProdePicks", () => {
+    it("marks prode picks as submitted", async () => {
+      const updateEq = vi.fn().mockResolvedValue({ error: null })
+      const update = vi.fn().mockReturnValue({ eq: updateEq })
+      const service = {
+        from: vi.fn((table: string) => {
+          if (table === "users") return { update }
+          throw new Error(`Unexpected table ${table}`)
+        }),
+      }
+      mocks.createServiceClient.mockReturnValue(service)
+
+      await continueFromProdePicks()
+
+      expect(update).toHaveBeenCalledWith({ prode_picks_submitted_at: expect.any(String) })
+      expect(updateEq).toHaveBeenCalledWith("id", "user-1")
+      expect(mocks.revalidatePath).toHaveBeenCalledWith("/onboarding")
+    })
+  })
+
   describe("saveMatchScorePick", () => {
     it("upserts a prediction row and revalidates path", async () => {
       const upsertFn = vi.fn().mockResolvedValue({ error: null })
@@ -462,14 +487,14 @@ describe("onboarding actions", () => {
     it("upserts 4 group_picks rows for a group with 3 predictions (partial fill)", async () => {
       // Group A has 3 predictions: A1 beats A2, A1 beats A3, A2 draws A3
       const predictions = [
-        { match_id: "m1", home_score: 2, away_score: 0, matches: { stage: "Group Stage - Group A" } },
-        { match_id: "m2", home_score: 1, away_score: 0, matches: { stage: "Group Stage - Group A" } },
-        { match_id: "m3", home_score: 1, away_score: 1, matches: { stage: "Group Stage - Group A" } },
+        { match_id: "m1", home_score: 2, away_score: 0, matches: { stage: "Group Stage - 1" } },
+        { match_id: "m2", home_score: 1, away_score: 0, matches: { stage: "Group Stage - 1" } },
+        { match_id: "m3", home_score: 1, away_score: 1, matches: { stage: "Group Stage - 1" } },
       ]
       const matchRows = [
-        { id: "m1", stage: "Group Stage - Group A", home_team_code: "A1", away_team_code: "A2" },
-        { id: "m2", stage: "Group Stage - Group A", home_team_code: "A1", away_team_code: "A3" },
-        { id: "m3", stage: "Group Stage - Group A", home_team_code: "A2", away_team_code: "A3" },
+        { id: "m1", stage: "Group Stage - 1", home_team_code: "A1", away_team_code: "A2" },
+        { id: "m2", stage: "Group Stage - 1", home_team_code: "A1", away_team_code: "A3" },
+        { id: "m3", stage: "Group Stage - 1", home_team_code: "A2", away_team_code: "A3" },
       ]
 
       const upsertFn = vi.fn().mockResolvedValue({ error: null })
@@ -480,15 +505,18 @@ describe("onboarding actions", () => {
       }
       const matchSelectChain = {
         select: vi.fn().mockReturnThis(),
-        in: vi.fn().mockReturnThis(),
-        ilike: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
+        in: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
+      }
+      const deleteChain = {
+        eq: vi.fn().mockReturnThis(),
+        in: vi.fn().mockResolvedValue({ error: null }),
       }
 
       mocks.createServiceClient.mockReturnValue({
         from: vi.fn((table: string) => {
           if (table === "predictions") return { select: vi.fn().mockReturnValue(predSelectChain) }
           if (table === "matches") return matchSelectChain
-          if (table === "group_picks") return { upsert: upsertFn }
+          if (table === "group_picks") return { delete: vi.fn().mockReturnValue(deleteChain), insert: upsertFn }
           return {}
         }),
       })
@@ -507,10 +535,10 @@ describe("onboarding actions", () => {
     it("breaks pts+GD+GF tie alphabetically", async () => {
       // A1 and A2 draw each match they play — identical stats → alphabetical
       const predictions = [
-        { match_id: "m1", home_score: 1, away_score: 1, matches: { stage: "Group Stage - Group A" } },
+        { match_id: "m1", home_score: 1, away_score: 1, matches: { stage: "Group Stage - 1" } },
       ]
       const matchRows = [
-        { id: "m1", stage: "Group Stage - Group A", home_team_code: "A1", away_team_code: "A2" },
+        { id: "m1", stage: "Group Stage - 1", home_team_code: "A1", away_team_code: "A2" },
       ]
 
       const upsertFn = vi.fn().mockResolvedValue({ error: null })
@@ -521,15 +549,18 @@ describe("onboarding actions", () => {
       }
       const matchSelectChain = {
         select: vi.fn().mockReturnThis(),
-        in: vi.fn().mockReturnThis(),
-        ilike: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
+        in: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
+      }
+      const deleteChain = {
+        eq: vi.fn().mockReturnThis(),
+        in: vi.fn().mockResolvedValue({ error: null }),
       }
 
       mocks.createServiceClient.mockReturnValue({
         from: vi.fn((table: string) => {
           if (table === "predictions") return { select: vi.fn().mockReturnValue(predSelectChain) }
           if (table === "matches") return matchSelectChain
-          if (table === "group_picks") return { upsert: upsertFn }
+          if (table === "group_picks") return { delete: vi.fn().mockReturnValue(deleteChain), insert: upsertFn }
           return {}
         }),
       })
@@ -559,11 +590,11 @@ describe("onboarding actions", () => {
       await expect(saveBracketPicks(buildFormData("picks", picks))).rejects.toThrow("Expected 32 bracket picks")
     })
 
-    it("rejects when bracket is already submitted", async () => {
+    it("rejects when onboarding is already completed", async () => {
       const bracketUpsert = vi.fn()
       const lockChain = {
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({ data: { bracket_submitted_at: "2026-05-14T00:00:00Z" }, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { awards_at: "2026-05-14T00:00:00Z" }, error: null }),
       }
       const service = {
         from: vi.fn((table: string) => {
@@ -576,7 +607,7 @@ describe("onboarding actions", () => {
       mocks.createServiceClient.mockReturnValue(service)
 
       await expect(saveBracketPicks(buildFormData("picks", validBracketPicks()))).rejects.toThrow(
-        "Forbidden: bracket already submitted"
+        "Forbidden: onboarding already completed"
       )
       expect(bracketUpsert).not.toHaveBeenCalled()
     })
@@ -586,7 +617,7 @@ describe("onboarding actions", () => {
       const tournamentUpsert = vi.fn().mockResolvedValue({ error: null })
       const lockChain = {
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({ data: { bracket_submitted_at: null }, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { awards_at: null }, error: null }),
       }
       const service = {
         from: vi.fn((table: string) => {
@@ -606,6 +637,63 @@ describe("onboarding actions", () => {
         { onConflict: "user_id" }
       )
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/onboarding")
+    })
+  })
+
+  describe("saveTournamentPredictions", () => {
+    it("marks awards_at when all awards are saved and redirects home", async () => {
+      const tournamentSelectChain = {
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: {
+            top_scorer_api_id: null,
+            best_player_api_id: null,
+            best_young_player_api_id: null,
+          },
+          error: null,
+        }),
+      }
+      const tournamentUpsert = vi.fn().mockResolvedValue({ error: null })
+      const userUpdateEq = vi.fn().mockResolvedValue({ error: null })
+      const userUpdate = vi.fn().mockReturnValue({ eq: userUpdateEq })
+      const service = {
+        from: vi.fn((table: string) => {
+          if (table === "tournament_predictions") {
+            return {
+              select: vi.fn().mockReturnValue(tournamentSelectChain),
+              upsert: tournamentUpsert,
+            }
+          }
+          if (table === "users") return { update: userUpdate }
+          throw new Error(`Unexpected table ${table}`)
+        }),
+      }
+      mocks.createServiceClient.mockReturnValue(service)
+      mocks.evaluateUser.mockResolvedValue([])
+
+      await expect(
+        saveTournamentPredictions(
+          buildMultiFormData({
+            top_scorer_api_id: "10",
+            best_player_api_id: "20",
+            best_young_player_api_id: "30",
+          })
+        )
+      ).rejects.toThrow("redirect")
+
+      expect(tournamentUpsert).toHaveBeenCalledWith(
+        {
+          user_id: "user-1",
+          top_scorer_api_id: 10,
+          best_player_api_id: 20,
+          best_young_player_api_id: 30,
+        },
+        { onConflict: "user_id" }
+      )
+      expect(userUpdate).toHaveBeenCalledWith({ awards_at: expect.any(String) })
+      expect(userUpdateEq).toHaveBeenCalledWith("id", "user-1")
+      expect(mocks.revalidatePath).toHaveBeenCalledWith("/onboarding")
+      expect(mocks.redirect).toHaveBeenCalledWith("/")
     })
   })
 })

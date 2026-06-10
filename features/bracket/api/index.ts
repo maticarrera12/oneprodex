@@ -211,7 +211,7 @@ export async function getBracketData(
 ): Promise<BracketData | null> {
   const [teamsResult, userResult, groupRowsResult, thirdRowsResult, picksResult, knockoutResult, allKnockoutResult] = await Promise.all([
     supabase.from("teams").select("code,name,logo"),
-    supabase.from("users").select("bracket_submitted_at").eq("id", userId).maybeSingle(),
+    supabase.from("users").select("awards_at").eq("id", userId).maybeSingle(),
     supabase
       .from("group_picks")
       .select("group_code,position,team_code")
@@ -267,6 +267,6 @@ export async function getBracketData(
       logo: logoByCode.get(championCode) ?? null,
       subtitle: "Predicción de campeón",
     },
-    readOnly: Boolean(userResult.data?.bracket_submitted_at),
+    readOnly: Boolean(userResult.data?.awards_at),
   }
 }

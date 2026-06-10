@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 
 import { Flag } from "@/features/home/components/flag"
@@ -11,6 +12,7 @@ import { usePrediction } from "@/features/predictions/hooks/usePrediction"
 import type { MatchEvent, MatchPredictionState, PlayerDetail } from "@/features/predictions/types"
 import { MAX_RED_CARDS, MAX_SCORERS, MAX_YELLOW_CARDS } from "@/features/predictions/types"
 import type { Match } from "@/features/matches/types"
+import { derivePredictionFlow } from "@/features/matches/utils/prediction-flow"
 
 type MatchDetailScreenProps = {
   match: Match
@@ -40,20 +42,29 @@ function formatKickoff(kickoff: string): { date: string; time: string } {
 }
 
 export function MatchDetailScreen({ match, predictionState, players, events }: MatchDetailScreenProps) {
+  const router = useRouter()
   const isLive = match.status === "LIVE"
   const isFinished = match.status === "FINISHED"
-  const isLocked = match.status !== "UPCOMING"
   const editLocked = predictionState.editLocked
+  const predictionFlow = derivePredictionFlow({
+    matchStatus: match.status,
+    hasScore: Boolean(predictionState.score),
+    editLocked,
+  })
   const kickoff = formatKickoff(match.kickoff)
   const [selectedSquad, setSelectedSquad] = useState<"home" | "away">("home")
 
-  const { optimistic, toggleScorer, toggleYellowCard, toggleRedCard, toggleCleanSheet, handleScoreSubmit } = usePrediction(
+  const { optimistic, toggleScorer, toggleYellowCard, toggleRedCard, toggleCleanSheet, handleScoreSubmit, handleExtrasSubmit } = usePrediction(
     predictionState,
     match.id,
-    isLocked,
+    predictionFlow.scoreLocked,
+    predictionFlow.extrasLocked,
     match.home,
     match.away,
   )
+
+  const [extrasSaving, setExtrasSaving] = useState(false)
+  const [extrasError, setExtrasError] = useState<string | null>(null)
 
   const activePlayers = useMemo(
     () => (selectedSquad === "home" ? players.home : players.away),
@@ -74,6 +85,20 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
     if (draftScore.home === 0) next.push(match.away)
     return next
   }, [draftScore.away, draftScore.home, match.away, match.home])
+
+  async function saveExtras() {
+    setExtrasSaving(true)
+    setExtrasError(null)
+    const result = await handleExtrasSubmit()
+    setExtrasSaving(false)
+
+    if (result.error) {
+      setExtrasError(result.error === "already_locked" ? "Estos detalles ya fueron guardados." : "No se pudieron guardar los detalles.")
+      return
+    }
+
+    router.refresh()
+  }
 
   return (
     <div className="space-y-4 pt-4 pb-28">
@@ -192,17 +217,18 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
           homeScore={draftScore.home}
           awayScore={draftScore.away}
           onChange={(home, away) => setDraftScore({ home, away })}
-          isLocked={isLocked}
+          isLocked={predictionFlow.scoreLocked}
           onSubmit={handleScoreSubmit}
         />
       </section>
 
-      {!isLocked ? null : editLocked ? (
-        <section className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-4">
-          <p className="text-xs text-(--color-text3)">Ya editaste los detalles de este partido.</p>
-        </section>
-      ) : (
+      {predictionFlow.extrasVisible ? (
       <section className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-3">
+        {predictionFlow.extrasLocked ? (
+          <p className="mb-3 rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-xs text-primary">
+            Detalles guardados. Podés ver tus elecciones, pero ya no se pueden cambiar.
+          </p>
+        ) : null}
         <div className="mb-3 flex gap-2">
           <button
             type="button"
@@ -278,13 +304,13 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
                 const yellowSelected = optimistic.yellowCardIds.includes(player.api_id)
                 const redSelected = optimistic.redCardIds.includes(player.api_id)
                 const blockScorer =
-                  isLocked ||
+                  predictionFlow.extrasLocked ||
                   (!scorerSelected && optimistic.scorerIds.length >= MAX_SCORERS) ||
                   (draftScore.home === 0 && draftScore.away === 0)
                 const blockYellow =
-                  isLocked || (!yellowSelected && optimistic.yellowCardIds.length >= MAX_YELLOW_CARDS)
+                  predictionFlow.extrasLocked || (!yellowSelected && optimistic.yellowCardIds.length >= MAX_YELLOW_CARDS)
                 const blockRed =
-                  isLocked || (!redSelected && optimistic.redCardIds.length >= MAX_RED_CARDS)
+                  predictionFlow.extrasLocked || (!redSelected && optimistic.redCardIds.length >= MAX_RED_CARDS)
 
                 return (
                   <div
@@ -349,8 +375,24 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
             </div>
           )}
         </div>
+
+        <div className="mt-3 space-y-2">
+          <button
+            type="button"
+            disabled={extrasSaving || predictionFlow.extrasLocked}
+            onClick={saveExtras}
+            className="h-11 w-full rounded-xl bg-(--color-primary) text-sm font-semibold text-black shadow-[0_8px_22px_rgba(163,230,53,0.28)] transition disabled:opacity-60"
+          >
+            {predictionFlow.extrasLocked
+              ? "Detalles guardados"
+              : extrasSaving
+                ? "Guardando detalles..."
+                : "Guardar goleadores y tarjetas"}
+          </button>
+          {extrasError ? <p className="text-center text-xs text-red-400">{extrasError}</p> : null}
+        </div>
       </section>
-      )}
+      ) : null}
 
       <CleanSheetToggle
         matchId={match.id}
@@ -360,7 +402,7 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
         awayGoalsPredicted={draftScore.away}
         selectedCodes={cleanSheetCodes}
         onToggle={toggleCleanSheet}
-        isLocked={isLocked}
+        isLocked={predictionFlow.scoreLocked}
       />
 
       {isFinished && (
@@ -384,15 +426,15 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
 
       <button
         type="button"
-        disabled={isLocked}
+        disabled={predictionFlow.scoreLocked}
         onClick={() => handleScoreSubmit(draftScore.home, draftScore.away)}
         className={`h-12 w-full rounded-xl font-semibold transition ${
-          isLocked
+          predictionFlow.scoreLocked
             ? "border border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-primary)"
             : "bg-(--color-primary) text-black shadow-[0_8px_22px_rgba(163,230,53,0.35)]"
         }`}
       >
-        {isLocked
+        {predictionFlow.scoreLocked
           ? `Bloqueada · ${draftScore.home}-${draftScore.away}`
           : `Bloquear predicción · ${draftScore.home}-${draftScore.away}`}
       </button>

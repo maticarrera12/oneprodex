@@ -134,7 +134,15 @@ describe("commitScorerEdits", () => {
     expect(mocks.revalidatePath).not.toHaveBeenCalled()
   })
 
-  it("rejects scorer edits when stored score is 0-0", async () => {
+  it("rejects scorers but still saves cards when stored score is 0-0", async () => {
+    const casUpdateChain = {
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValue({ data: [{ id: "pred-1" }], error: null }),
+    }
+    const deleteChain = {
+      eq: vi.fn().mockReturnThis(),
+    }
+    const insertFn = vi.fn().mockResolvedValue({ error: null })
     const predictionResult = {
       data: { home_score: 0, away_score: 0, edit_locked: false },
       error: null,
@@ -147,7 +155,16 @@ describe("commitScorerEdits", () => {
     const service = {
       from: vi.fn((table: string) => {
         if (table === "predictions") {
-          return { select: vi.fn().mockReturnValue(selectChain) }
+          return {
+            select: vi.fn().mockReturnValue(selectChain),
+            update: vi.fn().mockReturnValue(casUpdateChain),
+          }
+        }
+        if (table === "prediction_players") {
+          return {
+            delete: vi.fn().mockReturnValue(deleteChain),
+            insert: insertFn,
+          }
         }
         throw new Error(`Unexpected table ${table}`)
       }),
@@ -157,12 +174,20 @@ describe("commitScorerEdits", () => {
     const formData = buildFormData({
       match_id: "match-1",
       scorers: JSON.stringify([{ player_api_id: 123, type: "SCORER" }]),
-      cards: JSON.stringify([]),
+      cards: JSON.stringify([{ player_api_id: 456, type: "YELLOW_CARD" }]),
     })
 
     const result = await commitScorerEdits(formData)
-    expect(result).toEqual({ error: "zero_zero" })
-    expect(mocks.revalidatePath).not.toHaveBeenCalled()
+    expect(result).not.toHaveProperty("error")
+    expect(insertFn).toHaveBeenCalledWith([
+      {
+        user_id: "user-1",
+        match_id: "match-1",
+        player_api_id: 456,
+        type: "YELLOW_CARD",
+      },
+    ])
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/partidos/match-1")
   })
 })
 

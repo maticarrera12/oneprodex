@@ -2,6 +2,7 @@
 
 import { useOptimistic, useTransition } from 'react'
 import {
+  commitScorerEdits,
   savePrediction,
   toggleScorerPrediction,
   toggleCardPrediction,
@@ -69,7 +70,8 @@ function optimisticReducer(state: OptimisticState, action: OptimisticAction): Op
 export function usePrediction(
   initial: MatchPredictionState,
   matchId: string,
-  isLocked: boolean,
+  scoreLocked: boolean,
+  extrasLocked: boolean,
   homeTeamCode: string,
   awayTeamCode: string,
 ) {
@@ -89,7 +91,7 @@ export function usePrediction(
   )
 
   function toggleScorer(apiId: number) {
-    if (isLocked) return
+    if (extrasLocked) return
     startTransition(() => {
       dispatchOptimistic({ type: 'TOGGLE_SCORER', apiId })
       void (async () => {
@@ -102,7 +104,7 @@ export function usePrediction(
   }
 
   function toggleYellowCard(apiId: number) {
-    if (isLocked) return
+    if (extrasLocked) return
     startTransition(() => {
       dispatchOptimistic({ type: 'TOGGLE_YELLOW_CARD', apiId })
       void (async () => {
@@ -116,7 +118,7 @@ export function usePrediction(
   }
 
   function toggleRedCard(apiId: number) {
-    if (isLocked) return
+    if (extrasLocked) return
     startTransition(() => {
       dispatchOptimistic({ type: 'TOGGLE_RED_CARD', apiId })
       void (async () => {
@@ -130,7 +132,7 @@ export function usePrediction(
   }
 
   function toggleCleanSheet(teamCode: string) {
-    if (isLocked) return
+    if (scoreLocked) return
     startTransition(() => {
       dispatchOptimistic({ type: 'TOGGLE_CLEAN_SHEET', teamCode })
       void (async () => {
@@ -143,7 +145,7 @@ export function usePrediction(
   }
 
   function handleScoreSubmit(home: number, away: number) {
-    if (isLocked) return
+    if (scoreLocked) return
     startTransition(() => {
       dispatchOptimistic({ type: 'SET_SCORE', home, away })
       void (async () => {
@@ -156,5 +158,33 @@ export function usePrediction(
     })
   }
 
-  return { optimistic, toggleScorer, toggleYellowCard, toggleRedCard, toggleCleanSheet, handleScoreSubmit }
+  async function handleExtrasSubmit(): Promise<{ error?: string }> {
+    if (extrasLocked) return { error: 'already_locked' }
+
+    const fd = new FormData()
+    fd.set('match_id', matchId)
+    fd.set(
+      'scorers',
+      JSON.stringify(optimistic.scorerIds.map((player_api_id) => ({ player_api_id, type: 'SCORER' }))),
+    )
+    fd.set(
+      'cards',
+      JSON.stringify([
+        ...optimistic.yellowCardIds.map((player_api_id) => ({ player_api_id, type: 'YELLOW_CARD' })),
+        ...optimistic.redCardIds.map((player_api_id) => ({ player_api_id, type: 'RED_CARD' })),
+      ]),
+    )
+
+    return commitScorerEdits(fd)
+  }
+
+  return {
+    optimistic,
+    toggleScorer,
+    toggleYellowCard,
+    toggleRedCard,
+    toggleCleanSheet,
+    handleScoreSubmit,
+    handleExtrasSubmit,
+  }
 }

@@ -601,6 +601,7 @@ export type Database = {
       }
       users: {
         Row: {
+          awards_at: string | null
           avatar_url: string | null
           bracket_submitted_at: string | null
           created_at: string | null
@@ -609,8 +610,10 @@ export type Database = {
           id: string
           achievement_points: number
           onboarding_mode: string
+          prode_picks_submitted_at: string | null
         }
         Insert: {
+          awards_at?: string | null
           avatar_url?: string | null
           bracket_submitted_at?: string | null
           created_at?: string | null
@@ -619,8 +622,10 @@ export type Database = {
           id: string
           achievement_points?: number
           onboarding_mode?: string
+          prode_picks_submitted_at?: string | null
         }
         Update: {
+          awards_at?: string | null
           avatar_url?: string | null
           bracket_submitted_at?: string | null
           created_at?: string | null
@@ -629,6 +634,7 @@ export type Database = {
           id?: string
           achievement_points?: number
           onboarding_mode?: string
+          prode_picks_submitted_at?: string | null
         }
         Relationships: []
       }

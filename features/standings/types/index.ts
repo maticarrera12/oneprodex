@@ -45,6 +45,7 @@ export interface StandingGroup {
   played: number
   total: number
   rows: StandingRow[]
+  projectedRows?: StandingRow[]
   fixtures: GroupFixture[]
   insight: GroupInsight
 }

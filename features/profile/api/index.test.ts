@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { mapToProfileAchievement } from "@/features/profile/api"
+import { getUserStats, mapToProfileAchievement, mapUserProfile } from "@/features/profile/api"
 
 type AchievementRow = Parameters<typeof mapToProfileAchievement>[0]
 
@@ -183,5 +183,74 @@ describe("mapToProfileAchievement", () => {
       expect(result.icon).toBe("calendar")
       expect(result.tone).toBe("amber")
     })
+  })
+})
+
+describe("getUserStats", () => {
+  it("includes achievement_points in total points and calculates streak from scored predictions", async () => {
+    const predictionsResult = {
+      data: [
+        { points: 2 },
+        { points: 5 },
+        { points: 0 },
+        { points: 5 },
+        { points: null },
+      ],
+      error: null,
+    }
+    const userResult = { data: { achievement_points: 10 }, error: null }
+    const supabase = {
+      from: (table: string) => {
+        if (table === "predictions") {
+          return {
+            select: () => ({
+              eq: () => ({
+                order: () => predictionsResult,
+              }),
+            }),
+          }
+        }
+        if (table === "users") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: () => userResult,
+              }),
+            }),
+          }
+        }
+        throw new Error(`Unexpected table ${table}`)
+      },
+    }
+
+    const stats = await getUserStats(supabase as never, "user-1")
+
+    expect(stats.totalPts).toBe(22)
+    expect(stats.predictionPts).toBe(12)
+    expect(stats.achievementPts).toBe(10)
+    expect(stats.streak).toBe(2)
+    expect(stats.accuracy).toBe(3 / 4)
+  })
+})
+
+describe("mapUserProfile", () => {
+  it("uses dynamic champion pick details when available", () => {
+    const profile = mapUserProfile(
+      {
+        id: "user-1",
+        display_name: "User One",
+        handle: "userone",
+        created_at: "2026-06-01T00:00:00Z",
+        achievement_points: 10,
+      } as never,
+      { totalPts: 22, predictionPts: 12, achievementPts: 10, predictionCount: 4, accuracy: 0.75, streak: 2 },
+      { code: "BRA", name: "Brasil", logo: "https://example.com/bra.png" },
+    )
+
+    expect(profile.championPick).toBe("BRA")
+    expect(profile.championPickName).toBe("Brasil")
+    expect(profile.championPickLogo).toBe("https://example.com/bra.png")
+    expect(profile.points).toBe(22)
+    expect(profile.streak).toBe(2)
   })
 })

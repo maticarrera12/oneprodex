@@ -4,9 +4,9 @@ import { deriveOnboardingStep } from "@/features/onboarding/api"
 describe("deriveOnboardingStep", () => {
   // --- existing quick-mode tests (backward compat) ---
 
-  it("returns complete when bracket is submitted", () => {
+  it("returns complete when awards timestamp exists", () => {
     const step = deriveOnboardingStep({
-      submittedAt: "2026-05-14T12:00:00.000Z",
+      awardsAt: "2026-05-14T12:00:00.000Z",
       onboardingMode: "quick",
       groupPickCount: 48,
       bestThirdCount: 8,
@@ -21,7 +21,7 @@ describe("deriveOnboardingStep", () => {
 
   it("returns mode_select when onboardingMode is null", () => {
     const step = deriveOnboardingStep({
-      submittedAt: null,
+      awardsAt: null,
       onboardingMode: null,
       groupPickCount: 0,
       bestThirdCount: 0,
@@ -38,7 +38,7 @@ describe("deriveOnboardingStep", () => {
 
   it("returns quick_step 1 when group picks are incomplete (quick mode)", () => {
     const step = deriveOnboardingStep({
-      submittedAt: null,
+      awardsAt: null,
       onboardingMode: "quick",
       groupPickCount: 47,
       bestThirdCount: 0,
@@ -53,7 +53,7 @@ describe("deriveOnboardingStep", () => {
 
   it("returns quick_step 2 when best thirds are incomplete (quick mode)", () => {
     const step = deriveOnboardingStep({
-      submittedAt: null,
+      awardsAt: null,
       onboardingMode: "quick",
       groupPickCount: 48,
       bestThirdCount: 7,
@@ -68,7 +68,7 @@ describe("deriveOnboardingStep", () => {
 
   it("returns quick_step 3 when bracket picks are incomplete (quick mode)", () => {
     const step = deriveOnboardingStep({
-      submittedAt: null,
+      awardsAt: null,
       onboardingMode: "quick",
       groupPickCount: 48,
       bestThirdCount: 8,
@@ -83,7 +83,7 @@ describe("deriveOnboardingStep", () => {
 
   it("returns quick_step 4 when awards are missing (quick mode)", () => {
     const step = deriveOnboardingStep({
-      submittedAt: null,
+      awardsAt: null,
       onboardingMode: "quick",
       groupPickCount: 48,
       bestThirdCount: 8,
@@ -100,7 +100,7 @@ describe("deriveOnboardingStep", () => {
 
   it("returns prode_picks when prode picks are incomplete (prode mode)", () => {
     const step = deriveOnboardingStep({
-      submittedAt: null,
+      awardsAt: null,
       onboardingMode: "prode",
       groupPickCount: 0,
       bestThirdCount: 0,
@@ -115,7 +115,7 @@ describe("deriveOnboardingStep", () => {
 
   it("returns prode_picks with filled=0 when no prode picks exist", () => {
     const step = deriveOnboardingStep({
-      submittedAt: null,
+      awardsAt: null,
       onboardingMode: "prode",
       groupPickCount: 0,
       bestThirdCount: 0,
@@ -130,7 +130,8 @@ describe("deriveOnboardingStep", () => {
 
   it("returns bracket when all prode picks done but bracket incomplete (prode mode)", () => {
     const step = deriveOnboardingStep({
-      submittedAt: null,
+      awardsAt: null,
+      prodePicksSubmittedAt: null,
       onboardingMode: "prode",
       groupPickCount: 0,
       bestThirdCount: 0,
@@ -143,9 +144,25 @@ describe("deriveOnboardingStep", () => {
     expect(step).toEqual({ status: "bracket" })
   })
 
+  it("returns awards when prode picks were saved to continue but are incomplete", () => {
+    const step = deriveOnboardingStep({
+      awardsAt: null,
+      prodePicksSubmittedAt: "2026-06-10T16:00:00.000Z",
+      onboardingMode: "prode",
+      groupPickCount: 0,
+      bestThirdCount: 0,
+      bracketPickCount: 0,
+      hasTournamentPrediction: false,
+      hasAllAwards: false,
+      prodePickCount: 12,
+      groupStageMatchCount: 72,
+    })
+    expect(step).toEqual({ status: "awards" })
+  })
+
   it("returns awards when prode picks done and bracket done but awards missing (prode mode)", () => {
     const step = deriveOnboardingStep({
-      submittedAt: null,
+      awardsAt: null,
       onboardingMode: "prode",
       groupPickCount: 0,
       bestThirdCount: 0,
@@ -158,9 +175,9 @@ describe("deriveOnboardingStep", () => {
     expect(step).toEqual({ status: "awards" })
   })
 
-  it("returns complete for prode mode when bracket is submitted", () => {
+  it("returns complete for prode mode when awards timestamp exists", () => {
     const step = deriveOnboardingStep({
-      submittedAt: "2026-05-14T12:00:00.000Z",
+      awardsAt: "2026-05-14T12:00:00.000Z",
       onboardingMode: "prode",
       groupPickCount: 0,
       bestThirdCount: 0,
@@ -171,5 +188,20 @@ describe("deriveOnboardingStep", () => {
       groupStageMatchCount: 72,
     })
     expect(step).toEqual({ status: "complete" })
+  })
+
+  it("does not complete prode mode from awards alone until awards timestamp is set", () => {
+    const step = deriveOnboardingStep({
+      awardsAt: null,
+      onboardingMode: "prode",
+      groupPickCount: 0,
+      bestThirdCount: 0,
+      bracketPickCount: 32,
+      hasTournamentPrediction: true,
+      hasAllAwards: true,
+      prodePickCount: 72,
+      groupStageMatchCount: 72,
+    })
+    expect(step).toEqual({ status: "awards" })
   })
 })

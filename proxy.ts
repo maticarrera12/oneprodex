@@ -45,18 +45,18 @@ export async function proxy(request: NextRequest) {
   if (user && onboardingEnabled) {
     const { data: profile } = await supabase
       .from('users')
-      .select('bracket_submitted_at')
+      .select('awards_at')
       .eq('id', user.id)
       .maybeSingle()
 
-    const hasSubmittedBracket = Boolean(profile?.bracket_submitted_at)
+    const hasCompletedAwards = Boolean(profile?.awards_at)
 
     const isUnirseRoute = pathname.startsWith('/unirse')
-    if (!hasSubmittedBracket && !isOnboardingRoute && !isUnirseRoute && !pathname.startsWith('/api/')) {
+    if (!hasCompletedAwards && !isOnboardingRoute && !isUnirseRoute && !pathname.startsWith('/api/')) {
       return NextResponse.redirect(new URL('/onboarding', request.url))
     }
 
-    if (hasSubmittedBracket && isOnboardingRoute) {
+    if (hasCompletedAwards && isOnboardingRoute) {
       return NextResponse.redirect(new URL('/', request.url))
     }
   }

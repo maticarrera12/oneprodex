@@ -246,10 +246,10 @@ export async function saveBracketPicks(formData: FormData): Promise<void> {
   validateBracketPicks(picks)
 
   const service = createServiceClient()
-  const lockResult = await service.from("users").select("bracket_submitted_at").eq("id", userId).maybeSingle()
+  const lockResult = await service.from("users").select("awards_at").eq("id", userId).maybeSingle()
   if (lockResult.error) throw new Error(lockResult.error.message)
-  if (lockResult.data?.bracket_submitted_at) {
-    throw new Error("Forbidden: bracket already submitted")
+  if (lockResult.data?.awards_at) {
+    throw new Error("Forbidden: onboarding already completed")
   }
 
   const upsertResult = await service
@@ -291,9 +291,7 @@ export async function saveTournamentPredictions(formData: FormData): Promise<voi
 
   const service = createServiceClient()
 
-  // Check if awards were already submitted by looking for an existing row with
-  // all three awards filled. bracket_submitted_at is not a reliable gate here
-  // because prode-mode users have it set before they reach the awards step.
+  // Awards are immutable once all three required picks exist.
   const awardsLockResult = await service
     .from("tournament_predictions")
     .select("top_scorer_api_id,best_player_api_id,best_young_player_api_id")
@@ -318,7 +316,7 @@ export async function saveTournamentPredictions(formData: FormData): Promise<voi
 
   const submitResult = await service
     .from("users")
-    .update({ bracket_submitted_at: new Date().toISOString() })
+    .update({ awards_at: new Date().toISOString() })
     .eq("id", userId)
   if (submitResult.error) throw new Error(submitResult.error.message)
 
@@ -326,7 +324,7 @@ export async function saveTournamentPredictions(formData: FormData): Promise<voi
 
   revalidatePath("/onboarding")
   revalidatePath("/grupo")
-  redirect("/grupo")
+  redirect("/")
 }
 
 export async function setOnboardingMode(formData: FormData): Promise<void> {
@@ -339,6 +337,18 @@ export async function setOnboardingMode(formData: FormData): Promise<void> {
   const service = createServiceClient()
   const { error } = await service.from("users").update({ onboarding_mode: mode }).eq("id", userId)
   if (error) throw new Error(error.message)
+  revalidatePath("/onboarding")
+}
+
+export async function continueFromProdePicks(): Promise<void> {
+  const userId = await getAuthUserId()
+  const service = createServiceClient()
+  const { error } = await service
+    .from("users")
+    .update({ prode_picks_submitted_at: new Date().toISOString() })
+    .eq("id", userId)
+  if (error) throw new Error(error.message)
+
   revalidatePath("/onboarding")
 }
 
@@ -373,10 +383,24 @@ export async function saveMatchScorePick(formData: FormData): Promise<void> {
   revalidatePath("/standings")
 }
 
+const GROUP_NUM_TO_CODE: Record<string, string> = {
+  "1": "A", "2": "B", "3": "C", "4": "D",
+  "5": "E", "6": "F", "7": "G", "8": "H",
+  "9": "I", "10": "J", "11": "K", "12": "L",
+}
+
+function groupFromStage(stage: string): string | null {
+  const letter = stage.match(/Group\s+([A-L])\b/i)
+  if (letter) return letter[1].toUpperCase()
+  const num = stage.match(/Group Stage\s*-\s*(\d+)/i)
+  if (num) return GROUP_NUM_TO_CODE[num[1]] ?? null
+  return null
+}
+
 export async function deriveAndPersistGroupRankings(userId: string): Promise<void> {
   const service = createServiceClient()
 
-  // Fetch only group-stage predictions for this user (partial fills are fine)
+  // Fetch all group-stage predictions for this user (partial fills are fine)
   const { data: predictionRows, error: predError } = await service
     .from("predictions")
     .select("match_id,home_score,away_score,matches!inner(stage)")
@@ -389,16 +413,16 @@ export async function deriveAndPersistGroupRankings(userId: string): Promise<voi
 
   const { data: rawMatchRows, error: matchError } = await service
     .from("matches")
-    .select("id,stage,home_team_code,away_team_code")
+    .select("id,home_team_code,away_team_code,stage")
     .in("id", matchIds)
-    .ilike("stage", "Group Stage%")
-
-  const matchRows = (rawMatchRows ?? []).map((m) => ({
-    ...m,
-    group_code: m.stage?.match(/Group\s+([A-L])$/i)?.[1]?.toUpperCase() ?? null,
-  }))
 
   if (matchError || !rawMatchRows) return
+
+  // Derive group from stage field ("Group Stage - Group A" → "A")
+  const matchRows = rawMatchRows.map((m) => ({
+    ...m,
+    group_code: groupFromStage(m.stage) ?? null,
+  }))
 
   // Compute group standings using pure function
   const { computeGroupStandings } = await import("@/features/onboarding/utils/group-standings")
@@ -450,11 +474,21 @@ export async function deriveAndPersistGroupRankings(userId: string): Promise<voi
     }
   }
 
-  const { error: upsertError } = await service
-    .from("group_picks")
-    .upsert(groupPicksPayload, { onConflict: "user_id,group_code,position" })
+  const affectedGroups = [...new Set(groupPicksPayload.map((r) => r.group_code))]
 
-  if (upsertError) throw new Error(upsertError.message)
+  const { error: deleteError } = await service
+    .from("group_picks")
+    .delete()
+    .eq("user_id", userId)
+    .in("group_code", affectedGroups)
+
+  if (deleteError) throw new Error(deleteError.message)
+
+  const { error: insertError } = await service
+    .from("group_picks")
+    .insert(groupPicksPayload)
+
+  if (insertError) throw new Error(insertError.message)
 }
 
 type PredictionRow = { match_id: string; home_score: number; away_score: number }

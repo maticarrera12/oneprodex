@@ -13,7 +13,8 @@ type TournamentPredictionRow = Pick<
 const GROUP_STAGE_MATCH_COUNT = 72
 
 export type DeriveStepInput = {
-  submittedAt: string | null
+  awardsAt: string | null
+  prodePicksSubmittedAt?: string | null
   onboardingMode: string | null
   groupPickCount: number
   bestThirdCount: number
@@ -25,15 +26,16 @@ export type DeriveStepInput = {
 }
 
 export function deriveOnboardingStep(input: DeriveStepInput): OnboardingStep {
-  if (input.submittedAt) return { status: 'complete' }
+  if (input.awardsAt) return { status: 'complete' }
   if (!input.onboardingMode) return { status: 'mode_select' }
 
   if (input.onboardingMode === 'prode') {
-    if (input.prodePickCount < input.groupStageMatchCount)
+    if (input.prodePickCount < input.groupStageMatchCount) {
+      if (input.prodePicksSubmittedAt) return { status: 'awards' }
       return { status: 'prode_picks', filled: input.prodePickCount, total: input.groupStageMatchCount }
+    }
     if (input.bracketPickCount < 32) return { status: 'bracket' }
-    if (!input.hasAllAwards) return { status: 'awards' }
-    return { status: 'complete' }
+    return { status: 'awards' }
   }
 
   // mode = 'quick' — existing 4-step logic
@@ -87,20 +89,23 @@ function mapTournamentPrediction(row: TournamentPredictionRow | null): Onboardin
   }
 }
 
-function groupCodeFromStage(stage: string | null): GroupCode | null {
-  if (!stage) return null
-  const m = stage.match(/Group\s+([A-L])$/i)
-  return m ? (m[1].toUpperCase() as GroupCode) : null
+const VALID_GROUPS: GroupCode[] = ["A","B","C","D","E","F","G","H","I","J","K","L"]
+
+function normalizeGroupCode(raw: string): string {
+  const s = raw.trim().toUpperCase()
+  return s.startsWith("GROUP ") ? s.slice(6) : s
 }
 
 export async function getGroupStageMatchesWithPredictions(
   supabase: SupabaseClient<Database>,
   userId: string
 ): Promise<Partial<Record<GroupCode, MatchWithPrediction[]>>> {
-  const [matchesResult, predictionsResult] = await Promise.all([
+  const [standingsResult, teamsResult, matchesResult, predictionsResult] = await Promise.all([
+    supabase.from("standings").select("group_code,team_code"),
+    supabase.from("teams").select("api_id,code"),
     supabase
       .from("matches")
-      .select("id,home_team_code,away_team_code,stage,kickoff")
+      .select("id,home_team_code,away_team_code,kickoff,stage")
       .ilike("stage", "Group Stage%")
       .order("kickoff", { ascending: true }),
     supabase
@@ -109,28 +114,45 @@ export async function getGroupStageMatchesWithPredictions(
       .eq("user_id", userId),
   ])
 
-  const matches = matchesResult.data ?? []
-  const predictions = predictionsResult.data ?? []
+  // Resolve numeric api_id team codes → canonical code (same as getStandingsByGroup)
+  const byApiId = new Map<string, string>()
+  const byCode = new Set<string>()
+  for (const t of teamsResult.data ?? []) {
+    const canonical = t.code.trim().toUpperCase()
+    byCode.add(canonical)
+    if (t.api_id != null) byApiId.set(String(t.api_id), canonical)
+  }
 
-  const predByMatchId = new Map(predictions.map((p) => [p.match_id, p]))
+  const teamToGroup = new Map<string, GroupCode>()
+  for (const row of standingsResult.data ?? []) {
+    const g = normalizeGroupCode(row.group_code) as GroupCode
+    if (!VALID_GROUPS.includes(g)) continue
+    const raw = row.team_code.trim()
+    const canonical = byCode.has(raw.toUpperCase())
+      ? raw.toUpperCase()
+      : (byApiId.get(raw) ?? raw.toUpperCase())
+    teamToGroup.set(canonical, g)
+  }
+
+  const predByMatchId = new Map((predictionsResult.data ?? []).map((p) => [p.match_id, p]))
 
   const result: Partial<Record<GroupCode, MatchWithPrediction[]>> = {}
-  for (const match of matches) {
-    const group = groupCodeFromStage(match.stage)
+  for (const match of matchesResult.data ?? []) {
+    const homeCode = match.home_team_code.trim().toUpperCase()
+    const awayCode = match.away_team_code.trim().toUpperCase()
+    const group = teamToGroup.get(homeCode) ?? teamToGroup.get(awayCode)
     if (!group) continue
     if (!result[group]) result[group] = []
     const pred = predByMatchId.get(match.id)
     result[group]!.push({
       match: {
         id: match.id,
-        home_team_code: match.home_team_code,
-        away_team_code: match.away_team_code,
+        home_team_code: homeCode,
+        away_team_code: awayCode,
         group_code: group,
         kickoff: match.kickoff,
       },
-      prediction: pred
-        ? { home_score: pred.home_score, away_score: pred.away_score }
-        : null,
+      prediction: pred ? { home_score: pred.home_score, away_score: pred.away_score } : null,
     })
   }
 
@@ -142,7 +164,7 @@ export async function getOnboardingState(
   userId: string
 ): Promise<OnboardingState> {
   const [userResult, groupCountResult, bestThirdCountResult, bracketCountResult, tournamentResult, prodePickCountResult] = await Promise.all([
-    supabase.from("users").select("bracket_submitted_at,onboarding_mode").eq("id", userId).maybeSingle(),
+    supabase.from("users").select("awards_at,prode_picks_submitted_at,onboarding_mode").eq("id", userId).maybeSingle(),
     supabase.from("group_picks").select("user_id", { count: "exact", head: true }).eq("user_id", userId),
     supabase
       .from("group_picks")
@@ -161,12 +183,14 @@ export async function getOnboardingState(
       .select("match_id, matches!inner(stage)", { count: "exact", head: true })
       .eq("user_id", userId)
       .ilike("matches.stage", "Group Stage%"),
+
   ])
 
   const tournamentPrediction = tournamentResult.error ? null : tournamentResult.data
   const userData = userResult.error ? null : userResult.data
   const step = deriveOnboardingStep({
-    submittedAt: userData?.bracket_submitted_at ?? null,
+    awardsAt: userData?.awards_at ?? null,
+    prodePicksSubmittedAt: userData?.prode_picks_submitted_at ?? null,
     onboardingMode: userData?.onboarding_mode ?? null,
     groupPickCount: groupCountResult.count ?? 0,
     bestThirdCount: bestThirdCountResult.count ?? 0,

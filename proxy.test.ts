@@ -25,10 +25,10 @@ describe("proxy onboarding gate", () => {
     vi.clearAllMocks()
   })
 
-  it("redirects authenticated users without submitted bracket to /onboarding", async () => {
+  it("redirects authenticated users without completed awards to /onboarding", async () => {
     process.env.NEXT_PUBLIC_ONBOARDING_ENABLED = "true"
 
-    const maybeSingle = vi.fn().mockResolvedValue({ data: { bracket_submitted_at: null } })
+    const maybeSingle = vi.fn().mockResolvedValue({ data: { awards_at: null } })
     const eq = vi.fn().mockReturnValue({ maybeSingle })
     const select = vi.fn().mockReturnValue({ eq })
 
@@ -44,7 +44,7 @@ describe("proxy onboarding gate", () => {
   it("does not force onboarding when feature flag is disabled", async () => {
     process.env.NEXT_PUBLIC_ONBOARDING_ENABLED = "false"
 
-    const maybeSingle = vi.fn().mockResolvedValue({ data: { bracket_submitted_at: null } })
+    const maybeSingle = vi.fn().mockResolvedValue({ data: { awards_at: null } })
     const eq = vi.fn().mockReturnValue({ maybeSingle })
     const select = vi.fn().mockReturnValue({ eq })
 
@@ -58,10 +58,10 @@ describe("proxy onboarding gate", () => {
     expect(response.status).toBe(200)
   })
 
-  it("redirects submitted users away from /onboarding to /", async () => {
+  it("redirects users with completed awards away from /onboarding to /", async () => {
     process.env.NEXT_PUBLIC_ONBOARDING_ENABLED = "true"
 
-    const maybeSingle = vi.fn().mockResolvedValue({ data: { bracket_submitted_at: "2026-05-14T00:00:00Z" } })
+    const maybeSingle = vi.fn().mockResolvedValue({ data: { awards_at: "2026-05-14T00:00:00Z" } })
     const eq = vi.fn().mockReturnValue({ maybeSingle })
     const select = vi.fn().mockReturnValue({ eq })
 
@@ -72,5 +72,23 @@ describe("proxy onboarding gate", () => {
 
     const response = await proxy(makeRequest("/onboarding"))
     expect(response.headers.get("location")).toBe("https://oneprodex.test/")
+  })
+
+  it("does not treat submitted bracket as completed onboarding without awards", async () => {
+    process.env.NEXT_PUBLIC_ONBOARDING_ENABLED = "true"
+
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: { awards_at: null, bracket_submitted_at: "2026-05-14T00:00:00Z" },
+    })
+    const eq = vi.fn().mockReturnValue({ maybeSingle })
+    const select = vi.fn().mockReturnValue({ eq })
+
+    mocks.createServerClient.mockReturnValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "u1" } } }) },
+      from: vi.fn().mockReturnValue({ select }),
+    })
+
+    const response = await proxy(makeRequest("/grupo"))
+    expect(response.headers.get("location")).toBe("https://oneprodex.test/onboarding")
   })
 })

@@ -13,7 +13,9 @@ export interface ProfileUser {
   nextLevelTitle: string
   levelCurrent: number
   levelTarget: number
-  championPick: string
+  championPick: string | null
+  championPickName?: string | null
+  championPickLogo?: string | null
   points: number
   rank: number
   rankOf: number

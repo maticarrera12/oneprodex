@@ -171,6 +171,7 @@ export function BracketStep({ groupRankings, bestThirds, initialPicks, logoByCod
     startTransition(async () => {
       try {
         await onContinue(formData)
+        window.location.assign(`/onboarding?continue=${Date.now()}`)
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "No se pudo guardar el bracket.")
       }

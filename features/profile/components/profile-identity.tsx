@@ -1,7 +1,7 @@
 import Image from "next/image"
-import { Flag } from "@/features/home/components/flag"
 import type { ProfileUser } from "@/features/profile/types"
 import { GroupAvatar } from "@/features/groups/components/group-avatar"
+import { TeamLogo } from "@/features/shared/components/team-logo"
 
 type ProfileIdentityProps = {
   user: ProfileUser
@@ -37,8 +37,14 @@ export function ProfileIdentity({ user, accentColor }: ProfileIdentityProps) {
             {user.levelTitle}
           </p>
           <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-(--color-lime-deep) bg-(--color-lime-bg) px-2 py-1 font-mono text-[10px] font-semibold tracking-wider text-(--color-primary) uppercase">
-            <Flag code={user.championPick} size={14} />
-            {user.championPick} champion pick
+            {user.championPick ? (
+              <>
+                <TeamLogo code={user.championPick} logo={user.championPickLogo} size={14} />
+                {user.championPickName ?? user.championPick} champion pick
+              </>
+            ) : (
+              "Sin champion pick"
+            )}
           </div>
         </div>
       </div>

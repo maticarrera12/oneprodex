@@ -15,35 +15,38 @@ type MatchAggRow = {
 }
 
 function buildSupabase(matchRows: MatchAggRow[], teamRows: unknown[] = []) {
-  // The implementation uses Promise.all with two parallel queries:
-  //   1. from("matches").select(...).not(...)
-  //   2. from("teams").select(...)
-  //
-  // We intercept by tracking which "from" call is which.
-  let matchesCallCount = 0
-  let teamsCallCount = 0
+  const standingsRows = Array.from(
+    matchRows.reduce((acc, row) => {
+      if (!row.group_code) return acc
+      acc.set(`${row.group_code}:${row.home_team_code}`, { group_code: row.group_code, team_code: row.home_team_code })
+      acc.set(`${row.group_code}:${row.away_team_code}`, { group_code: row.group_code, team_code: row.away_team_code })
+      return acc
+    }, new Map<string, { group_code: string; team_code: string }>())
+      .values(),
+  )
+
+  const standingsChain = {
+    order: vi.fn().mockReturnValue({ data: standingsRows, error: null }),
+  }
 
   const matchesChain = {
-    not: vi.fn().mockReturnValue({
-      data: matchRows,
-      error: null,
-    }),
+    ilike: vi.fn().mockReturnValue({ data: matchRows, error: null }),
   }
 
-  const teamsChain = {
-    data: teamRows,
-    error: null,
-  }
+  const teamsChain = { data: teamRows, error: null }
 
   const from = vi.fn().mockImplementation((table: string) => {
+    if (table === "standings") {
+      return {
+        select: vi.fn().mockReturnValue(standingsChain),
+      }
+    }
     if (table === "matches") {
-      matchesCallCount++
       return {
         select: vi.fn().mockReturnValue(matchesChain),
       }
     }
     if (table === "teams") {
-      teamsCallCount++
       return {
         select: vi.fn().mockReturnValue(teamsChain),
       }

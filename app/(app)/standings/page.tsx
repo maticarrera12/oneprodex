@@ -5,7 +5,10 @@ import { createClient } from "@/lib/supabase/server"
 
 export default async function StandingsPage() {
   const supabase = await createClient()
-  const groups = await getStandingsByGroup(supabase)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const groups = await getStandingsByGroup(supabase, user?.id ?? null)
 
   if (groups.length === 0) {
     return <EmptyState message="Sin datos de posiciones" />

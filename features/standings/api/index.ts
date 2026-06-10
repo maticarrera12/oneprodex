@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { formatKickoffParts } from "@/features/matches/utils/kickoff"
 import type { GroupFixture, StandingGroup, StandingQualification, StandingRow } from "@/features/standings/types"
+import { computeProjectedStandingRowsByGroup } from "@/features/standings/utils/projected-standings"
 import type { Database } from "@/lib/supabase/database.types"
 
 type MatchRow = Pick<
@@ -10,6 +11,10 @@ type MatchRow = Pick<
 type TeamVisualRow = Pick<
   Database["public"]["Tables"]["teams"]["Row"],
   "api_id" | "code" | "logo" | "name" | "c1" | "c2" | "c3"
+>
+type PredictionRow = Pick<
+  Database["public"]["Tables"]["predictions"]["Row"],
+  "match_id" | "home_score" | "away_score"
 >
 type TeamAccum = { w: number; d: number; l: number; gf: number; ga: number; pts: number }
 
@@ -93,8 +98,11 @@ function mapMatchToGroupFixture(row: MatchRow, logoByCode: Map<string, string | 
   }
 }
 
-export async function getStandingsByGroup(supabase: SupabaseClient<Database>): Promise<StandingGroup[]> {
-  const [{ data: standingsData, error: standingsError }, { data: matchData }, { data: teamsData }] =
+export async function getStandingsByGroup(
+  supabase: SupabaseClient<Database>,
+  userId?: string | null,
+): Promise<StandingGroup[]> {
+  const [{ data: standingsData, error: standingsError }, { data: matchData }, { data: teamsData }, { data: predictionData }] =
     await Promise.all([
       supabase
         .from("standings")
@@ -105,6 +113,12 @@ export async function getStandingsByGroup(supabase: SupabaseClient<Database>): P
         .select("id,home_team_code,away_team_code,home_score,away_score,status,kickoff,minute,stage")
         .ilike("stage", "Group Stage%"),
       supabase.from("teams").select("api_id,code,logo,name,c1,c2,c3"),
+      userId
+        ? supabase
+          .from("predictions")
+          .select("match_id,home_score,away_score")
+          .eq("user_id", userId)
+        : Promise.resolve({ data: [] as PredictionRow[] }),
     ])
 
   if (standingsError || !standingsData || standingsData.length === 0) return []
@@ -183,6 +197,31 @@ export async function getStandingsByGroup(supabase: SupabaseClient<Database>): P
   }
 
   const groups: StandingGroup[] = []
+  const projectedRowsByGroup = userId
+    ? computeProjectedStandingRowsByGroup({
+      groupToTeams,
+      matches: (matchData ?? []).flatMap((match) => {
+        const home = normalizeTeamCode(match.home_team_code)
+        const away = normalizeTeamCode(match.away_team_code)
+        const groupCode = teamToGroup.get(home) ?? teamToGroup.get(away)
+        if (!groupCode) return []
+        return [{ id: match.id, groupCode, home, away }]
+      }),
+      predictions: (predictionData ?? []).map((prediction) => ({
+        matchId: prediction.match_id,
+        homeScore: prediction.home_score,
+        awayScore: prediction.away_score,
+      })),
+      buildRow: (teamCode, accum, position) =>
+        mapAccumToStandingRow(
+          teamCode,
+          { w: accum.g, d: accum.e, l: accum.p, gf: accum.gf, ga: accum.ga, pts: accum.pts },
+          position,
+          teamsByCode,
+          teamsByApiId,
+        ),
+    })
+    : null
 
   for (const [groupCode, accumMap] of accumByGroup) {
     const sorted = Array.from(accumMap.entries()).sort(
@@ -204,6 +243,7 @@ export async function getStandingsByGroup(supabase: SupabaseClient<Database>): P
       played: sorted.reduce((sum, [, a]) => sum + a.w + a.d + a.l, 0),
       total: sorted.length * 3,
       rows: standingRows,
+      projectedRows: projectedRowsByGroup?.get(groupCode),
       fixtures,
       insight: {
         title: "Sin actividad reciente",
