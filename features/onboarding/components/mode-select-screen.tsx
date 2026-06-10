@@ -45,8 +45,6 @@ export function ModeSelectScreen({ onSelect }: ModeSelectScreenProps) {
       try {
         await onSelect(formData)
       } catch (cause) {
-        // redirect() throws a special Next.js error — let it propagate
-        if (cause instanceof Error && cause.message === "NEXT_REDIRECT") throw cause
         setError(cause instanceof Error ? cause.message : "No se pudo guardar el modo.")
       }
     })

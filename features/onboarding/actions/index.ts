@@ -339,7 +339,7 @@ export async function setOnboardingMode(formData: FormData): Promise<void> {
   const service = createServiceClient()
   const { error } = await service.from("users").update({ onboarding_mode: mode }).eq("id", userId)
   if (error) throw new Error(error.message)
-  redirect("/onboarding")
+  revalidatePath("/onboarding")
 }
 
 export async function saveMatchScorePick(formData: FormData): Promise<void> {

@@ -232,11 +232,11 @@ describe("onboarding actions", () => {
       mocks.createServiceClient.mockReturnValue(service)
 
       // redirect() throws internally — catch it so the assertion below can run
-      await setOnboardingMode(buildMultiFormData({ mode: "prode" })).catch(() => {})
+      await setOnboardingMode(buildMultiFormData({ mode: "prode" }))
 
       expect(update).toHaveBeenCalledWith({ onboarding_mode: "prode" })
       expect(updateChain.eq).toHaveBeenCalledWith("id", "user-1")
-      expect(mocks.redirect).toHaveBeenCalledWith("/onboarding")
+      expect(mocks.revalidatePath).toHaveBeenCalledWith("/onboarding")
     })
 
     it("accepts quick mode", async () => {
@@ -252,7 +252,7 @@ describe("onboarding actions", () => {
       }
       mocks.createServiceClient.mockReturnValue(service)
 
-      await setOnboardingMode(buildMultiFormData({ mode: "quick" })).catch(() => {})
+      await setOnboardingMode(buildMultiFormData({ mode: "quick" }))
 
       expect(update).toHaveBeenCalledWith({ onboarding_mode: "quick" })
     })
