@@ -9,16 +9,18 @@ import { CleanSheetToggle } from "@/features/predictions/components/clean-sheet-
 import { PointsBreakdown } from "@/features/predictions/components/points-breakdown"
 import { ScorePrediction } from "@/features/predictions/components/score-prediction"
 import { usePrediction } from "@/features/predictions/hooks/usePrediction"
+import type { MatchConsensusGroup } from "@/features/predictions/api"
 import type { MatchEvent, MatchPredictionState, PlayerDetail } from "@/features/predictions/types"
 import { MAX_RED_CARDS, MAX_SCORERS, MAX_YELLOW_CARDS } from "@/features/predictions/types"
 import type { Match } from "@/features/matches/types"
-import { derivePredictionFlow } from "@/features/matches/utils/prediction-flow"
+import { canPickScorerForTeam, derivePredictionFlow } from "@/features/matches/utils/prediction-flow"
 
 type MatchDetailScreenProps = {
   match: Match
   predictionState: MatchPredictionState
   players: { home: PlayerDetail[]; away: PlayerDetail[] }
   events: MatchEvent[]
+  consensusGroups: MatchConsensusGroup[]
 }
 
 function formatKickoff(kickoff: string): { date: string; time: string } {
@@ -41,7 +43,7 @@ function formatKickoff(kickoff: string): { date: string; time: string } {
   return { date, time }
 }
 
-export function MatchDetailScreen({ match, predictionState, players, events }: MatchDetailScreenProps) {
+export function MatchDetailScreen({ match, predictionState, players, events, consensusGroups }: MatchDetailScreenProps) {
   const router = useRouter()
   const isLive = match.status === "LIVE"
   const isFinished = match.status === "FINISHED"
@@ -65,6 +67,8 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
 
   const [extrasSaving, setExtrasSaving] = useState(false)
   const [extrasError, setExtrasError] = useState<string | null>(null)
+  const hasSavedOrOptimisticScore = Boolean(optimistic.score)
+  const scoreLocked = predictionFlow.scoreLocked || hasSavedOrOptimisticScore
 
   const activePlayers = useMemo(
     () => (selectedSquad === "home" ? players.home : players.away),
@@ -89,7 +93,7 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
   async function saveExtras() {
     setExtrasSaving(true)
     setExtrasError(null)
-    const result = await handleExtrasSubmit()
+    const result = await handleExtrasSubmit(draftScore.home, draftScore.away)
     setExtrasSaving(false)
 
     if (result.error) {
@@ -217,8 +221,9 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
           homeScore={draftScore.home}
           awayScore={draftScore.away}
           onChange={(home, away) => setDraftScore({ home, away })}
-          isLocked={predictionFlow.scoreLocked}
+          isLocked={scoreLocked}
           onSubmit={handleScoreSubmit}
+          showSubmit={false}
         />
       </section>
 
@@ -303,10 +308,15 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
                 const scorerSelected = optimistic.scorerIds.includes(player.api_id)
                 const yellowSelected = optimistic.yellowCardIds.includes(player.api_id)
                 const redSelected = optimistic.redCardIds.includes(player.api_id)
+                const scorerAllowedForSide = canPickScorerForTeam({
+                  teamSide: selectedSquad,
+                  homeScore: draftScore.home,
+                  awayScore: draftScore.away,
+                })
                 const blockScorer =
                   predictionFlow.extrasLocked ||
                   (!scorerSelected && optimistic.scorerIds.length >= MAX_SCORERS) ||
-                  (draftScore.home === 0 && draftScore.away === 0)
+                  !scorerAllowedForSide
                 const blockYellow =
                   predictionFlow.extrasLocked || (!yellowSelected && optimistic.yellowCardIds.length >= MAX_YELLOW_CARDS)
                 const blockRed =
@@ -387,7 +397,7 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
               ? "Detalles guardados"
               : extrasSaving
                 ? "Guardando detalles..."
-                : "Guardar goleadores y tarjetas"}
+                : "Guardar predicción"}
           </button>
           {extrasError ? <p className="text-center text-xs text-red-400">{extrasError}</p> : null}
         </div>
@@ -402,7 +412,7 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
         awayGoalsPredicted={draftScore.away}
         selectedCodes={cleanSheetCodes}
         onToggle={toggleCleanSheet}
-        isLocked={predictionFlow.scoreLocked}
+        isLocked={scoreLocked}
       />
 
       {isFinished && (
@@ -417,28 +427,117 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
         />
       )}
 
-      <section>
-        <p className="mb-2 text-xs font-semibold tracking-wider text-(--color-text2) uppercase">Les Cracks · consenso</p>
-        <div className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-4">
-          <p className="text-sm text-(--color-text3)">Cargando consenso...</p>
-        </div>
-      </section>
+      <ConsensusSection groups={consensusGroups} home={match.home} away={match.away} />
 
-      <button
-        type="button"
-        disabled={predictionFlow.scoreLocked}
-        onClick={() => handleScoreSubmit(draftScore.home, draftScore.away)}
-        className={`h-12 w-full rounded-xl font-semibold transition ${
-          predictionFlow.scoreLocked
-            ? "border border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-primary)"
-            : "bg-(--color-primary) text-black shadow-[0_8px_22px_rgba(163,230,53,0.35)]"
-        }`}
-      >
-        {predictionFlow.scoreLocked
-          ? `Bloqueada · ${draftScore.home}-${draftScore.away}`
-          : `Bloquear predicción · ${draftScore.home}-${draftScore.away}`}
-      </button>
     </div>
+  )
+}
+
+function ConsensusSection({
+  groups,
+  home,
+  away,
+}: {
+  groups: MatchConsensusGroup[]
+  home: string
+  away: string
+}) {
+  const [selectedGroupId, setSelectedGroupId] = useState(groups[0]?.id ?? "")
+  const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? groups[0]
+
+  useEffect(() => {
+    setSelectedGroupId(groups[0]?.id ?? "")
+  }, [groups])
+
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold tracking-wider text-(--color-text2) uppercase">
+          {groups.length === 0 ? "Unite a un grupo" : "Consenso del grupo"}
+        </p>
+        {groups.length === 1 ? (
+          <p className="truncate font-mono text-[10px] text-primary">{groups[0]?.name}</p>
+        ) : null}
+      </div>
+
+      <div className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-4">
+        {groups.length === 0 ? (
+          <p className="text-sm text-(--color-text3)">Cuando estés en un grupo vas a ver las predicciones de otros participantes para este partido.</p>
+        ) : (
+          <div className="space-y-3">
+            {groups.length > 1 ? (
+              <div className="scrollbar-none -mx-1 flex gap-2 overflow-x-auto px-1">
+                {groups.map((group) => {
+                  const active = group.id === selectedGroup?.id
+                  return (
+                    <button
+                      key={group.id}
+                      type="button"
+                      onClick={() => setSelectedGroupId(group.id)}
+                      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                        active
+                          ? "border-primary/45 bg-primary/15 text-primary"
+                          : "border-(--color-border-hi) bg-(--color-bg2) text-(--color-text2)"
+                      }`}
+                    >
+                      {group.name}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : null}
+
+            {selectedGroup ? (
+              <>
+                <div className="rounded-xl border border-(--color-border-hi) bg-(--color-bg2) p-3">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-(--color-text3)">
+                    {selectedGroup.name}
+                  </p>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        {selectedGroup.summary.topScore
+                          ? `Marcador más elegido: ${selectedGroup.summary.topScore}`
+                          : "Todavía no hay predicciones"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-(--color-text3)">
+                        {selectedGroup.summary.count > 0
+                          ? `${selectedGroup.summary.count} predicción${selectedGroup.summary.count === 1 ? "" : "es"} cargada${selectedGroup.summary.count === 1 ? "" : "s"}`
+                          : `Cuando alguien prediga ${home} - ${away}, aparece acá.`}
+                      </p>
+                    </div>
+                    {selectedGroup.summary.topScore ? (
+                      <span className="rounded-full border border-primary/35 bg-primary/15 px-3 py-1 font-mono text-xs font-semibold text-primary">
+                        {selectedGroup.summary.topScoreCount}x
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                {selectedGroup.predictions.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedGroup.predictions.map((prediction) => (
+                      <div
+                        key={prediction.userId}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-(--color-border-hi) bg-(--color-bg2) px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">{prediction.displayName}</p>
+                          <p className="font-mono text-[10px] text-(--color-text3)">@{prediction.handle}</p>
+                        </div>
+                        <span className="rounded-lg border border-(--color-border-hi) bg-background px-2.5 py-1 font-mono text-sm font-semibold">
+                          {prediction.homeScore}-{prediction.awayScore}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+        )}
+      </div>
+    </section>
   )
 }
 

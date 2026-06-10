@@ -20,6 +20,7 @@ type ScorePredictionProps = {
   onChange: (home: number, away: number) => void
   isLocked: boolean
   onSubmit: (home: number, away: number) => void
+  showSubmit?: boolean
 }
 
 export function ScorePrediction({
@@ -28,6 +29,7 @@ export function ScorePrediction({
   onChange,
   isLocked,
   onSubmit,
+  showSubmit = true,
 }: ScorePredictionProps) {
   return (
     <>
@@ -75,7 +77,7 @@ export function ScorePrediction({
         })}
       </div>
 
-      {!isLocked && (
+      {!isLocked && showSubmit && (
         <>
           <div className="flex items-center justify-center gap-3 px-4 pb-3">
             <span className="font-mono text-[11px] text-(--color-text3)">Resultado exacto · 5 pts</span>

@@ -202,6 +202,8 @@ type ScorerOrCardRow = {
 
 export async function commitScorerEdits(formData: FormData): Promise<{ error?: string }> {
   const matchId = formData.get('match_id') as string
+  const homeScoreRaw = formData.get('home_score')
+  const awayScoreRaw = formData.get('away_score')
   const scorers: ScorerOrCardRow[] = JSON.parse(formData.get('scorers') as string ?? '[]')
   const cards: ScorerOrCardRow[] = JSON.parse(formData.get('cards') as string ?? '[]')
 
@@ -219,9 +221,23 @@ export async function commitScorerEdits(formData: FormData): Promise<{ error?: s
     .eq('match_id', matchId)
     .maybeSingle()
 
-  if (!storedPrediction) return { error: 'no_prediction' }
+  let prediction = storedPrediction
+  if (!prediction) {
+    if (homeScoreRaw === null || awayScoreRaw === null) return { error: 'no_prediction' }
+    const homeScore = Number(homeScoreRaw)
+    const awayScore = Number(awayScoreRaw)
+    if (!Number.isFinite(homeScore) || !Number.isFinite(awayScore)) return { error: 'invalid_score' }
 
-  const scoreIsZeroZero = storedPrediction.home_score === 0 && storedPrediction.away_score === 0
+    const { error: scoreError } = await serviceClient.from('predictions').upsert(
+      { user_id: user.id, match_id: matchId, home_score: homeScore, away_score: awayScore },
+      { onConflict: 'user_id,match_id' },
+    )
+    if (scoreError) return { error: scoreError.message }
+
+    prediction = { home_score: homeScore, away_score: awayScore, edit_locked: false }
+  }
+
+  const scoreIsZeroZero = prediction.home_score === 0 && prediction.away_score === 0
 
   // Atomic CAS: lock the prediction only if it's not already locked
   // UPDATE predictions SET edit_locked = true WHERE match_id = $1 AND user_id = $2 AND edit_locked = false RETURNING id
@@ -244,7 +260,36 @@ export async function commitScorerEdits(formData: FormData): Promise<{ error?: s
     .eq('user_id', user.id)
     .eq('match_id', matchId)
 
-  const rows = [...(scoreIsZeroZero ? [] : scorers), ...cards]
+  let validScorers = scorers
+  if (scoreIsZeroZero) {
+    validScorers = []
+  } else if (scorers.length > 0) {
+    const { data: matchTeams } = await serviceClient
+      .from('matches')
+      .select('home_team_code,away_team_code')
+      .eq('id', matchId)
+      .maybeSingle()
+
+    if (matchTeams) {
+      const allowedTeamCodes = new Set<string>()
+      if (prediction.home_score > 0) allowedTeamCodes.add(matchTeams.home_team_code)
+      if (prediction.away_score > 0) allowedTeamCodes.add(matchTeams.away_team_code)
+
+      const scorerIds = scorers.map((row) => row.player_api_id)
+      const { data: playerRows } = await serviceClient
+        .from('players')
+        .select('api_id,team_code')
+        .in('api_id', scorerIds)
+
+      const teamByPlayerId = new Map((playerRows ?? []).map((row) => [row.api_id, row.team_code] as const))
+      validScorers = scorers.filter((row) => {
+        const teamCode = teamByPlayerId.get(row.player_api_id)
+        return teamCode ? allowedTeamCodes.has(teamCode) : false
+      })
+    }
+  }
+
+  const rows = [...validScorers, ...cards]
   if (rows.length > 0) {
     await serviceClient.from('prediction_players').insert(
       rows.map((row) => ({

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation"
 
 import MatchDetailScreen from "@/features/matches/components/match-detail-screen"
 import { getMatchById } from "@/features/matches/api"
-import { getPredictionsForMatch, getPlayersForMatch } from "@/features/predictions/api"
+import { getPredictionsForMatch, getPlayersForMatch, getMatchConsensusGroups } from "@/features/predictions/api"
 import { createClient } from "@/lib/supabase/server"
 import type { MatchEvent, MatchPredictionState } from "@/features/predictions/types"
 
@@ -31,7 +31,10 @@ export default async function MatchDetailPage({ params }: Props) {
 
   if (!match) notFound()
 
-  const players = await getPlayersForMatch(supabase, match.home, match.away)
+  const [players, consensusGroups] = await Promise.all([
+    getPlayersForMatch(supabase, match.home, match.away),
+    user ? getMatchConsensusGroups(supabase, match.id, user.id) : Promise.resolve([]),
+  ])
 
   const events: MatchEvent[] = []
 
@@ -41,6 +44,7 @@ export default async function MatchDetailPage({ params }: Props) {
       predictionState={predState}
       players={players}
       events={events}
+      consensusGroups={consensusGroups}
     />
   )
 }

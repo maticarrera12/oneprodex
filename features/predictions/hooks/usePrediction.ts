@@ -1,11 +1,9 @@
 'use client'
 
-import { useOptimistic, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import {
   commitScorerEdits,
   savePrediction,
-  toggleScorerPrediction,
-  toggleCardPrediction,
   toggleCleanSheetPrediction,
 } from '@/features/predictions/actions'
 import type { MatchPredictionState } from '@/features/predictions/types'
@@ -77,8 +75,22 @@ export function usePrediction(
 ) {
   const [, startTransition] = useTransition()
 
-  const [optimistic, dispatchOptimistic] = useOptimistic<OptimisticState, OptimisticAction>(
-    {
+  const [optimistic, setOptimistic] = useState<OptimisticState>({
+    homeTeamCode,
+    awayTeamCode,
+    scorerIds: initial.scorerIds,
+    yellowCardIds: initial.yellowCardIds,
+    redCardIds: initial.redCardIds,
+    cleanSheetCodes: initial.cleanSheetCodes,
+    score: initial.score,
+  })
+
+  function dispatchOptimistic(action: OptimisticAction) {
+    setOptimistic((current) => optimisticReducer(current, action))
+  }
+
+  useEffect(() => {
+    setOptimistic({
       homeTeamCode,
       awayTeamCode,
       scorerIds: initial.scorerIds,
@@ -86,20 +98,13 @@ export function usePrediction(
       redCardIds: initial.redCardIds,
       cleanSheetCodes: initial.cleanSheetCodes,
       score: initial.score,
-    },
-    optimisticReducer,
-  )
+    })
+  }, [awayTeamCode, homeTeamCode, initial, matchId])
 
   function toggleScorer(apiId: number) {
     if (extrasLocked) return
     startTransition(() => {
       dispatchOptimistic({ type: 'TOGGLE_SCORER', apiId })
-      void (async () => {
-        const fd = new FormData()
-        fd.set('match_id', matchId)
-        fd.set('player_api_id', String(apiId))
-        await toggleScorerPrediction(fd)
-      })()
     })
   }
 
@@ -107,13 +112,6 @@ export function usePrediction(
     if (extrasLocked) return
     startTransition(() => {
       dispatchOptimistic({ type: 'TOGGLE_YELLOW_CARD', apiId })
-      void (async () => {
-        const fd = new FormData()
-        fd.set('match_id', matchId)
-        fd.set('player_api_id', String(apiId))
-        fd.set('type', 'YELLOW_CARD')
-        await toggleCardPrediction(fd)
-      })()
     })
   }
 
@@ -121,13 +119,6 @@ export function usePrediction(
     if (extrasLocked) return
     startTransition(() => {
       dispatchOptimistic({ type: 'TOGGLE_RED_CARD', apiId })
-      void (async () => {
-        const fd = new FormData()
-        fd.set('match_id', matchId)
-        fd.set('player_api_id', String(apiId))
-        fd.set('type', 'RED_CARD')
-        await toggleCardPrediction(fd)
-      })()
     })
   }
 
@@ -158,11 +149,13 @@ export function usePrediction(
     })
   }
 
-  async function handleExtrasSubmit(): Promise<{ error?: string }> {
+  async function handleExtrasSubmit(home: number, away: number): Promise<{ error?: string }> {
     if (extrasLocked) return { error: 'already_locked' }
 
     const fd = new FormData()
     fd.set('match_id', matchId)
+    fd.set('home_score', String(home))
+    fd.set('away_score', String(away))
     fd.set(
       'scorers',
       JSON.stringify(optimistic.scorerIds.map((player_api_id) => ({ player_api_id, type: 'SCORER' }))),
