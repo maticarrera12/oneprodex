@@ -44,6 +44,16 @@ export async function savePrediction(formData: FormData): Promise<void> {
   if (!user) return
 
   const serviceClient = createServiceClient()
+
+  // Score lock guard: reject score update if prediction row already exists
+  const { data: existing } = await serviceClient
+    .from('predictions')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('match_id', matchId)
+    .maybeSingle()
+  if (existing) return
+
   await serviceClient.from('predictions').upsert(
     { user_id: user.id, match_id: matchId, home_score: homeScore, away_score: awayScore },
     { onConflict: 'user_id,match_id' },
@@ -92,6 +102,16 @@ export async function toggleScorerPrediction(formData: FormData): Promise<void> 
   if (!user) return
 
   const serviceClient = createServiceClient()
+
+  // 0-0 guard: reject scorer insert if stored prediction score is 0-0
+  const { data: storedPrediction } = await serviceClient
+    .from('predictions')
+    .select('home_score,away_score')
+    .eq('user_id', user.id)
+    .eq('match_id', matchId)
+    .maybeSingle()
+  if (storedPrediction && storedPrediction.home_score === 0 && storedPrediction.away_score === 0) return
+
   const { data: existing } = await serviceClient
     .from('prediction_players')
     .select('id')
@@ -173,4 +193,72 @@ export async function toggleCardPrediction(formData: FormData): Promise<void> {
 export async function toggleCleanSheetPrediction(formData: FormData): Promise<void> {
   const matchId = formData.get('match_id') as string
   revalidatePath(`/partidos/${matchId}`)
+}
+
+type ScorerOrCardRow = {
+  player_api_id: number
+  type: 'SCORER' | 'YELLOW_CARD' | 'RED_CARD'
+}
+
+export async function commitScorerEdits(formData: FormData): Promise<{ error?: string }> {
+  const matchId = formData.get('match_id') as string
+  const scorers: ScorerOrCardRow[] = JSON.parse(formData.get('scorers') as string ?? '[]')
+  const cards: ScorerOrCardRow[] = JSON.parse(formData.get('cards') as string ?? '[]')
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'unauthorized' }
+
+  const serviceClient = createServiceClient()
+
+  // Fetch stored prediction to check 0-0 and edit_locked state
+  const { data: storedPrediction } = await serviceClient
+    .from('predictions')
+    .select('home_score,away_score,edit_locked')
+    .eq('user_id', user.id)
+    .eq('match_id', matchId)
+    .maybeSingle()
+
+  if (!storedPrediction) return { error: 'no_prediction' }
+
+  // 0-0 guard runs FIRST (spec edge case E3)
+  if (storedPrediction.home_score === 0 && storedPrediction.away_score === 0) {
+    return { error: 'zero_zero' }
+  }
+
+  // Atomic CAS: lock the prediction only if it's not already locked
+  // UPDATE predictions SET edit_locked = true WHERE match_id = $1 AND user_id = $2 AND edit_locked = false RETURNING id
+  const { data: locked } = await serviceClient
+    .from('predictions')
+    .update({ edit_locked: true })
+    .eq('user_id', user.id)
+    .eq('match_id', matchId)
+    .eq('edit_locked', false)
+    .select('id')
+
+  if (!locked || locked.length === 0) {
+    return { error: 'already_locked' }
+  }
+
+  // Delete existing scorer/card rows and insert new ones
+  await serviceClient
+    .from('prediction_players')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('match_id', matchId)
+
+  const rows = [...scorers, ...cards]
+  if (rows.length > 0) {
+    await serviceClient.from('prediction_players').insert(
+      rows.map((row) => ({
+        user_id: user.id,
+        match_id: matchId,
+        player_api_id: row.player_api_id,
+        type: row.type,
+      }))
+    )
+  }
+
+  revalidatePath(`/partidos/${matchId}`)
+  return {}
 }
