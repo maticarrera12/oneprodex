@@ -23,7 +23,7 @@ vi.mock("next/navigation", () => ({
   redirect: mocks.redirect,
 }))
 
-import { saveBestThirds, saveBracketPicks, saveGroupPicks, setOnboardingMode, saveMatchScorePick, deriveAndPersistGroupRankings } from "@/features/onboarding/actions"
+import { saveBestThirds, saveBracketPicks, saveGroupPicks, setOnboardingMode, saveMatchScorePick, deriveAndPersistGroupRankings, saveTournamentPredictions } from "@/features/onboarding/actions"
 
 const ALL_SLOTS = [
   "R32_P1",
@@ -373,6 +373,173 @@ describe("onboarding actions", () => {
         { onConflict: "user_id,match_id" }
       )
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/onboarding")
+    })
+
+    it("rejects when match is not a group-stage match (group_code is null)", async () => {
+      const matchSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "match-ko", group_code: null }, error: null }),
+      }
+      mocks.createServiceClient.mockReturnValue({
+        from: vi.fn((table: string) => {
+          if (table === "matches") return matchSelectChain
+          return { select: vi.fn().mockReturnThis() }
+        }),
+      })
+
+      const formData = buildMultiFormData({ match_id: "match-ko", home_score: "1", away_score: "0" })
+      await expect(saveMatchScorePick(formData)).rejects.toThrow("Not a group-stage match")
+    })
+
+    it("rejects when match is not found", async () => {
+      const matchSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }
+      mocks.createServiceClient.mockReturnValue({
+        from: vi.fn((table: string) => {
+          if (table === "matches") return matchSelectChain
+          return { select: vi.fn().mockReturnThis() }
+        }),
+      })
+
+      const formData = buildMultiFormData({ match_id: "no-such-match", home_score: "1", away_score: "0" })
+      await expect(saveMatchScorePick(formData)).rejects.toThrow("Not a group-stage match")
+    })
+
+    it("calls revalidatePath for /standings in addition to /onboarding", async () => {
+      const upsertFn = vi.fn().mockResolvedValue({ error: null })
+      const matchSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "m1", group_code: "A" }, error: null }),
+      }
+      const predSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        not: vi.fn().mockResolvedValue({ data: [], error: null }),
+      }
+      mocks.createServiceClient.mockReturnValue({
+        from: vi.fn((table: string) => {
+          if (table === "matches") return matchSelectChain
+          if (table === "predictions") return { upsert: upsertFn, select: vi.fn().mockReturnValue(predSelectChain) }
+          if (table === "group_picks") return { upsert: vi.fn().mockResolvedValue({ error: null }) }
+          return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis() }
+        }),
+      })
+
+      const formData = buildMultiFormData({ match_id: "m1", home_score: "2", away_score: "0" })
+      await saveMatchScorePick(formData)
+
+      expect(mocks.revalidatePath).toHaveBeenCalledWith("/standings")
+      expect(mocks.revalidatePath).toHaveBeenCalledWith("/onboarding")
+    })
+  })
+
+  describe("deriveAndPersistGroupRankings", () => {
+    it("returns early without upserting when there are 0 predictions", async () => {
+      const upsertFn = vi.fn()
+      const predSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        not: vi.fn().mockResolvedValue({ data: [], error: null }),
+      }
+      mocks.createServiceClient.mockReturnValue({
+        from: vi.fn((table: string) => {
+          if (table === "predictions") return { select: vi.fn().mockReturnValue(predSelectChain) }
+          if (table === "group_picks") return { upsert: upsertFn }
+          return {}
+        }),
+      })
+
+      await deriveAndPersistGroupRankings("user-1")
+      expect(upsertFn).not.toHaveBeenCalled()
+    })
+
+    it("upserts 4 group_picks rows for a group with 3 predictions (partial fill)", async () => {
+      // Group A has 3 predictions: A1 beats A2, A1 beats A3, A2 draws A3
+      const predictions = [
+        { match_id: "m1", home_score: 2, away_score: 0, matches: { group_code: "A" } },
+        { match_id: "m2", home_score: 1, away_score: 0, matches: { group_code: "A" } },
+        { match_id: "m3", home_score: 1, away_score: 1, matches: { group_code: "A" } },
+      ]
+      const matchRows = [
+        { id: "m1", group_code: "A", home_team_code: "A1", away_team_code: "A2" },
+        { id: "m2", group_code: "A", home_team_code: "A1", away_team_code: "A3" },
+        { id: "m3", group_code: "A", home_team_code: "A2", away_team_code: "A3" },
+      ]
+
+      const upsertFn = vi.fn().mockResolvedValue({ error: null })
+      const predSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        not: vi.fn().mockResolvedValue({ data: predictions, error: null }),
+      }
+      const matchSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        in: vi.fn().mockReturnThis(),
+        not: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
+      }
+
+      mocks.createServiceClient.mockReturnValue({
+        from: vi.fn((table: string) => {
+          if (table === "predictions") return { select: vi.fn().mockReturnValue(predSelectChain) }
+          if (table === "matches") return matchSelectChain
+          if (table === "group_picks") return { upsert: upsertFn }
+          return {}
+        }),
+      })
+
+      await deriveAndPersistGroupRankings("user-1")
+
+      expect(upsertFn).toHaveBeenCalledTimes(1)
+      const upsertedRows = upsertFn.mock.calls[0]?.[0] as Array<{ group_code: string; position: number; team_code: string }>
+      const groupARows = upsertedRows.filter((r) => r.group_code === "A")
+      // Only 3 teams have predictions (A1, A2, A3) — A4 not seen so 3 rows
+      expect(groupARows).toHaveLength(3)
+      // A1: 6pts — 1st place
+      expect(groupARows.find((r) => r.position === 1)?.team_code).toBe("A1")
+    })
+
+    it("breaks pts+GD+GF tie alphabetically", async () => {
+      // A1 and A2 draw each match they play — identical stats → alphabetical
+      const predictions = [
+        { match_id: "m1", home_score: 1, away_score: 1, matches: { group_code: "A" } },
+      ]
+      const matchRows = [
+        { id: "m1", group_code: "A", home_team_code: "A1", away_team_code: "A2" },
+      ]
+
+      const upsertFn = vi.fn().mockResolvedValue({ error: null })
+      const predSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        not: vi.fn().mockResolvedValue({ data: predictions, error: null }),
+      }
+      const matchSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        in: vi.fn().mockReturnThis(),
+        not: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
+      }
+
+      mocks.createServiceClient.mockReturnValue({
+        from: vi.fn((table: string) => {
+          if (table === "predictions") return { select: vi.fn().mockReturnValue(predSelectChain) }
+          if (table === "matches") return matchSelectChain
+          if (table === "group_picks") return { upsert: upsertFn }
+          return {}
+        }),
+      })
+
+      await deriveAndPersistGroupRankings("user-1")
+
+      const upsertedRows = upsertFn.mock.calls[0]?.[0] as Array<{ group_code: string; position: number; team_code: string }>
+      const groupARows = upsertedRows.filter((r) => r.group_code === "A")
+      // Alphabetical: A1 first (position 1), A2 second (position 2)
+      expect(groupARows.find((r) => r.position === 1)?.team_code).toBe("A1")
+      expect(groupARows.find((r) => r.position === 2)?.team_code).toBe("A2")
     })
   })
 
