@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 type ModeSelectScreenProps = {
@@ -33,6 +34,7 @@ const MODES: ModeOption[] = [
 ]
 
 export function ModeSelectScreen({ onSelect }: ModeSelectScreenProps) {
+  const router = useRouter()
   const [selected, setSelected] = useState<"prode" | "quick" | null>(null)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -47,6 +49,7 @@ export function ModeSelectScreen({ onSelect }: ModeSelectScreenProps) {
     startTransition(async () => {
       try {
         await onSelect(formData)
+        router.refresh()
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "No se pudo guardar el modo.")
       }

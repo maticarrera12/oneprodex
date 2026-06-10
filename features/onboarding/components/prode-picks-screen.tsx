@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import type { GroupCode } from "@/features/onboarding/types"
 
@@ -87,6 +88,7 @@ function MatchRow({
   item: MatchWithPrediction
   onSave: (formData: FormData) => Promise<void>
 }) {
+  const router = useRouter()
   const [score, setScore] = useState<ScoreState>({
     home: item.prediction?.home_score ?? 0,
     away: item.prediction?.away_score ?? 0,
@@ -110,9 +112,9 @@ function MatchRow({
       try {
         await onSave(formData)
         setSaveState({ status: "saved", error: null })
+        router.refresh()
       } catch (cause) {
         const msg = cause instanceof Error ? cause.message : "Error al guardar."
-        // Check if it's the locked error
         if (msg.toLowerCase().includes("locked") || msg.toLowerCase().includes("already")) {
           setSaveState({ status: "error", error: "El resultado ya fue guardado y no se puede cambiar." })
         } else {
