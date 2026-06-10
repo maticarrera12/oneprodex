@@ -353,12 +353,12 @@ export async function saveMatchScorePick(formData: FormData): Promise<void> {
   // Verify this is a group-stage match before saving
   const { data: matchRow, error: matchLookupError } = await service
     .from("matches")
-    .select("id,group_code")
+    .select("id,stage")
     .eq("id", matchId)
     .maybeSingle()
 
   if (matchLookupError) throw new Error(matchLookupError.message)
-  if (!matchRow?.group_code) throw new Error("Not a group-stage match")
+  if (!matchRow?.stage?.toLowerCase().includes("group stage")) throw new Error("Not a group-stage match")
 
   const { error } = await service.from("predictions").upsert(
     { user_id: userId, match_id: matchId, home_score: homeScore, away_score: awayScore },
@@ -379,21 +379,26 @@ export async function deriveAndPersistGroupRankings(userId: string): Promise<voi
   // Fetch only group-stage predictions for this user (partial fills are fine)
   const { data: predictionRows, error: predError } = await service
     .from("predictions")
-    .select("match_id,home_score,away_score,matches!inner(group_code)")
+    .select("match_id,home_score,away_score,matches!inner(stage)")
     .eq("user_id", userId)
-    .not("matches.group_code", "is", null)
+    .ilike("matches.stage", "Group Stage%")
 
   if (predError || !predictionRows || predictionRows.length === 0) return
 
   const matchIds = predictionRows.map((row) => row.match_id)
 
-  const { data: matchRows, error: matchError } = await service
+  const { data: rawMatchRows, error: matchError } = await service
     .from("matches")
-    .select("id,group_code,home_team_code,away_team_code")
+    .select("id,stage,home_team_code,away_team_code")
     .in("id", matchIds)
-    .not("group_code", "is", null)
+    .ilike("stage", "Group Stage%")
 
-  if (matchError || !matchRows) return
+  const matchRows = (rawMatchRows ?? []).map((m) => ({
+    ...m,
+    group_code: m.stage?.match(/Group\s+([A-L])$/i)?.[1]?.toUpperCase() ?? null,
+  }))
+
+  if (matchError || !rawMatchRows) return
 
   // Compute group standings using pure function
   const { computeGroupStandings } = await import("@/features/onboarding/utils/group-standings")

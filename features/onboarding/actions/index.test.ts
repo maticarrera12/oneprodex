@@ -340,12 +340,12 @@ describe("onboarding actions", () => {
       const matchSelectChain = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "match-1", group_code: "A" }, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "match-1", stage: "Group Stage - Group A" }, error: null }),
       }
       const predSelectChain = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        not: vi.fn().mockResolvedValue({ data: [], error: null }),
+        ilike: vi.fn().mockResolvedValue({ data: [], error: null }),
       }
 
       mocks.createServiceClient.mockReturnValue({
@@ -380,7 +380,7 @@ describe("onboarding actions", () => {
       const matchSelectChain = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "match-ko", group_code: null }, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "match-ko", stage: "Round of 16" }, error: null }),
       }
       mocks.createServiceClient.mockReturnValue({
         from: vi.fn((table: string) => {
@@ -415,12 +415,12 @@ describe("onboarding actions", () => {
       const matchSelectChain = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "m1", group_code: "A" }, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "m1", stage: "Group Stage - Group A" }, error: null }),
       }
       const predSelectChain = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        not: vi.fn().mockResolvedValue({ data: [], error: null }),
+        ilike: vi.fn().mockResolvedValue({ data: [], error: null }),
       }
       mocks.createServiceClient.mockReturnValue({
         from: vi.fn((table: string) => {
@@ -445,7 +445,7 @@ describe("onboarding actions", () => {
       const predSelectChain = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        not: vi.fn().mockResolvedValue({ data: [], error: null }),
+        ilike: vi.fn().mockResolvedValue({ data: [], error: null }),
       }
       mocks.createServiceClient.mockReturnValue({
         from: vi.fn((table: string) => {
@@ -462,26 +462,26 @@ describe("onboarding actions", () => {
     it("upserts 4 group_picks rows for a group with 3 predictions (partial fill)", async () => {
       // Group A has 3 predictions: A1 beats A2, A1 beats A3, A2 draws A3
       const predictions = [
-        { match_id: "m1", home_score: 2, away_score: 0, matches: { group_code: "A" } },
-        { match_id: "m2", home_score: 1, away_score: 0, matches: { group_code: "A" } },
-        { match_id: "m3", home_score: 1, away_score: 1, matches: { group_code: "A" } },
+        { match_id: "m1", home_score: 2, away_score: 0, matches: { stage: "Group Stage - Group A" } },
+        { match_id: "m2", home_score: 1, away_score: 0, matches: { stage: "Group Stage - Group A" } },
+        { match_id: "m3", home_score: 1, away_score: 1, matches: { stage: "Group Stage - Group A" } },
       ]
       const matchRows = [
-        { id: "m1", group_code: "A", home_team_code: "A1", away_team_code: "A2" },
-        { id: "m2", group_code: "A", home_team_code: "A1", away_team_code: "A3" },
-        { id: "m3", group_code: "A", home_team_code: "A2", away_team_code: "A3" },
+        { id: "m1", stage: "Group Stage - Group A", home_team_code: "A1", away_team_code: "A2" },
+        { id: "m2", stage: "Group Stage - Group A", home_team_code: "A1", away_team_code: "A3" },
+        { id: "m3", stage: "Group Stage - Group A", home_team_code: "A2", away_team_code: "A3" },
       ]
 
       const upsertFn = vi.fn().mockResolvedValue({ error: null })
       const predSelectChain = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        not: vi.fn().mockResolvedValue({ data: predictions, error: null }),
+        ilike: vi.fn().mockResolvedValue({ data: predictions, error: null }),
       }
       const matchSelectChain = {
         select: vi.fn().mockReturnThis(),
         in: vi.fn().mockReturnThis(),
-        not: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
+        ilike: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
       }
 
       mocks.createServiceClient.mockReturnValue({
@@ -507,22 +507,22 @@ describe("onboarding actions", () => {
     it("breaks pts+GD+GF tie alphabetically", async () => {
       // A1 and A2 draw each match they play — identical stats → alphabetical
       const predictions = [
-        { match_id: "m1", home_score: 1, away_score: 1, matches: { group_code: "A" } },
+        { match_id: "m1", home_score: 1, away_score: 1, matches: { stage: "Group Stage - Group A" } },
       ]
       const matchRows = [
-        { id: "m1", group_code: "A", home_team_code: "A1", away_team_code: "A2" },
+        { id: "m1", stage: "Group Stage - Group A", home_team_code: "A1", away_team_code: "A2" },
       ]
 
       const upsertFn = vi.fn().mockResolvedValue({ error: null })
       const predSelectChain = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        not: vi.fn().mockResolvedValue({ data: predictions, error: null }),
+        ilike: vi.fn().mockResolvedValue({ data: predictions, error: null }),
       }
       const matchSelectChain = {
         select: vi.fn().mockReturnThis(),
         in: vi.fn().mockReturnThis(),
-        not: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
+        ilike: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
       }
 
       mocks.createServiceClient.mockReturnValue({

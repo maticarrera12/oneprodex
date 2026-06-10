@@ -87,6 +87,12 @@ function mapTournamentPrediction(row: TournamentPredictionRow | null): Onboardin
   }
 }
 
+function groupCodeFromStage(stage: string | null): GroupCode | null {
+  if (!stage) return null
+  const m = stage.match(/Group\s+([A-L])$/i)
+  return m ? (m[1].toUpperCase() as GroupCode) : null
+}
+
 export async function getGroupStageMatchesWithPredictions(
   supabase: SupabaseClient<Database>,
   userId: string
@@ -94,8 +100,8 @@ export async function getGroupStageMatchesWithPredictions(
   const [matchesResult, predictionsResult] = await Promise.all([
     supabase
       .from("matches")
-      .select("id,home_team_code,away_team_code,group_code,kickoff")
-      .not("group_code", "is", null)
+      .select("id,home_team_code,away_team_code,stage,kickoff")
+      .ilike("stage", "Group Stage%")
       .order("kickoff", { ascending: true }),
     supabase
       .from("predictions")
@@ -110,8 +116,8 @@ export async function getGroupStageMatchesWithPredictions(
 
   const result: Partial<Record<GroupCode, MatchWithPrediction[]>> = {}
   for (const match of matches) {
-    if (!match.group_code) continue
-    const group = match.group_code as GroupCode
+    const group = groupCodeFromStage(match.stage)
+    if (!group) continue
     if (!result[group]) result[group] = []
     const pred = predByMatchId.get(match.id)
     result[group]!.push({
@@ -152,9 +158,9 @@ export async function getOnboardingState(
       .maybeSingle(),
     supabase
       .from("predictions")
-      .select("match_id, matches!inner(group_code)", { count: "exact", head: true })
+      .select("match_id, matches!inner(stage)", { count: "exact", head: true })
       .eq("user_id", userId)
-      .not("matches.group_code", "is", null),
+      .ilike("matches.stage", "Group Stage%"),
   ])
 
   const tournamentPrediction = tournamentResult.error ? null : tournamentResult.data
