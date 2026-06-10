@@ -18,6 +18,7 @@ export interface MatchPredictionState {
   yellowCardIds: number[]
   redCardIds: number[]
   cleanSheetCodes: string[]
+  editLocked: boolean
 }
 
 export interface TournamentPrediction {

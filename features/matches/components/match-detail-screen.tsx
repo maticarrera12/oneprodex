@@ -43,6 +43,7 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
   const isLive = match.status === "LIVE"
   const isFinished = match.status === "FINISHED"
   const isLocked = match.status !== "UPCOMING"
+  const editLocked = predictionState.editLocked
   const kickoff = formatKickoff(match.kickoff)
   const [selectedSquad, setSelectedSquad] = useState<"home" | "away">("home")
 
@@ -196,6 +197,11 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
         />
       </section>
 
+      {!isLocked ? null : editLocked ? (
+        <section className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-4">
+          <p className="text-xs text-(--color-text3)">Ya editaste los detalles de este partido.</p>
+        </section>
+      ) : (
       <section className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-3">
         <div className="mb-3 flex gap-2">
           <button
@@ -344,6 +350,7 @@ export function MatchDetailScreen({ match, predictionState, players, events }: M
           )}
         </div>
       </section>
+      )}
 
       <CleanSheetToggle
         matchId={match.id}

@@ -10,7 +10,7 @@ export async function getPredictionsForMatch(
   const [predResult, playersResult, cleanSheetsResult] = await Promise.all([
     supabase
       .from('predictions')
-      .select('home_score,away_score')
+      .select('home_score,away_score,edit_locked')
       .eq('user_id', userId)
       .eq('match_id', matchId)
       .maybeSingle(),
@@ -30,6 +30,8 @@ export async function getPredictionsForMatch(
     ? { home_score: predResult.data.home_score, away_score: predResult.data.away_score }
     : null
 
+  const editLocked = predResult.data?.edit_locked ?? false
+
   const players = playersResult.data ?? []
   const scorerIds = players.filter((p) => p.type === 'SCORER').map((p) => p.player_api_id)
   const yellowCardIds = players.filter((p) => p.type === 'YELLOW_CARD').map((p) => p.player_api_id)
@@ -37,7 +39,7 @@ export async function getPredictionsForMatch(
 
   const cleanSheetCodes = (cleanSheetsResult.data ?? []).map((cs) => cs.team_code)
 
-  return { score, scorerIds, yellowCardIds, redCardIds, cleanSheetCodes }
+  return { score, scorerIds, yellowCardIds, redCardIds, cleanSheetCodes, editLocked }
 }
 
 export async function getPlayersForMatch(

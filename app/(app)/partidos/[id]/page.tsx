@@ -14,6 +14,7 @@ const EMPTY_PREDICTION: MatchPredictionState = {
   yellowCardIds: [],
   redCardIds: [],
   cleanSheetCodes: [],
+  editLocked: false,
 }
 
 export default async function MatchDetailPage({ params }: Props) {
