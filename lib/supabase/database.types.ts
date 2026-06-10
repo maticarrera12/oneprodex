@@ -406,6 +406,7 @@ export type Database = {
         Row: {
           away_score: number
           created_at: string | null
+          edit_locked: boolean
           home_score: number
           id: string
           locked: boolean
@@ -417,6 +418,7 @@ export type Database = {
         Insert: {
           away_score: number
           created_at?: string | null
+          edit_locked?: boolean
           home_score: number
           id?: string
           locked?: boolean
@@ -428,6 +430,7 @@ export type Database = {
         Update: {
           away_score?: number
           created_at?: string | null
+          edit_locked?: boolean
           home_score?: number
           id?: string
           locked?: boolean
@@ -605,6 +608,7 @@ export type Database = {
           handle: string
           id: string
           achievement_points: number
+          onboarding_mode: string
         }
         Insert: {
           avatar_url?: string | null
@@ -614,6 +618,7 @@ export type Database = {
           handle: string
           id: string
           achievement_points?: number
+          onboarding_mode?: string
         }
         Update: {
           avatar_url?: string | null
@@ -623,6 +628,7 @@ export type Database = {
           handle?: string
           id?: string
           achievement_points?: number
+          onboarding_mode?: string
         }
         Relationships: []
       }

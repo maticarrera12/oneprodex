@@ -60,8 +60,16 @@ export interface AwardsSelection {
   best_young_player_api_id: number | null
 }
 
+export type OnboardingStep =
+  | { status: 'complete' }
+  | { status: 'mode_select' }
+  | { status: 'prode_picks'; filled: number; total: number }
+  | { status: 'bracket' }
+  | { status: 'awards' }
+  | { status: 'quick_step'; step: 1 | 2 | 3 | 4 }
+
 export interface OnboardingState {
-  step: 1 | 2 | 3 | 4 | 'complete'
+  step: OnboardingStep
   groupRankings: GroupRankings | null
   bestThirds: string[] | null
   bracketPicks: BracketPick[] | null
