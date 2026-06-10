@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GroupInfo } from "@/features/groups/types"
 import type { RankingEntry } from "@/features/rankings/types"
+import { normalizeInviteCode } from "@/features/groups/utils/invite-code"
 import type { Database } from "@/lib/supabase/database.types"
 
 type GroupRow = Database["public"]["Tables"]["groups"]["Row"]
@@ -86,8 +87,11 @@ export async function getGroupByInviteCode(
   supabase: SupabaseClient<Database>,
   inviteCode: string
 ): Promise<GroupInfo | null> {
+  const normalizedCode = normalizeInviteCode(inviteCode)
+  if (!normalizedCode) return null
+
   const [groupResult] = await Promise.all([
-    supabase.from("groups").select("*").eq("invite_code", inviteCode.toUpperCase()).maybeSingle(),
+    supabase.from("groups").select("*").eq("invite_code", normalizedCode).maybeSingle(),
   ])
 
   if (groupResult.error || !groupResult.data) return null

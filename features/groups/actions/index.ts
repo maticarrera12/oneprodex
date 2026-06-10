@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { evaluateUser } from '@/lib/achievements/evaluate'
+import { normalizeInviteCode } from '@/features/groups/utils/invite-code'
 
 function generateInviteCode(): string {
   return Math.random().toString(36).slice(2, 8).toUpperCase()
@@ -55,7 +56,8 @@ export async function joinGroup(formData: FormData) {
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) return
 
-  const code = (formData.get('code') as string).toUpperCase()
+  const code = normalizeInviteCode(formData.get('code') as string)
+  if (!code) return
 
   const supabase = createServiceClient()
   const { data: group, error: groupError } = await supabase
