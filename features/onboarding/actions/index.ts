@@ -324,7 +324,6 @@ export async function saveTournamentPredictions(formData: FormData): Promise<voi
 
   revalidatePath("/onboarding")
   revalidatePath("/grupo")
-  redirect("/")
 }
 
 export async function setOnboardingMode(formData: FormData): Promise<void> {

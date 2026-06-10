@@ -641,7 +641,7 @@ describe("onboarding actions", () => {
   })
 
   describe("saveTournamentPredictions", () => {
-    it("marks awards_at when all awards are saved and redirects home", async () => {
+    it("marks awards_at when all awards are saved", async () => {
       const tournamentSelectChain = {
         eq: vi.fn().mockReturnThis(),
         maybeSingle: vi.fn().mockResolvedValue({
@@ -671,15 +671,13 @@ describe("onboarding actions", () => {
       mocks.createServiceClient.mockReturnValue(service)
       mocks.evaluateUser.mockResolvedValue([])
 
-      await expect(
-        saveTournamentPredictions(
-          buildMultiFormData({
-            top_scorer_api_id: "10",
-            best_player_api_id: "20",
-            best_young_player_api_id: "30",
-          })
-        )
-      ).rejects.toThrow("redirect")
+      await saveTournamentPredictions(
+        buildMultiFormData({
+          top_scorer_api_id: "10",
+          best_player_api_id: "20",
+          best_young_player_api_id: "30",
+        })
+      )
 
       expect(tournamentUpsert).toHaveBeenCalledWith(
         {
@@ -693,7 +691,8 @@ describe("onboarding actions", () => {
       expect(userUpdate).toHaveBeenCalledWith({ awards_at: expect.any(String) })
       expect(userUpdateEq).toHaveBeenCalledWith("id", "user-1")
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/onboarding")
-      expect(mocks.redirect).toHaveBeenCalledWith("/")
+      expect(mocks.revalidatePath).toHaveBeenCalledWith("/grupo")
+      expect(mocks.redirect).not.toHaveBeenCalled()
     })
   })
 })

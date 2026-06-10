@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState, useTransition } from "react"
 import type { AwardsSelection } from "@/features/onboarding/types"
 import { cn } from "@/lib/utils"
@@ -107,6 +108,7 @@ function PlayerSearchField({ title, placeholder, state, pending, onQueryChange, 
 }
 
 export function AwardsStep({ initialSelection, onContinue }: AwardsStepProps) {
+  const router = useRouter()
   const [topScorer, setTopScorer] = useState<FieldState>({ query: "", selected: null, results: [] })
   const [bestPlayer, setBestPlayer] = useState<FieldState>({ query: "", selected: null, results: [] })
   const [bestYoungPlayer, setBestYoungPlayer] = useState<FieldState>({ query: "", selected: null, results: [] })
@@ -186,6 +188,8 @@ export function AwardsStep({ initialSelection, onContinue }: AwardsStepProps) {
     startSubmitTransition(async () => {
       try {
         await onContinue(formData)
+        router.push("/")
+        router.refresh()
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "No se pudo enviar el onboarding.")
       }
