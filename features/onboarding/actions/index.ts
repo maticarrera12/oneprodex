@@ -319,6 +319,168 @@ export async function saveTournamentPredictions(formData: FormData): Promise<voi
   redirect("/grupo")
 }
 
+export async function setOnboardingMode(formData: FormData): Promise<void> {
+  const rawMode = formData.get("mode")
+  if (rawMode !== "prode" && rawMode !== "quick") {
+    throw new Error("Invalid onboarding mode. Expected 'prode' or 'quick'.")
+  }
+  const mode = rawMode as "prode" | "quick"
+  const userId = await getAuthUserId()
+  const service = createServiceClient()
+  const { error } = await service.from("users").update({ onboarding_mode: mode }).eq("id", userId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/onboarding")
+}
+
+export async function saveMatchScorePick(formData: FormData): Promise<void> {
+  const matchId = formData.get("match_id") as string
+  const homeScore = Number(formData.get("home_score"))
+  const awayScore = Number(formData.get("away_score"))
+
+  const userId = await getAuthUserId()
+  const service = createServiceClient()
+
+  const { error } = await service.from("predictions").upsert(
+    { user_id: userId, match_id: matchId, home_score: homeScore, away_score: awayScore },
+    { onConflict: "user_id,match_id" }
+  )
+  if (error) throw new Error(error.message)
+
+  // After upsert, count total prode picks for this user
+  const { count } = await service
+    .from("predictions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+
+  if ((count ?? 0) >= 72) {
+    await deriveAndPersistGroupRankings(userId)
+  }
+
+  revalidatePath("/onboarding")
+}
+
+export async function deriveAndPersistGroupRankings(userId: string): Promise<void> {
+  const service = createServiceClient()
+
+  // Idempotency guard: if group_picks already has 48 rows, skip
+  const { count: existingCount } = await service
+    .from("group_picks")
+    .select("user_id", { count: "exact", head: true })
+    .eq("user_id", userId)
+
+  if ((existingCount ?? 0) >= 48) return
+
+  // Fetch 72 predictions + match info for group-stage matches
+  const { data: predictionRows, error: predError } = await service
+    .from("predictions")
+    .select("match_id,home_score,away_score")
+    .eq("user_id", userId)
+
+  if (predError || !predictionRows || predictionRows.length < 72) return
+
+  const matchIds = predictionRows.map((row) => row.match_id)
+
+  const { data: matchRows, error: matchError } = await service
+    .from("matches")
+    .select("id,group_code,home_team_code,away_team_code")
+    .in("id", matchIds)
+    .not("group_code", "is", null)
+
+  if (matchError || !matchRows) return
+
+  // Compute group standings using pure function
+  const { computeGroupStandings } = await import("@/features/onboarding/utils/group-standings")
+  const rankings = computeGroupStandings(predictionRows, matchRows)
+
+  // Upsert group_picks rows (positions 1-4 per group)
+  const groupPicksPayload: Array<{
+    user_id: string
+    group_code: string
+    position: number
+    team_code: string
+    advances_as_third: boolean
+  }> = []
+
+  const allThirds: Array<{ group_code: string; team_code: string; pts: number; gd: number; gf: number }> = []
+
+  for (const [groupCode, teams] of Object.entries(rankings)) {
+    for (let i = 0; i < teams.length; i++) {
+      const teamCode = teams[i]
+      if (!teamCode) continue
+      groupPicksPayload.push({
+        user_id: userId,
+        group_code: groupCode,
+        position: i + 1,
+        team_code: teamCode,
+        advances_as_third: false,
+      })
+      if (i === 2) {
+        // position 3 (third-place teams)
+        const stats = computeTeamStats(predictionRows, matchRows, groupCode, teamCode)
+        allThirds.push({ group_code: groupCode, team_code: teamCode, ...stats })
+      }
+    }
+  }
+
+  // Determine best 8 thirds
+  const sortedThirds = allThirds.sort((a, b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts
+    if (b.gd !== a.gd) return b.gd - a.gd
+    if (b.gf !== a.gf) return b.gf - a.gf
+    return a.team_code.localeCompare(b.team_code)
+  })
+  const best8Codes = new Set(sortedThirds.slice(0, 8).map((t) => t.team_code))
+
+  // Mark advances_as_third for best 8
+  for (const pick of groupPicksPayload) {
+    if (pick.position === 3 && best8Codes.has(pick.team_code)) {
+      pick.advances_as_third = true
+    }
+  }
+
+  const { error: upsertError } = await service
+    .from("group_picks")
+    .upsert(groupPicksPayload, { onConflict: "user_id,group_code,position" })
+
+  if (upsertError) throw new Error(upsertError.message)
+}
+
+type PredictionRow = { match_id: string; home_score: number; away_score: number }
+type MatchRow = { id: string; group_code: string | null; home_team_code: string; away_team_code: string }
+
+function computeTeamStats(
+  predictions: PredictionRow[],
+  matches: MatchRow[],
+  groupCode: string,
+  teamCode: string
+): { pts: number; gd: number; gf: number } {
+  let pts = 0
+  let gd = 0
+  let gf = 0
+
+  const groupMatches = matches.filter((m) => m.group_code === groupCode)
+  for (const match of groupMatches) {
+    const isHome = match.home_team_code === teamCode
+    const isAway = match.away_team_code === teamCode
+    if (!isHome && !isAway) continue
+
+    const pred = predictions.find((p) => p.match_id === match.id)
+    if (!pred) continue
+
+    const [scored, conceded] = isHome
+      ? [pred.home_score, pred.away_score]
+      : [pred.away_score, pred.home_score]
+
+    gf += scored
+    gd += scored - conceded
+
+    if (scored > conceded) pts += 3
+    else if (scored === conceded) pts += 1
+  }
+
+  return { pts, gd, gf }
+}
+
 export async function searchPlayers(query: string): Promise<SearchPlayer[]> {
   const text = query.trim()
   if (text.length < 2) return []

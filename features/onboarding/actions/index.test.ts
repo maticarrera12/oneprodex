@@ -23,7 +23,7 @@ vi.mock("next/navigation", () => ({
   redirect: mocks.redirect,
 }))
 
-import { saveBestThirds, saveBracketPicks, saveGroupPicks } from "@/features/onboarding/actions"
+import { saveBestThirds, saveBracketPicks, saveGroupPicks, setOnboardingMode, saveMatchScorePick, deriveAndPersistGroupRankings } from "@/features/onboarding/actions"
 
 const ALL_SLOTS = [
   "R32_P1",
@@ -82,6 +82,14 @@ function buildGroupPicksPayload(): Array<{ group_code: string; position: number;
 function buildFormData(key: string, value: unknown): FormData {
   const formData = new FormData()
   formData.set(key, JSON.stringify(value))
+  return formData
+}
+
+function buildMultiFormData(data: Record<string, string>): FormData {
+  const formData = new FormData()
+  for (const [key, value] of Object.entries(data)) {
+    formData.set(key, value)
+  }
   return formData
 }
 
@@ -205,6 +213,157 @@ describe("onboarding actions", () => {
       expect(update).toHaveBeenNthCalledWith(1, { advances_as_third: false })
       expect(update).toHaveBeenNthCalledWith(2, { advances_as_third: true })
       expect(setChain.in).toHaveBeenCalledWith("team_code", selected)
+      expect(mocks.revalidatePath).toHaveBeenCalledWith("/onboarding")
+    })
+  })
+
+  describe("setOnboardingMode", () => {
+    it("writes onboarding_mode for the authenticated user", async () => {
+      const updateChain = {
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      }
+      const update = vi.fn().mockReturnValue(updateChain)
+      const service = {
+        from: vi.fn((table: string) => {
+          if (table === "users") return { update }
+          throw new Error(`Unexpected table ${table}`)
+        }),
+      }
+      mocks.createServiceClient.mockReturnValue(service)
+
+      await setOnboardingMode(buildMultiFormData({ mode: "prode" }))
+
+      expect(update).toHaveBeenCalledWith({ onboarding_mode: "prode" })
+      expect(updateChain.eq).toHaveBeenCalledWith("id", "user-1")
+      expect(mocks.revalidatePath).toHaveBeenCalledWith("/onboarding")
+    })
+
+    it("accepts quick mode", async () => {
+      const updateChain = {
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      }
+      const update = vi.fn().mockReturnValue(updateChain)
+      const service = {
+        from: vi.fn((table: string) => {
+          if (table === "users") return { update }
+          throw new Error(`Unexpected table ${table}`)
+        }),
+      }
+      mocks.createServiceClient.mockReturnValue(service)
+
+      await setOnboardingMode(buildMultiFormData({ mode: "quick" }))
+
+      expect(update).toHaveBeenCalledWith({ onboarding_mode: "quick" })
+    })
+
+    it("throws on invalid mode value", async () => {
+      mocks.createServiceClient.mockReturnValue({ from: vi.fn() })
+
+      await expect(
+        setOnboardingMode(buildMultiFormData({ mode: "wizard" }))
+      ).rejects.toThrow()
+    })
+  })
+
+  describe("saveMatchScorePick", () => {
+    it("upserts a prediction row and revalidates path", async () => {
+      const upsertFn = vi.fn().mockResolvedValue({ error: null })
+      const countChain = {
+        eq: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+      }
+      // simulate count query after upsert returning < 72
+      const selectCountResult = { count: 10, error: null }
+      const selectChain = {
+        eq: vi.fn().mockReturnThis(),
+        select: vi.fn().mockResolvedValue(selectCountResult),
+      }
+      const service = {
+        from: vi.fn((table: string) => {
+          if (table === "predictions") {
+            return {
+              upsert: upsertFn,
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnThis(),
+                count: 10,
+              }),
+            }
+          }
+          return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis() }
+        }),
+      }
+      // Separate mock to track count
+      const countResult = { count: 10, error: null }
+      const serviceWithCount = {
+        from: vi.fn((table: string) => {
+          if (table === "predictions") {
+            return {
+              upsert: vi.fn().mockResolvedValue({ error: null }),
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnThis(),
+                head: true,
+              }),
+            }
+          }
+          return {}
+        }),
+      }
+
+      // We need to handle: upsert then count query
+      const upsert2 = vi.fn().mockResolvedValue({ error: null })
+      const countSelectChain = {
+        eq: vi.fn().mockReturnThis(),
+        select: vi.fn().mockResolvedValue({ count: 10, error: null }),
+      }
+      let upsertCalled = false
+      const service2 = {
+        from: vi.fn((table: string) => {
+          if (table === "predictions") {
+            return {
+              upsert: (payload: unknown, opts: unknown) => {
+                upsert2(payload, opts)
+                upsertCalled = true
+                return Promise.resolve({ error: null })
+              },
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnThis(),
+                // when count is requested
+                then: vi.fn().mockResolvedValue({ count: 10, error: null }),
+              }),
+            }
+          }
+          return {}
+        }),
+      }
+
+      mocks.createServiceClient.mockReturnValue({
+        from: vi.fn((table: string) => {
+          if (table === "predictions") {
+            return {
+              upsert: upsertFn,
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnThis(),
+                head: true,
+                count: 10,
+              }),
+            }
+          }
+          return { select: vi.fn().mockReturnThis() }
+        }),
+      })
+
+      const formData = buildMultiFormData({
+        match_id: "match-1",
+        home_score: "2",
+        away_score: "1",
+      })
+
+      // We expect the action to upsert without throwing
+      await expect(saveMatchScorePick(formData)).resolves.not.toThrow()
+      expect(upsertFn).toHaveBeenCalledWith(
+        expect.objectContaining({ match_id: "match-1", home_score: 2, away_score: 1 }),
+        { onConflict: "user_id,match_id" }
+      )
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/onboarding")
     })
   })

@@ -6,18 +6,24 @@ import {
   saveBracketPicks,
   saveGroupPicks,
   saveTournamentPredictions,
+  setOnboardingMode,
+  saveMatchScorePick,
 } from "@/features/onboarding/actions"
 import { BestThirdsStep } from "@/features/onboarding/components/best-thirds-step"
 import { BracketStep } from "@/features/onboarding/components/bracket-step"
 import { GroupPicksStep } from "@/features/onboarding/components/group-picks-step"
+import { ModeSelectScreen } from "@/features/onboarding/components/mode-select-screen"
+import { ProdePicksScreen } from "@/features/onboarding/components/prode-picks-screen"
 import { ProgressBar } from "@/features/onboarding/components/progress-bar"
 import { AwardsStep } from "@/features/onboarding/components/awards-step"
 import type { GroupCode, OnboardingState, OnboardingStep, OnboardingTeam, ThirdPlaceTeam } from "@/features/onboarding/types"
+import type { MatchWithPrediction } from "@/features/onboarding/components/prode-picks-screen"
 
 type OnboardingScreenProps = {
   step: OnboardingStep
   savedData: Omit<OnboardingState, "step">
   teamsByGroup?: Partial<Record<GroupCode, OnboardingTeam[]>>
+  matchesByGroup?: Partial<Record<GroupCode, MatchWithPrediction[]>>
 }
 
 const ALL_GROUPS: GroupCode[] = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]
@@ -63,7 +69,7 @@ function deriveThirdPlaceTeams(
   })
 }
 
-export function OnboardingScreen({ step, savedData, teamsByGroup }: OnboardingScreenProps) {
+export function OnboardingScreen({ step, savedData, teamsByGroup, matchesByGroup }: OnboardingScreenProps) {
   const normalizedTeams = useMemo(
     () => normalizeTeamsByGroup(teamsByGroup, savedData.groupRankings, ALL_GROUPS),
     [savedData.groupRankings, teamsByGroup]
@@ -90,6 +96,19 @@ export function OnboardingScreen({ step, savedData, teamsByGroup }: OnboardingSc
   return (
     <div className="mx-auto w-full max-w-5xl space-y-4 py-4 pb-28">
       {quickStep !== null && <ProgressBar currentStep={quickStep} />}
+
+      {step.status === "mode_select" ? (
+        <ModeSelectScreen onSelect={setOnboardingMode} />
+      ) : null}
+
+      {step.status === "prode_picks" ? (
+        <ProdePicksScreen
+          matchesByGroup={matchesByGroup ?? {}}
+          filled={step.filled}
+          total={step.total}
+          onSave={saveMatchScorePick}
+        />
+      ) : null}
 
       {step.status === "quick_step" && step.step === 1 ? (
         <GroupPicksStep groups={ALL_GROUPS} teamsByGroup={normalizedTeams} initialRankings={savedData.groupRankings} onContinue={saveGroupPicks} />
