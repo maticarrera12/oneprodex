@@ -346,13 +346,13 @@ export async function evalLoPasoAlGrupo(
   userId: string,
   supabase: SupabaseClient,
 ): Promise<EvalResult | null> {
-  const [userResult, membershipResult] = await Promise.all([
-    supabase.from('users').select('bracket_submitted_at').eq('id', userId).maybeSingle(),
-    supabase.from('group_members').select('group_id', { count: 'exact', head: true }).eq('user_id', userId),
-  ])
+  const { data, error } = await supabase
+    .from('users')
+    .select('share_link_sent_at')
+    .eq('id', userId)
+    .maybeSingle()
 
-  if (userResult.error || !userResult.data?.bracket_submitted_at) return null
-  if (membershipResult.error || !membershipResult.count || membershipResult.count < 1) return null
+  if (error || !data?.share_link_sent_at) return null
 
   return { achievement_id: 'lo_paso_al_grupo', tier: 'bronze', progress_json: null }
 }

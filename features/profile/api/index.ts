@@ -111,27 +111,37 @@ export async function getProfileAchievements(
 ): Promise<ProfileAchievement[]> {
   const [catalogResult, earnedResult] = await Promise.all([
     supabase.from("achievements").select("id, name, description, type, tiers, points"),
-    supabase.from("user_achievements").select("*, achievements(*)").eq("user_id", userId),
+    supabase
+      .from("user_achievements")
+      .select("achievement_id, tier, earned_at, progress_json")
+      .eq("user_id", userId),
   ])
 
-  const catalog = catalogResult.data ?? []
-  const earned = (earnedResult.data ?? []) as unknown as UserAchievementJoinRow[]
-  const earnedMap = new Map(earned.map((r) => [r.achievement_id, r]))
+  if (catalogResult.error) {
+    console.error("[profile] failed to load achievements catalog:", catalogResult.error)
+    return []
+  }
+
+  if (earnedResult.error) {
+    console.error("[profile] failed to load user achievements:", earnedResult.error)
+  }
+
+  const catalog = catalogResult.data
+const earnedMap = new Map(
+    (earnedResult.data ?? []).map((r) => [r.achievement_id, r])
+  )
 
   return catalog.map((a) => {
     const userRow = earnedMap.get(a.id)
-    if (userRow) return mapToProfileAchievement(userRow)
-
-    // Not earned yet — build a locked placeholder
-    const placeholder: UserAchievementJoinRow = {
+    const joinRow: UserAchievementJoinRow = {
       user_id: userId,
       achievement_id: a.id,
-      tier: null,
-      earned_at: "",
-      progress_json: { current: 0 },
+      tier: (userRow?.tier as UserAchievementJoinRow["tier"]) ?? null,
+      earned_at: userRow?.earned_at ?? "",
+      progress_json: (userRow?.progress_json as Record<string, unknown>) ?? { current: 0 },
       achievements: a as UserAchievementJoinRow["achievements"],
     }
-    return mapToProfileAchievement(placeholder)
+    return mapToProfileAchievement(joinRow)
   })
 }
 

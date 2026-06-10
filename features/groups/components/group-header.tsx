@@ -32,9 +32,14 @@ export function GroupHeader({ name, members, inviteCode, onAdd, groups = [], act
     setShareOpen(false)
   }
 
+  function triggerShareAchievement() {
+    fetch('/api/achievements/share-group', { method: 'POST' }).catch(() => {})
+  }
+
   async function copyInviteLink() {
     if (typeof window !== 'undefined' && window.navigator?.clipboard?.writeText) {
       await window.navigator.clipboard.writeText(shareBase)
+      triggerShareAchievement()
       setToastMessage('Link copiado')
     }
   }
@@ -47,6 +52,7 @@ export function GroupHeader({ name, members, inviteCode, onAdd, groups = [], act
           text: shareText,
           url: shareBase,
         })
+        triggerShareAchievement()
         setToastMessage('Compartido')
         closeShare()
       } catch {
@@ -63,6 +69,7 @@ export function GroupHeader({ name, members, inviteCode, onAdd, groups = [], act
           text: shareText,
           url: shareBase,
         })
+        triggerShareAchievement()
         closeShare()
         return
       }
@@ -72,6 +79,7 @@ export function GroupHeader({ name, members, inviteCode, onAdd, groups = [], act
 
     if (typeof window !== 'undefined' && window.navigator?.clipboard?.writeText) {
       await window.navigator.clipboard.writeText(shareMessage)
+      triggerShareAchievement()
       setToastMessage('Texto copiado para Instagram')
     }
 
@@ -182,7 +190,7 @@ export function GroupHeader({ name, members, inviteCode, onAdd, groups = [], act
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 rounded-lg border border-(--color-border-hi) bg-(--color-card-hi) px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-black/20"
-                  onClick={closeShare}
+                  onClick={() => { triggerShareAchievement(); closeShare() }}
                 >
                   <span className="inline-flex size-5 items-center justify-center rounded-full bg-[#25D366] text-[10px] font-bold text-black">W</span>
                   WhatsApp
@@ -192,7 +200,7 @@ export function GroupHeader({ name, members, inviteCode, onAdd, groups = [], act
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 rounded-lg border border-(--color-border-hi) bg-(--color-card-hi) px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-black/20"
-                  onClick={closeShare}
+                  onClick={() => { triggerShareAchievement(); closeShare() }}
                 >
                   <span className="inline-flex size-5 items-center justify-center rounded-full bg-[#1877F2] text-[10px] font-bold text-white">f</span>
                   Facebook
@@ -202,7 +210,7 @@ export function GroupHeader({ name, members, inviteCode, onAdd, groups = [], act
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 rounded-lg border border-(--color-border-hi) bg-(--color-card-hi) px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-black/20"
-                  onClick={closeShare}
+                  onClick={() => { triggerShareAchievement(); closeShare() }}
                 >
                   <span className="inline-flex size-5 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white">X</span>
                   X
