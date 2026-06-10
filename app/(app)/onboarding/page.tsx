@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { getOnboardingState } from "@/features/onboarding/api"
+import { getOnboardingState, getGroupStageMatchesWithPredictions } from "@/features/onboarding/api"
 import { OnboardingScreen } from "@/features/onboarding/components/onboarding-screen"
 import { getStandingsByGroup } from "@/features/standings/api"
 import type { GroupCode, OnboardingTeam } from "@/features/onboarding/types"
@@ -60,7 +60,12 @@ export default async function OnboardingPage() {
     redirect("/")
   }
 
-  const teamsByGroup = await getTeamsByGroup(serviceClient)
+  const [teamsByGroup, matchesByGroup] = await Promise.all([
+    getTeamsByGroup(serviceClient),
+    state.step.status === "prode_picks"
+      ? getGroupStageMatchesWithPredictions(serviceClient, user.id)
+      : Promise.resolve(undefined),
+  ])
 
   return (
     <OnboardingScreen
@@ -72,6 +77,7 @@ export default async function OnboardingPage() {
         tournamentPredictions: state.tournamentPredictions,
       }}
       teamsByGroup={teamsByGroup}
+      matchesByGroup={matchesByGroup}
     />
   )
 }

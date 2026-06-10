@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { BracketPick, GroupCode, GroupRankings, OnboardingState, OnboardingStep } from "@/features/onboarding/types"
 import type { Database } from "@/lib/supabase/database.types"
+import type { GroupStageMatch, MatchWithPrediction } from "@/features/onboarding/components/prode-picks-screen"
 
 type GroupPickRow = Pick<Database["public"]["Tables"]["group_picks"]["Row"], "group_code" | "position" | "team_code">
 type BracketPickRow = Pick<Database["public"]["Tables"]["bracket_picks"]["Row"], "slot" | "team_code">
@@ -84,6 +85,50 @@ function mapTournamentPrediction(row: TournamentPredictionRow | null): Onboardin
     best_player_api_id: row.best_player_api_id,
     best_young_player_api_id: row.best_young_player_api_id,
   }
+}
+
+export async function getGroupStageMatchesWithPredictions(
+  supabase: SupabaseClient<Database>,
+  userId: string
+): Promise<Partial<Record<GroupCode, MatchWithPrediction[]>>> {
+  const [matchesResult, predictionsResult] = await Promise.all([
+    supabase
+      .from("matches")
+      .select("id,home_team_code,away_team_code,group_code,kickoff")
+      .not("group_code", "is", null)
+      .order("kickoff", { ascending: true }),
+    supabase
+      .from("predictions")
+      .select("match_id,home_score,away_score")
+      .eq("user_id", userId),
+  ])
+
+  const matches = matchesResult.data ?? []
+  const predictions = predictionsResult.data ?? []
+
+  const predByMatchId = new Map(predictions.map((p) => [p.match_id, p]))
+
+  const result: Partial<Record<GroupCode, MatchWithPrediction[]>> = {}
+  for (const match of matches) {
+    if (!match.group_code) continue
+    const group = match.group_code as GroupCode
+    if (!result[group]) result[group] = []
+    const pred = predByMatchId.get(match.id)
+    result[group]!.push({
+      match: {
+        id: match.id,
+        home_team_code: match.home_team_code,
+        away_team_code: match.away_team_code,
+        group_code: group,
+        kickoff: match.kickoff,
+      },
+      prediction: pred
+        ? { home_score: pred.home_score, away_score: pred.away_score }
+        : null,
+    })
+  }
+
+  return result
 }
 
 export async function getOnboardingState(
