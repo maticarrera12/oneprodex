@@ -18,7 +18,7 @@ export function ProfileAchievementsFull({ achievements }: Props) {
           <p className="mb-3 font-mono text-[10px] uppercase tracking-wider text-(--color-text3)">
             Conseguidos · {earned.length}
           </p>
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
             {earned.map((a) => <AchievementSquare key={a.id} achievement={a} />)}
           </div>
         </section>
@@ -29,7 +29,7 @@ export function ProfileAchievementsFull({ achievements }: Props) {
           <p className="mb-3 font-mono text-[10px] uppercase tracking-wider text-(--color-text3)">
             Bloqueados · {locked.length}
           </p>
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
             {locked.map((a) => <AchievementSquare key={a.id} achievement={a} />)}
           </div>
         </section>

@@ -339,7 +339,7 @@ export async function evalArrancamos(
 
   if (error || !data || !data.bracket_submitted_at) return null
 
-  return { achievement_id: 'arrancamos', tier: null, progress_json: null }
+  return { achievement_id: 'arrancamos', tier: 'bronze', progress_json: null }
 }
 
 export async function evalLoPasoAlGrupo(
@@ -354,7 +354,7 @@ export async function evalLoPasoAlGrupo(
   if (userResult.error || !userResult.data?.bracket_submitted_at) return null
   if (membershipResult.error || !membershipResult.count || membershipResult.count < 1) return null
 
-  return { achievement_id: 'lo_paso_al_grupo', tier: null, progress_json: null }
+  return { achievement_id: 'lo_paso_al_grupo', tier: 'bronze', progress_json: null }
 }
 
 export async function evalTrajoRefuerzos(
@@ -368,7 +368,7 @@ export async function evalTrajoRefuerzos(
 
   if (error || !count || count < 1) return null
 
-  return { achievement_id: 'trajo_refuerzos', tier: null, progress_json: null }
+  return { achievement_id: 'trajo_refuerzos', tier: 'bronze', progress_json: null }
 }
 
 export async function evalDeMemoria(
@@ -440,7 +440,7 @@ export async function evalDeMemoria(
 
     const exactMatch = groupPicks.every((code, idx) => code === actualRanking[idx])
     if (exactMatch) {
-      return { achievement_id: 'de_memoria', tier: null, progress_json: null }
+      return { achievement_id: 'de_memoria', tier: 'bronze', progress_json: null }
     }
   }
 
@@ -479,7 +479,7 @@ export async function evalLlegoALaSemi(
   const allCorrect = userPicks.every((pick) => actualSemifinalists.has(pick.team_code))
   if (!allCorrect) return null
 
-  return { achievement_id: 'llego_a_la_semi', tier: null, progress_json: null }
+  return { achievement_id: 'llego_a_la_semi', tier: 'bronze', progress_json: null }
 }
 
 export async function evalLoVeiaVenir(
@@ -509,7 +509,7 @@ export async function evalLoVeiaVenir(
 
   if (!champion || tournamentPred.champion_code !== champion) return null
 
-  return { achievement_id: 'lo_veia_venir', tier: null, progress_json: null }
+  return { achievement_id: 'lo_veia_venir', tier: 'bronze', progress_json: null }
 }
 
 export async function evalEsElNine(
@@ -545,7 +545,7 @@ export async function evalEsElNine(
 
   if (tournamentPred.top_scorer_api_id !== topScorer[0]) return null
 
-  return { achievement_id: 'es_el_nine', tier: null, progress_json: null }
+  return { achievement_id: 'es_el_nine', tier: 'bronze', progress_json: null }
 }
 
 export async function evalEnElPodio(
@@ -585,7 +585,7 @@ export async function evalEnElPodio(
     const userRankIdx = leaderboard.findIndex((row: { user_id: string }) => row.user_id === userId)
     if (userRankIdx === -1 || userRankIdx >= 3) continue
 
-    return { achievement_id: 'en_el_podio', tier: null, progress_json: null }
+    return { achievement_id: 'en_el_podio', tier: 'bronze', progress_json: null }
   }
 
   return null
@@ -645,7 +645,7 @@ export async function evalFuaElDiego(
   const accuracy = correctCount / totalCount
   if (accuracy < 0.7) return null
 
-  return { achievement_id: 'fua_el_diego', tier: null, progress_json: { accuracy } }
+  return { achievement_id: 'fua_el_diego', tier: 'bronze', progress_json: { accuracy } }
 }
 
 // ─── Core evaluation engine ───────────────────────────────────────────────────
@@ -655,7 +655,7 @@ async function evaluateUserWithCatalog(
   supabase: SupabaseClient,
   catalog: AchievementRow[],
 ): Promise<void> {
-  const results = await Promise.all([
+  const settled = await Promise.allSettled([
     evalMatador(userId, supabase, catalog),
     evalOnFire(userId, supabase, catalog),
     evalDeTaquito(userId, supabase, catalog),
@@ -672,10 +672,23 @@ async function evaluateUserWithCatalog(
     evalFuaElDiego(userId, supabase),
   ])
 
-  const { data: existingRows } = await supabase
+  const results: (EvalResult | null)[] = settled.map((s, i) => {
+    if (s.status === 'rejected') {
+      console.error(`[achievements] evaluator ${i} failed for user ${userId}:`, s.reason)
+      return null
+    }
+    return s.value
+  })
+
+  const { data: existingRows, error: existingError } = await supabase
     .from('user_achievements')
     .select('achievement_id, tier')
     .eq('user_id', userId)
+
+  if (existingError) {
+    console.error(`[achievements] failed to fetch existing rows for user ${userId}:`, existingError)
+    return
+  }
 
   const existingMap = new Map(
     (existingRows ?? []).map((r) => [r.achievement_id, r.tier as string | null]),
@@ -692,7 +705,7 @@ async function evaluateUserWithCatalog(
       catalog.find((a) => a.id === result.achievement_id)?.type === 'progressive'
 
     if (isProgressive && result.tier === null) {
-      await supabase.from('user_achievements').upsert(
+      const { error } = await supabase.from('user_achievements').upsert(
         {
           user_id: userId,
           achievement_id: result.achievement_id,
@@ -701,10 +714,11 @@ async function evaluateUserWithCatalog(
         },
         { onConflict: 'user_id,achievement_id' },
       )
+      if (error) console.error(`[achievements] upsert progress failed (${result.achievement_id}):`, error)
       continue
     }
 
-    const existingOrder = existing ? (tierOrder[existing] ?? 0) : 0
+    const existingOrder = existing !== undefined ? (tierOrder[existing ?? ''] ?? 0) : 0
     const newOrder = result.tier ? (tierOrder[result.tier] ?? 0) : 0
     const tierAdvanced = newOrder > existingOrder
 
@@ -718,16 +732,17 @@ async function evaluateUserWithCatalog(
       }
     }
 
-    await supabase.from('user_achievements').upsert(
+    const { error } = await supabase.from('user_achievements').upsert(
       {
         user_id: userId,
         achievement_id: result.achievement_id,
         tier: result.tier,
         progress_json: result.progress_json,
-        earned_at: tierAdvanced || !existing ? new Date().toISOString() : undefined,
+        earned_at: tierAdvanced || existing === undefined ? new Date().toISOString() : undefined,
       },
       { onConflict: 'user_id,achievement_id' },
     )
+    if (error) console.error(`[achievements] upsert failed (${result.achievement_id}):`, error)
   }
 
   if (pointsDelta > 0) {
@@ -738,10 +753,11 @@ async function evaluateUserWithCatalog(
       .maybeSingle()
 
     if (currentUser) {
-      await supabase
+      const { error } = await supabase
         .from('users')
         .update({ achievement_points: (currentUser.achievement_points ?? 0) + pointsDelta })
         .eq('id', userId)
+      if (error) console.error(`[achievements] points update failed for user ${userId}:`, error)
     }
   }
 }

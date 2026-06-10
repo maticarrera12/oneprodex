@@ -88,7 +88,7 @@ export function mapToProfileAchievement(row: UserAchievementJoinRow): ProfileAch
     progressRatio = got ? 1 : 0
   }
 
-  const tierLabel = row.tier ? ` · ${row.tier.charAt(0).toUpperCase() + row.tier.slice(1)}` : ""
+  const tierLabel = (isProgressive && row.tier) ? ` · ${row.tier.charAt(0).toUpperCase() + row.tier.slice(1)}` : ""
   const sub = achievement.description ?? achievement.name
 
   return {
@@ -100,7 +100,7 @@ export function mapToProfileAchievement(row: UserAchievementJoinRow): ProfileAch
     got,
     icon: ACHIEVEMENT_ICON_MAP[row.achievement_id] ?? "check",
     tone: got ? (ACHIEVEMENT_TONE_MAP[row.achievement_id] ?? "lime") : "mute",
-    tier: row.tier,
+    tier: isProgressive ? row.tier : null,
     totalTiers: isProgressive ? 3 : 1,
   }
 }
