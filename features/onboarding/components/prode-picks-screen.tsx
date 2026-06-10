@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import type { GroupCode } from "@/features/onboarding/types"
@@ -26,13 +26,9 @@ type ProdePicksScreenProps = {
 }
 
 const ALL_GROUPS: GroupCode[] = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]
+const AUTOSAVE_DELAY_MS = 600
 
-type ScoreState = { home: number; away: number }
-
-type MatchSaveState = {
-  status: "idle" | "saving" | "saved" | "error"
-  error: string | null
-}
+type SaveStatus = "idle" | "saving" | "saved" | "error"
 
 function ScoreInput({
   label,
@@ -46,37 +42,36 @@ function ScoreInput({
   disabled: boolean
 }) {
   return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="text-[10px] text-(--color-text3)">{label}</span>
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          disabled={disabled || value <= 0}
-          onClick={() => onChange(Math.max(0, value - 1))}
-          className={cn(
-            "inline-flex size-7 items-center justify-center rounded-lg border text-sm font-semibold transition",
-            disabled || value <= 0
-              ? "border-(--color-border-hi) text-(--color-text4) opacity-40"
-              : "border-(--color-border-hi) bg-(--color-bg2) text-(--color-text2) hover:bg-(--color-card-hi)"
-          )}
-        >
-          −
-        </button>
-        <span className="w-7 text-center font-mono text-base font-semibold">{value}</span>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange(value + 1)}
-          className={cn(
-            "inline-flex size-7 items-center justify-center rounded-lg border text-sm font-semibold transition",
-            disabled
-              ? "border-(--color-border-hi) text-(--color-text4) opacity-40"
-              : "border-(--color-border-hi) bg-(--color-bg2) text-(--color-text2) hover:bg-(--color-card-hi)"
-          )}
-        >
-          +
-        </button>
-      </div>
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        disabled={disabled || value <= 0}
+        onClick={() => onChange(Math.max(0, value - 1))}
+        className={cn(
+          "inline-flex size-7 items-center justify-center rounded-lg border text-sm font-semibold transition",
+          disabled || value <= 0
+            ? "border-(--color-border-hi) text-(--color-text4) opacity-40"
+            : "border-(--color-border-hi) bg-(--color-bg2) text-(--color-text2) hover:bg-(--color-card-hi)"
+        )}
+        aria-label={`Restar gol ${label}`}
+      >
+        −
+      </button>
+      <span className="w-6 text-center font-mono text-base font-semibold">{value}</span>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onChange(value + 1)}
+        className={cn(
+          "inline-flex size-7 items-center justify-center rounded-lg border text-sm font-semibold transition",
+          disabled
+            ? "border-(--color-border-hi) text-(--color-text4) opacity-40"
+            : "border-(--color-border-hi) bg-(--color-bg2) text-(--color-text2) hover:bg-(--color-card-hi)"
+        )}
+        aria-label={`Sumar gol ${label}`}
+      >
+        +
+      </button>
     </div>
   )
 }
@@ -84,109 +79,102 @@ function ScoreInput({
 function MatchRow({
   item,
   onSave,
+  onSaved,
 }: {
   item: MatchWithPrediction
   onSave: (formData: FormData) => Promise<void>
+  onSaved: () => void
 }) {
   const router = useRouter()
-  const [score, setScore] = useState<ScoreState>({
-    home: item.prediction?.home_score ?? 0,
-    away: item.prediction?.away_score ?? 0,
-  })
-  const [saveState, setSaveState] = useState<MatchSaveState>({
-    status: item.prediction ? "saved" : "idle",
-    error: null,
-  })
-  const [isPending, startTransition] = useTransition()
+  const [home, setHome] = useState(item.prediction?.home_score ?? 0)
+  const [away, setAway] = useState(item.prediction?.away_score ?? 0)
+  const [status, setStatus] = useState<SaveStatus>(item.prediction ? "saved" : "idle")
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isSaving = useRef(false)
 
-  const isPredicted = saveState.status === "saved"
-
-  function handleSave() {
-    setSaveState({ status: "saving", error: null })
-    const formData = new FormData()
-    formData.set("match_id", item.match.id)
-    formData.set("home_score", String(score.home))
-    formData.set("away_score", String(score.away))
-
-    startTransition(async () => {
+  function scheduleAutoSave(nextHome: number, nextAway: number) {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setStatus("idle")
+    timerRef.current = setTimeout(async () => {
+      if (isSaving.current) return
+      isSaving.current = true
+      setStatus("saving")
+      const formData = new FormData()
+      formData.set("match_id", item.match.id)
+      formData.set("home_score", String(nextHome))
+      formData.set("away_score", String(nextAway))
       try {
         await onSave(formData)
-        setSaveState({ status: "saved", error: null })
+        setStatus("saved")
+        setErrorMsg(null)
+        onSaved()
         router.refresh()
       } catch (cause) {
         const msg = cause instanceof Error ? cause.message : "Error al guardar."
-        if (msg.toLowerCase().includes("locked") || msg.toLowerCase().includes("already")) {
-          setSaveState({ status: "error", error: "El resultado ya fue guardado y no se puede cambiar." })
-        } else {
-          setSaveState({ status: "error", error: msg })
-        }
+        setStatus("error")
+        setErrorMsg(
+          msg.toLowerCase().includes("locked") || msg.toLowerCase().includes("already")
+            ? "El resultado ya fue guardado y no se puede cambiar."
+            : msg
+        )
+      } finally {
+        isSaving.current = false
       }
-    })
+    }, AUTOSAVE_DELAY_MS)
   }
+
+  // Cleanup timer on unmount
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+
+  function handleHome(v: number) {
+    setHome(v)
+    scheduleAutoSave(v, away)
+  }
+
+  function handleAway(v: number) {
+    setAway(v)
+    scheduleAutoSave(home, v)
+  }
+
+  const isPredicted = status === "saved"
+  const isBusy = status === "saving"
 
   return (
     <div
       className={cn(
-        "grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2 rounded-xl border p-2.5 transition",
+        "flex items-center gap-2 rounded-xl border p-2.5 transition",
         isPredicted
           ? "border-primary/30 bg-primary/5"
           : "border-(--color-border-hi) bg-(--color-bg2)"
       )}
     >
-      <div className="flex items-center gap-2">
-        <span className="truncate text-xs font-semibold">{item.match.home_team_code}</span>
+      <span className="w-14 truncate text-right text-xs font-semibold">{item.match.home_team_code}</span>
+
+      <div className="flex flex-1 items-center justify-center gap-2">
+        <ScoreInput label={item.match.home_team_code} value={home} onChange={handleHome} disabled={isBusy} />
+        <span className="text-xs font-bold text-(--color-text3)">-</span>
+        <ScoreInput label={item.match.away_team_code} value={away} onChange={handleAway} disabled={isBusy} />
       </div>
 
-      <div className="flex items-center gap-2">
-        <ScoreInput
-          label={item.match.home_team_code}
-          value={score.home}
-          onChange={(v) => {
-            setScore((s) => ({ ...s, home: v }))
-            if (saveState.status === "saved") setSaveState({ status: "idle", error: null })
-          }}
-          disabled={isPending}
-        />
-        <span className="text-xs text-(--color-text3)">-</span>
-        <ScoreInput
-          label={item.match.away_team_code}
-          value={score.away}
-          onChange={(v) => {
-            setScore((s) => ({ ...s, away: v }))
-            if (saveState.status === "saved") setSaveState({ status: "idle", error: null })
-          }}
-          disabled={isPending}
-        />
+      <span className="w-14 truncate text-xs font-semibold">{item.match.away_team_code}</span>
+
+      <div className="w-5 text-center text-sm">
+        {isBusy && <span className="text-(--color-text3)">·</span>}
+        {isPredicted && !isBusy && <span className="text-primary">✓</span>}
+        {status === "error" && <span className="text-red-400">!</span>}
       </div>
 
-      <div className="flex items-center justify-end gap-2">
-        <span className="truncate text-xs font-semibold">{item.match.away_team_code}</span>
-      </div>
-
-      <div className="flex flex-col items-end gap-1">
-        <button
-          type="button"
-          disabled={isPending || saveState.status === "saving"}
-          onClick={handleSave}
-          className={cn(
-            "rounded-lg border px-2.5 py-1 text-xs font-semibold transition",
-            isPredicted
-              ? "border-primary/30 bg-primary/15 text-primary"
-              : "border-(--color-border-hi) bg-(--color-bg2) text-(--color-text2) hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
-          )}
-        >
-          {isPending ? "..." : isPredicted ? "✓" : "Guardar"}
-        </button>
-        {saveState.error && (
-          <p className="text-right text-[10px] text-red-400">{saveState.error}</p>
-        )}
-      </div>
+      {errorMsg && (
+        <p className="col-span-full mt-1 text-[10px] text-red-400">{errorMsg}</p>
+      )}
     </div>
   )
 }
 
 export function ProdePicksScreen({ matchesByGroup, filled, total, onSave }: ProdePicksScreenProps) {
-  const progressPct = total > 0 ? Math.round((filled / total) * 100) : 0
+  const [localFilled, setLocalFilled] = useState(filled)
+  const progressPct = total > 0 ? Math.round((localFilled / total) * 100) : 0
 
   return (
     <section className="space-y-4 rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-3">
@@ -194,13 +182,13 @@ export function ProdePicksScreen({ matchesByGroup, filled, total, onSave }: Prod
         <div>
           <h2 className="text-sm font-semibold">Predecí los partidos</h2>
           <p className="mt-0.5 text-xs text-(--color-text3)">
-            {filled} de {total} partidos completados
+            {localFilled} de {total} partidos completados
           </p>
         </div>
         <span
           className={cn(
             "rounded-full border px-2 py-1 text-xs font-semibold",
-            filled === total
+            localFilled === total
               ? "border-primary/30 bg-primary/15 text-primary"
               : "border-(--color-border-hi) bg-(--color-bg2) text-(--color-text2)"
           )}
@@ -227,7 +215,12 @@ export function ProdePicksScreen({ matchesByGroup, filled, total, onSave }: Prod
               <p className="text-xs font-semibold text-(--color-text2)">Grupo {group}</p>
               <div className="space-y-1.5">
                 {matches.map((item) => (
-                  <MatchRow key={item.match.id} item={item} onSave={onSave} />
+                  <MatchRow
+                    key={item.match.id}
+                    item={item}
+                    onSave={onSave}
+                    onSaved={() => setLocalFilled((n) => n + 1)}
+                  />
                 ))}
               </div>
             </div>

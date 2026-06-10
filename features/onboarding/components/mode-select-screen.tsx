@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 type ModeSelectScreenProps = {
@@ -34,22 +33,17 @@ const MODES: ModeOption[] = [
 ]
 
 export function ModeSelectScreen({ onSelect }: ModeSelectScreenProps) {
-  const router = useRouter()
-  const [selected, setSelected] = useState<"prode" | "quick" | null>(null)
+  const [selected, setSelected] = useState<"prode" | "quick">("prode")
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  function handleSelect(mode: "prode" | "quick") {
-    setSelected(mode)
+  function handleContinue() {
     setError(null)
-
     const formData = new FormData()
-    formData.set("mode", mode)
-
+    formData.set("mode", selected)
     startTransition(async () => {
       try {
         await onSelect(formData)
-        router.refresh()
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "No se pudo guardar el modo.")
       }
@@ -69,13 +63,12 @@ export function ModeSelectScreen({ onSelect }: ModeSelectScreenProps) {
             key={mode.value}
             type="button"
             disabled={isPending}
-            onClick={() => handleSelect(mode.value)}
+            onClick={() => setSelected(mode.value)}
             className={cn(
               "relative flex flex-col gap-2 rounded-xl border p-4 text-left transition",
-              mode.highlighted
-                ? "border-primary/45 bg-primary/10"
-                : "border-(--color-border-hi) bg-(--color-bg2)",
-              selected === mode.value && "ring-2 ring-primary ring-offset-1",
+              selected === mode.value
+                ? "border-primary/60 bg-primary/10 ring-2 ring-primary/40"
+                : "border-(--color-border-hi) bg-(--color-bg2) hover:border-primary/30 hover:bg-primary/5",
               isPending && "opacity-60"
             )}
           >
@@ -98,6 +91,15 @@ export function ModeSelectScreen({ onSelect }: ModeSelectScreenProps) {
       {error && (
         <p className="rounded-lg border border-red-400/40 bg-red-500/10 px-2 py-1.5 text-xs text-red-300">{error}</p>
       )}
+
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={handleContinue}
+        className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:opacity-60"
+      >
+        {isPending ? "Guardando..." : "Continuar"}
+      </button>
     </section>
   )
 }
