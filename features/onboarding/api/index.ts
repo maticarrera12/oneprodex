@@ -152,8 +152,9 @@ export async function getOnboardingState(
       .maybeSingle(),
     supabase
       .from("predictions")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId),
+      .select("match_id, matches!inner(group_code)", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .not("matches.group_code", "is", null),
   ])
 
   const tournamentPrediction = tournamentResult.error ? null : tournamentResult.data

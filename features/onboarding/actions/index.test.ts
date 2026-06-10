@@ -336,16 +336,24 @@ describe("onboarding actions", () => {
         }),
       }
 
+      const matchSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "match-1", group_code: "A" }, error: null }),
+      }
+      const predSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        not: vi.fn().mockResolvedValue({ data: [], error: null }),
+      }
+
       mocks.createServiceClient.mockReturnValue({
         from: vi.fn((table: string) => {
+          if (table === "matches") return matchSelectChain
           if (table === "predictions") {
             return {
               upsert: upsertFn,
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnThis(),
-                head: true,
-                count: 10,
-              }),
+              select: vi.fn(() => predSelectChain),
             }
           }
           return { select: vi.fn().mockReturnThis() }

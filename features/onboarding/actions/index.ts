@@ -340,43 +340,40 @@ export async function saveMatchScorePick(formData: FormData): Promise<void> {
   const userId = await getAuthUserId()
   const service = createServiceClient()
 
+  // Verify this is a group-stage match before saving
+  const { data: matchRow, error: matchLookupError } = await service
+    .from("matches")
+    .select("id,group_code")
+    .eq("id", matchId)
+    .maybeSingle()
+
+  if (matchLookupError) throw new Error(matchLookupError.message)
+  if (!matchRow?.group_code) throw new Error("Not a group-stage match")
+
   const { error } = await service.from("predictions").upsert(
     { user_id: userId, match_id: matchId, home_score: homeScore, away_score: awayScore },
     { onConflict: "user_id,match_id" }
   )
   if (error) throw new Error(error.message)
 
-  // After upsert, count total prode picks for this user
-  const { count } = await service
-    .from("predictions")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-
-  if ((count ?? 0) >= 72) {
-    await deriveAndPersistGroupRankings(userId)
-  }
+  // Recalculate derived standings from all group-stage predictions so far (partial is fine)
+  await deriveAndPersistGroupRankings(userId)
 
   revalidatePath("/onboarding")
+  revalidatePath("/standings")
 }
 
 export async function deriveAndPersistGroupRankings(userId: string): Promise<void> {
   const service = createServiceClient()
 
-  // Idempotency guard: if group_picks already has 48 rows, skip
-  const { count: existingCount } = await service
-    .from("group_picks")
-    .select("user_id", { count: "exact", head: true })
-    .eq("user_id", userId)
-
-  if ((existingCount ?? 0) >= 48) return
-
-  // Fetch 72 predictions + match info for group-stage matches
+  // Fetch only group-stage predictions for this user (partial fills are fine)
   const { data: predictionRows, error: predError } = await service
     .from("predictions")
-    .select("match_id,home_score,away_score")
+    .select("match_id,home_score,away_score,matches!inner(group_code)")
     .eq("user_id", userId)
+    .not("matches.group_code", "is", null)
 
-  if (predError || !predictionRows || predictionRows.length < 72) return
+  if (predError || !predictionRows || predictionRows.length === 0) return
 
   const matchIds = predictionRows.map((row) => row.match_id)
 
