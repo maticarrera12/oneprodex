@@ -1,10 +1,16 @@
 import { describe, expect, it, vi } from "vitest"
 import { evalArrancamos } from "@/lib/achievements/evaluate"
 
-function buildSupabase(userRow: { bracket_submitted_at: string | null } | null, error: unknown = null) {
+type TournamentRow = {
+  top_scorer_api_id: number | null
+  best_player_api_id: number | null
+  best_young_player_api_id: number | null
+}
+
+function buildSupabase(row: TournamentRow | null, error: unknown = null) {
   const chain = {
     eq: vi.fn().mockReturnThis(),
-    maybeSingle: vi.fn().mockResolvedValue({ data: userRow, error }),
+    maybeSingle: vi.fn().mockResolvedValue({ data: row, error }),
   }
   return {
     from: vi.fn().mockReturnValue({
@@ -13,29 +19,40 @@ function buildSupabase(userRow: { bracket_submitted_at: string | null } | null, 
   } as unknown as ReturnType<typeof import("@/lib/supabase/service").createServiceClient>
 }
 
+const fullAwards: TournamentRow = {
+  top_scorer_api_id: 1,
+  best_player_api_id: 2,
+  best_young_player_api_id: 3,
+}
+
 describe("evalArrancamos", () => {
-  it("returns bronze achievement regardless of bracket_submitted_at value", async () => {
-    // When awards step is completed, evalArrancamos should fire even without bracket
-    const supabase = buildSupabase({ bracket_submitted_at: null })
-    const result = await evalArrancamos("user-1", supabase)
+  it("returns bronze when all 3 awards are filled", async () => {
+    const result = await evalArrancamos("user-1", buildSupabase(fullAwards))
     expect(result).toEqual({ achievement_id: "arrancamos", tier: "bronze", progress_json: null })
   })
 
-  it("also fires when bracket_submitted_at is set (existing behavior preserved)", async () => {
-    const supabase = buildSupabase({ bracket_submitted_at: "2026-06-01T00:00:00Z" })
-    const result = await evalArrancamos("user-1", supabase)
-    expect(result).toEqual({ achievement_id: "arrancamos", tier: "bronze", progress_json: null })
+  it("returns null when top_scorer_api_id is missing", async () => {
+    const result = await evalArrancamos("user-1", buildSupabase({ ...fullAwards, top_scorer_api_id: null }))
+    expect(result).toBeNull()
   })
 
-  it("returns null when user row is not found", async () => {
-    const supabase = buildSupabase(null)
-    const result = await evalArrancamos("user-1", supabase)
+  it("returns null when best_player_api_id is missing", async () => {
+    const result = await evalArrancamos("user-1", buildSupabase({ ...fullAwards, best_player_api_id: null }))
+    expect(result).toBeNull()
+  })
+
+  it("returns null when best_young_player_api_id is missing", async () => {
+    const result = await evalArrancamos("user-1", buildSupabase({ ...fullAwards, best_young_player_api_id: null }))
+    expect(result).toBeNull()
+  })
+
+  it("returns null when tournament_predictions row not found", async () => {
+    const result = await evalArrancamos("user-1", buildSupabase(null))
     expect(result).toBeNull()
   })
 
   it("returns null on database error", async () => {
-    const supabase = buildSupabase(null, { message: "db error" })
-    const result = await evalArrancamos("user-1", supabase)
+    const result = await evalArrancamos("user-1", buildSupabase(null, { message: "db error" }))
     expect(result).toBeNull()
   })
 })
