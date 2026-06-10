@@ -7,5 +7,5 @@ type UpcomingRowProps = {
 }
 
 export function UpcomingRow({ match, teams }: UpcomingRowProps) {
-  return <MatchScheduleRow match={match} teams={teams} />
+  return <MatchScheduleRow match={match} teams={teams} layout="inline" />
 }

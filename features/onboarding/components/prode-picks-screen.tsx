@@ -2,11 +2,9 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Calendar02Icon } from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import { Flag } from "@/features/home/components/flag"
-import { formatKickoffParts } from "@/features/matches/utils/kickoff"
+import { formatDayHeading, formatKickoffParts, getKickoffDayKey, parseKickoff } from "@/features/matches/utils/kickoff"
 import type { GroupCode } from "@/features/onboarding/types"
 
 export type GroupStageMatch = {
@@ -35,6 +33,12 @@ const ALL_GROUPS: GroupCode[] = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J
 const AUTOSAVE_DELAY_MS = 600
 
 type SaveStatus = "idle" | "saving" | "saved" | "error"
+
+type ProdeDayGroup = {
+  dayKey: string
+  dayLabel: string
+  items: MatchWithPrediction[]
+}
 
 function TeamLogo({ code, logo, size = 24 }: { code: string; logo?: string; size?: number }) {
   if (logo) {
@@ -162,15 +166,13 @@ function MatchRow({
           : "border-border/80 border-l-2 border-l-primary"
       )}
     >
-      <div className="flex items-center gap-3">
-        {/* Home */}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <TeamLogo code={item.match.home_team_code} logo={logoByCode?.get(item.match.home_team_code)} size={24} />
           <span className="text-sm font-semibold">{item.match.home_team_code}</span>
         </div>
 
-        {/* Score pickers */}
-        <div className="flex flex-1 items-center justify-center gap-1.5">
+        <div className="flex items-center justify-center gap-1 sm:gap-1.5">
           <ScoreButton
             disabled={isBusy || home === null || home <= 0}
             onClick={() => updateScore(Math.max(0, (home ?? 0) - 1), away)}
@@ -198,23 +200,13 @@ function MatchRow({
           >+</ScoreButton>
         </div>
 
-        {/* Away */}
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span className="text-sm font-semibold">{item.match.away_team_code}</span>
+        <div className="flex min-w-0 items-center justify-end gap-1.5">
+          <span className="truncate text-sm font-semibold">{item.match.away_team_code}</span>
           <TeamLogo code={item.match.away_team_code} logo={logoByCode?.get(item.match.away_team_code)} size={24} />
         </div>
 
-        {/* Calendar + status */}
-        <div className="flex shrink-0 items-center gap-1.5">
-          <div className="rounded-md border border-zinc-800 p-1">
-            <div className="flex items-center gap-1">
-              <HugeiconsIcon icon={Calendar02Icon} size={22} color="currentColor" strokeWidth={1.5} />
-              <div className="flex flex-col">
-                <p className="font-mono text-[9px] uppercase tracking-[0.04em] text-zinc-400">{kickoff.date}</p>
-                <p className="font-mono text-[11px] font-semibold leading-tight">{kickoff.time}</p>
-              </div>
-            </div>
-          </div>
+        <div className="col-span-3 flex items-center justify-between border-t border-border/40 pt-2">
+          <p className="font-mono text-[10px] text-(--color-text3)">Kickoff · {kickoff.time}</p>
           <div className="w-4 text-center text-sm">
             {isBusy && <span className="text-muted-foreground">·</span>}
             {isPredicted && !isBusy && <span className="text-primary">✓</span>}
@@ -228,6 +220,31 @@ function MatchRow({
       )}
     </article>
   )
+}
+
+function groupProdeMatchesByDay(items: MatchWithPrediction[]): ProdeDayGroup[] {
+  const sorted = [...items].sort((a, b) => {
+    const aTime = parseKickoff(a.match.kickoff)?.getTime() ?? 0
+    const bTime = parseKickoff(b.match.kickoff)?.getTime() ?? 0
+    return aTime - bTime
+  })
+  const map = new Map<string, ProdeDayGroup>()
+
+  for (const item of sorted) {
+    const dayKey = getKickoffDayKey(item.match.kickoff)
+    const existing = map.get(dayKey)
+    if (existing) {
+      existing.items.push(item)
+    } else {
+      map.set(dayKey, {
+        dayKey,
+        dayLabel: formatDayHeading(item.match.kickoff),
+        items: [item],
+      })
+    }
+  }
+
+  return Array.from(map.values())
 }
 
 export function ProdePicksScreen({ matchesByGroup, filled, total, onSave, onSaveAndExit, logoByCode }: ProdePicksScreenProps) {
@@ -282,20 +299,34 @@ export function ProdePicksScreen({ matchesByGroup, filled, total, onSave, onSave
         {ALL_GROUPS.map((group) => {
           const matches = matchesByGroup[group]
           if (!matches || matches.length === 0) return null
+          const dayGroups = groupProdeMatchesByDay(matches)
           return (
-            <section key={group} className="space-y-2">
+            <section key={group} className="space-y-3">
               <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                 Grupo {group}
               </p>
-              <div className="space-y-2">
-                {matches.map((item) => (
-                  <MatchRow
-                    key={item.match.id}
-                    item={item}
-                    onSave={onSave}
-                    onSaved={() => setLocalFilled((n) => n + 1)}
-                    logoByCode={logoByCode}
-                  />
+              <div className="space-y-4">
+                {dayGroups.map((day) => (
+                  <section key={`${group}-${day.dayKey}`} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="h-px flex-1 bg-(--color-border-hi)" />
+                      <p className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-primary">
+                        {day.dayLabel}
+                      </p>
+                      <div className="h-px flex-1 bg-(--color-border-hi)" />
+                    </div>
+                    <div className="space-y-2">
+                      {day.items.map((item) => (
+                        <MatchRow
+                          key={item.match.id}
+                          item={item}
+                          onSave={onSave}
+                          onSaved={() => setLocalFilled((n) => n + 1)}
+                          logoByCode={logoByCode}
+                        />
+                      ))}
+                    </div>
+                  </section>
                 ))}
               </div>
             </section>
