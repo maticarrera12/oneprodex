@@ -76,15 +76,22 @@ export function ScorePrediction({
       </div>
 
       {!isLocked && (
-        <div className="border-t border-(--color-border-hi) px-4 pb-4 pt-3">
-          <button
-            type="button"
-            onClick={() => onSubmit(homeScore, awayScore)}
-            className="h-10 w-full rounded-xl bg-(--color-primary) font-semibold text-black text-sm shadow-[0_8px_22px_rgba(163,230,53,0.35)] transition"
-          >
-            Guardar {homeScore}–{awayScore}
-          </button>
-        </div>
+        <>
+          <div className="flex items-center justify-center gap-3 px-4 pb-3">
+            <span className="font-mono text-[11px] text-(--color-text3)">Resultado exacto · 5 pts</span>
+            <span className="text-(--color-text4)">·</span>
+            <span className="font-mono text-[11px] text-(--color-text3)">Solo resultado · 2 pts</span>
+          </div>
+          <div className="border-t border-(--color-border-hi) px-4 pb-4 pt-3">
+            <button
+              type="button"
+              onClick={() => onSubmit(homeScore, awayScore)}
+              className="h-10 w-full rounded-xl bg-(--color-primary) font-semibold text-black text-sm shadow-[0_8px_22px_rgba(163,230,53,0.35)] transition"
+            >
+              Guardar {homeScore}–{awayScore}
+            </button>
+          </div>
+        </>
       )}
     </>
   )
