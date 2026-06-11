@@ -7,6 +7,12 @@ import { scoreBracketForMatch } from '@/features/scoring/sync-bracket'
 import { evaluateAllUsers } from '@/lib/achievements/evaluate'
 import { NextResponse } from 'next/server'
 
+// Window in which a finished match keeps being re-scored, so late event
+// corrections from API-Football are picked up. Outside it, only matches
+// never marked scored_at are processed — this keeps the cron cost flat
+// instead of growing with every finished match of the tournament.
+const RESCORE_WINDOW_HOURS = 24
+
 function guardAuth(request: Request): NextResponse | null {
   const syncSecret = process.env.SYNC_SECRET
   if (!syncSecret) {
@@ -27,9 +33,14 @@ export async function POST(request: Request) {
 
   try {
     const supabase = createServiceClient()
+    const rescoreCutoff = new Date(Date.now() - RESCORE_WINDOW_HOURS * 3_600_000).toISOString()
 
     const [matchesResult, teamsResult] = await Promise.all([
-      supabase.from('matches').select('*').eq('status', 'FINISHED'),
+      supabase
+        .from('matches')
+        .select('*')
+        .eq('status', 'FINISHED')
+        .or(`scored_at.is.null,kickoff.gte.${rescoreCutoff}`),
       supabase.from('teams').select('api_id,code').not('api_id', 'is', null),
     ])
 
@@ -63,14 +74,25 @@ export async function POST(request: Request) {
           }
         }
 
-        await scoreMatch(supabase, match, teamCodeMap)
+        const scoredOk = await scoreMatch(supabase, match)
+        if (!scoredOk) {
+          failed++
+          continue
+        }
+
+        await supabase
+          .from('matches')
+          .update({ scored_at: new Date().toISOString() })
+          .eq('id', match.id)
         updated++
       } catch {
         failed++
       }
     }
 
-    await evaluateAllUsers(supabase)
+    if (updated > 0) {
+      await evaluateAllUsers(supabase)
+    }
 
     return NextResponse.json({ updated, failed }, { status: 200 })
   } catch (error) {
@@ -85,6 +107,19 @@ export async function POST(request: Request) {
   }
 }
 
+type PlayerPredRow = { user_id: string; player_api_id: number; type: string }
+type CleanSheetRow = { user_id: string; team_code: string }
+
+function groupByUser<T extends { user_id: string }>(rows: T[]): Map<string, T[]> {
+  const map = new Map<string, T[]>()
+  for (const row of rows) {
+    const list = map.get(row.user_id)
+    if (list) list.push(row)
+    else map.set(row.user_id, [row])
+  }
+  return map
+}
+
 async function scoreMatch(
   supabase: ReturnType<typeof createServiceClient>,
   match: {
@@ -97,9 +132,8 @@ async function scoreMatch(
     kickoff: string | null
     stage: string
   },
-  teamCodeMap: Map<number, string>,
-): Promise<void> {
-  const [predsResult, eventsResult] = await Promise.all([
+): Promise<boolean> {
+  const [predsResult, eventsResult, playerPredsResult, cleanSheetsResult] = await Promise.all([
     supabase
       .from('predictions')
       .select('id,user_id,home_score,away_score')
@@ -108,10 +142,24 @@ async function scoreMatch(
       .from('match_events')
       .select('player_api_id,type,team_code')
       .eq('match_id', match.id),
+    supabase
+      .from('prediction_players')
+      .select('user_id,player_api_id,type')
+      .eq('match_id', match.id),
+    supabase
+      .from('prediction_clean_sheets')
+      .select('user_id,team_code')
+      .eq('match_id', match.id),
   ])
+
+  if (predsResult.error || eventsResult.error || playerPredsResult.error || cleanSheetsResult.error) {
+    return false
+  }
 
   const predictions = predsResult.data ?? []
   const events = eventsResult.data ?? []
+  const playerPredsByUser = groupByUser((playerPredsResult.data ?? []) as PlayerPredRow[])
+  const cleanSheetsByUser = groupByUser((cleanSheetsResult.data ?? []) as CleanSheetRow[])
 
   const goalScorerIds = events
     .filter((e) => e.type === 'GOAL' || e.type === 'PENALTY')
@@ -124,26 +172,15 @@ async function scoreMatch(
     .filter((id): id is number => id !== null)
 
   const redCardedIds = events
-    .filter((e) => e.type === 'RED_CARD' || e.type === 'Second Yellow card')
+    .filter((e) => e.type === 'RED_CARD')
     .map((e) => e.player_api_id)
     .filter((id): id is number => id !== null)
 
-  for (const pred of predictions) {
-    const [playerPredResult, cleanSheetResult] = await Promise.all([
-      supabase
-        .from('prediction_players')
-        .select('player_api_id,type')
-        .eq('user_id', pred.user_id)
-        .eq('match_id', match.id),
-      supabase
-        .from('prediction_clean_sheets')
-        .select('team_code')
-        .eq('user_id', pred.user_id)
-        .eq('match_id', match.id),
-    ])
+  let allUpdatesOk = true
 
-    const playerPreds = playerPredResult.data ?? []
-    const cleanSheets = cleanSheetResult.data ?? []
+  for (const pred of predictions) {
+    const playerPreds = playerPredsByUser.get(pred.user_id) ?? []
+    const cleanSheets = cleanSheetsByUser.get(pred.user_id) ?? []
 
     const predictedScorerIds = playerPreds
       .filter((p) => p.type === 'SCORER')
@@ -178,11 +215,17 @@ async function scoreMatch(
 
     const totalPts = scorePts + scorerPts + cardPts + cleanSheetPts
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('predictions')
       .update({ points: totalPts })
       .eq('id', pred.id)
+
+    if (updateError) {
+      allUpdatesOk = false
+    }
   }
 
   await scoreBracketForMatch(supabase, match)
+
+  return allUpdatesOk
 }

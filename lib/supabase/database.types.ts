@@ -260,6 +260,7 @@ export type Database = {
           id: string
           kickoff: string
           minute: number | null
+          scored_at: string | null
           stage: string
           status: string
           synced_at: string | null
@@ -273,6 +274,7 @@ export type Database = {
           id: string
           kickoff: string
           minute?: number | null
+          scored_at?: string | null
           stage: string
           status?: string
           synced_at?: string | null
@@ -286,6 +288,7 @@ export type Database = {
           id?: string
           kickoff?: string
           minute?: number | null
+          scored_at?: string | null
           stage?: string
           status?: string
           synced_at?: string | null
