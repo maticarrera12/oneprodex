@@ -506,10 +506,6 @@ describe("onboarding actions", () => {
         select: vi.fn().mockReturnThis(),
         in: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
       }
-      const deleteChain = {
-        eq: vi.fn().mockReturnThis(),
-        in: vi.fn().mockResolvedValue({ error: null }),
-      }
 
       return {
         from: vi.fn((table: string) => {
@@ -517,7 +513,7 @@ describe("onboarding actions", () => {
           if (table === "matches") return matchSelectChain
           if (table === "standings") return { select: vi.fn().mockResolvedValue({ data: standings, error: null }) }
           if (table === "teams") return { select: vi.fn().mockResolvedValue({ data: teams, error: null }) }
-          if (table === "group_picks") return { delete: vi.fn().mockReturnValue(deleteChain), insert: insertFn }
+          if (table === "group_picks") return { upsert: insertFn }
           return {}
         }),
       }
@@ -557,6 +553,8 @@ describe("onboarding actions", () => {
       await deriveAndPersistGroupRankings("user-1")
 
       expect(insertFn).toHaveBeenCalledTimes(1)
+      // Upsert (not delete+insert) so concurrent autosaves can't hit duplicate-key
+      expect(insertFn.mock.calls[0]?.[1]).toEqual({ onConflict: "user_id,group_code,position" })
       const upsertedRows = insertFn.mock.calls[0]?.[0] as Array<{ group_code: string; position: number; team_code: string }>
       const groupARows = upsertedRows.filter((r) => r.group_code === "A")
       // Only 3 teams have predictions (A1, A2, A3) — A4 not seen so 3 rows

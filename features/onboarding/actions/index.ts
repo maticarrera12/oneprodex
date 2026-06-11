@@ -470,21 +470,14 @@ export async function deriveAndPersistGroupRankings(userId: string): Promise<voi
     }
   }
 
-  const affectedGroups = [...new Set(groupPicksPayload.map((r) => r.group_code))]
-
-  const { error: deleteError } = await service
+  // Upsert (not delete+insert): concurrent autosaves would interleave the
+  // delete/insert pair and crash on duplicate key. Rows per group never
+  // shrink (predictions are never deleted), so no stale rows are left behind.
+  const { error: upsertError } = await service
     .from("group_picks")
-    .delete()
-    .eq("user_id", userId)
-    .in("group_code", affectedGroups)
+    .upsert(groupPicksPayload, { onConflict: "user_id,group_code,position" })
 
-  if (deleteError) throw new Error(deleteError.message)
-
-  const { error: insertError } = await service
-    .from("group_picks")
-    .insert(groupPicksPayload)
-
-  if (insertError) throw new Error(insertError.message)
+  if (upsertError) throw new Error(upsertError.message)
 }
 
 type PredictionRow = { match_id: string; home_score: number; away_score: number }
