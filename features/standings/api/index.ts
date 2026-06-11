@@ -40,6 +40,10 @@ function normalizeGroupCode(code: string): string {
   return raw.startsWith("GROUP ") ? raw.slice(6) : raw
 }
 
+function isWorldCupGroupCode(groupCode: string): boolean {
+  return /^[A-L]$/.test(groupCode)
+}
+
 function resolveMatchGroupCode(
   match: Pick<MatchRow, "group_code" | "home_team_code" | "away_team_code">,
   teamToGroup: Map<string, string>,
@@ -154,15 +158,19 @@ export async function getStandingsByGroup(
 
   for (const row of standingsData) {
     const groupCode = normalizeGroupCode(row.group_code)
+    if (!isWorldCupGroupCode(groupCode)) continue
+
     const resolved = resolveTeam(row.team_code, teamsByCode, teamsByApiId)
-    const canonicalCode = resolved?.code ?? normalizeTeamCode(row.team_code)
+    const canonicalCode = normalizeTeamCode(resolved?.code ?? row.team_code)
 
     const existing = groupToTeams.get(groupCode) ?? []
     existing.push(canonicalCode)
     groupToTeams.set(groupCode, existing)
     teamToGroup.set(canonicalCode, groupCode)
-    // also map the raw team_code in case it's a numeric id
     teamToGroup.set(normalizeTeamCode(row.team_code), groupCode)
+    if (resolved?.api_id != null) {
+      teamToGroup.set(String(resolved.api_id), groupCode)
+    }
   }
 
   const teamApiIdByCode = new Map(
@@ -171,12 +179,37 @@ export async function getStandingsByGroup(
   const teamAliasesByGroup = buildGroupTeamAliasMap(groupToTeams, teamApiIdByCode)
   for (const row of standingsData) {
     const groupCode = normalizeGroupCode(row.group_code)
+    if (!isWorldCupGroupCode(groupCode)) continue
+
     const resolved = resolveTeam(row.team_code, teamsByCode, teamsByApiId)
     const canonicalCode = normalizeTeamCode(resolved?.code ?? row.team_code)
     const aliases = teamAliasesByGroup.get(groupCode)
     if (!aliases) continue
     aliases.set(normalizeTeamCode(row.team_code), canonicalCode)
     aliases.set(row.team_code.trim(), canonicalCode)
+    if (resolved?.api_id != null) {
+      aliases.set(String(resolved.api_id), canonicalCode)
+    }
+  }
+
+  for (const match of matchData ?? []) {
+    const groupCode = resolveMatchGroupCode(match, teamToGroup)
+    if (!groupCode || !isWorldCupGroupCode(groupCode)) continue
+
+    const aliases = teamAliasesByGroup.get(groupCode)
+    if (!aliases) continue
+
+    for (const rawCode of [match.home_team_code, match.away_team_code]) {
+      const resolved = resolveTeam(rawCode, teamsByCode, teamsByApiId)
+      if (!resolved?.code) continue
+      const canonicalCode = normalizeTeamCode(resolved.code)
+      if (!groupToTeams.get(groupCode)?.includes(canonicalCode)) continue
+      aliases.set(normalizeTeamCode(rawCode), canonicalCode)
+      aliases.set(rawCode.trim(), canonicalCode)
+      if (resolved.api_id != null) {
+        aliases.set(String(resolved.api_id), canonicalCode)
+      }
+    }
   }
 
   // Compute live stats from matches (FINISHED + LIVE), seed all teams at 0
@@ -261,6 +294,8 @@ export async function getStandingsByGroup(
     : null
 
   for (const [groupCode, accumMap] of accumByGroup) {
+    if (!isWorldCupGroupCode(groupCode)) continue
+
     const sortedTeams = sortTeamsByOlympicTiebreak(
       new Map(
         [...accumMap.entries()].map(([teamCode, accum]) => [

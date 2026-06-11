@@ -14,8 +14,16 @@ type MatchAggRow = {
   stage: string
 }
 
-function buildSupabase(matchRows: MatchAggRow[], teamRows: unknown[] = []) {
-  const standingsRows = Array.from(
+function buildSupabase(
+  matchRows: MatchAggRow[],
+  teamRows: unknown[] = [],
+  options?: {
+    standingsRows?: Array<{ group_code: string; team_code: string }>
+    predictions?: Array<{ match_id: string; home_score: number; away_score: number }>
+    userId?: string
+  },
+) {
+  const standingsRows = options?.standingsRows ?? Array.from(
     matchRows.reduce((acc, row) => {
       if (!row.group_code) return acc
       acc.set(`${row.group_code}:${row.home_team_code}`, { group_code: row.group_code, team_code: row.home_team_code })
@@ -24,6 +32,8 @@ function buildSupabase(matchRows: MatchAggRow[], teamRows: unknown[] = []) {
     }, new Map<string, { group_code: string; team_code: string }>())
       .values(),
   )
+
+  const predictions = options?.predictions ?? []
 
   const standingsChain = {
     order: vi.fn().mockReturnValue({ data: standingsRows, error: null }),
@@ -34,6 +44,10 @@ function buildSupabase(matchRows: MatchAggRow[], teamRows: unknown[] = []) {
   }
 
   const teamsChain = { data: teamRows, error: null }
+
+  const predictionsChain = {
+    eq: vi.fn().mockReturnValue({ data: predictions, error: null }),
+  }
 
   const from = vi.fn().mockImplementation((table: string) => {
     if (table === "standings") {
@@ -49,6 +63,13 @@ function buildSupabase(matchRows: MatchAggRow[], teamRows: unknown[] = []) {
     if (table === "teams") {
       return {
         select: vi.fn().mockReturnValue(teamsChain),
+      }
+    }
+    if (table === "predictions") {
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({ data: predictions, error: null }),
+        }),
       }
     }
     return { select: vi.fn().mockReturnValue({ data: [], error: null }) }
@@ -210,6 +231,43 @@ describe("features/standings/api — on-the-fly aggregation", () => {
       expect(row.gd).toBe(0)
       expect(row.pts).toBe(0)
       expect(row.pj).toBe(0)
+    }
+  })
+
+  it("projects PJ=3 per team when standings use api ids and matches have null group_code", async () => {
+    const groupAMatches: MatchAggRow[] = [
+      { id: "m1", home_team_code: "MEX", away_team_code: "KOR", home_score: null, away_score: null, group_code: null, status: "UPCOMING", kickoff: "2026-06-01T12:00:00Z", minute: null, stage: "Group Stage - 1" },
+      { id: "m2", home_team_code: "RSA", away_team_code: "CZE", home_score: null, away_score: null, group_code: null, status: "UPCOMING", kickoff: "2026-06-02T12:00:00Z", minute: null, stage: "Group Stage - 1" },
+      { id: "m3", home_team_code: "MEX", away_team_code: "RSA", home_score: null, away_score: null, group_code: null, status: "UPCOMING", kickoff: "2026-06-03T12:00:00Z", minute: null, stage: "Group Stage - 2" },
+      { id: "m4", home_team_code: "KOR", away_team_code: "CZE", home_score: null, away_score: null, group_code: null, status: "UPCOMING", kickoff: "2026-06-04T12:00:00Z", minute: null, stage: "Group Stage - 2" },
+      { id: "m5", home_team_code: "MEX", away_team_code: "CZE", home_score: null, away_score: null, group_code: null, status: "UPCOMING", kickoff: "2026-06-05T12:00:00Z", minute: null, stage: "Group Stage - 3" },
+      { id: "m6", home_team_code: "KOR", away_team_code: "RSA", home_score: null, away_score: null, group_code: null, status: "UPCOMING", kickoff: "2026-06-06T12:00:00Z", minute: null, stage: "Group Stage - 3" },
+    ]
+    const teams = [
+      { api_id: 16, code: "MEX", logo: null, name: "Mexico", c1: null, c2: null, c3: null },
+      { api_id: 17, code: "KOR", logo: null, name: "Korea", c1: null, c2: null, c3: null },
+      { api_id: 770, code: "CZE", logo: null, name: "Czechia", c1: null, c2: null, c3: null },
+      { api_id: 1531, code: "RSA", logo: null, name: "South Africa", c1: null, c2: null, c3: null },
+    ]
+    const standingsRows = [
+      { group_code: "Group A", team_code: "16" },
+      { group_code: "Group A", team_code: "17" },
+      { group_code: "Group A", team_code: "770" },
+      { group_code: "Group A", team_code: "1531" },
+    ]
+    const predictions = groupAMatches.map((match, index) => ({
+      match_id: match.id,
+      home_score: index % 3,
+      away_score: (index + 1) % 3,
+    }))
+
+    const supabase = buildSupabase(groupAMatches, teams, { standingsRows, predictions })
+    const groups = await getStandingsByGroup(supabase as never, "user-1")
+
+    const groupA = groups.find((group) => group.id === "A")
+    expect(groupA?.projectedRows).toHaveLength(4)
+    for (const row of groupA?.projectedRows ?? []) {
+      expect(row.pj).toBe(3)
     }
   })
 })

@@ -68,11 +68,16 @@ export function resolveRosterTeamCode(
   const roster = groupToTeams.get(groupCode)
   if (!roster) return null
 
+  const rosterByUpper = new Map(roster.map((code) => [code.trim().toUpperCase(), code]))
   const normalized = teamCode.trim().toUpperCase()
   const aliases = teamAliasesByGroup.get(groupCode)
-  const canonical = aliases?.get(normalized) ?? aliases?.get(teamCode.trim()) ?? normalized
+  const canonicalUpper = (
+    aliases?.get(normalized) ??
+    aliases?.get(teamCode.trim()) ??
+    normalized
+  ).trim().toUpperCase()
 
-  return roster.includes(canonical) ? canonical : null
+  return rosterByUpper.get(canonicalUpper) ?? null
 }
 
 export function computeProjectedStandingRowsByGroup<Row>({
