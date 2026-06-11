@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GroupCode, GroupRankings } from "@/features/onboarding/types"
 import { resolveR32Pairs } from "@/features/onboarding/utils/slot-resolver"
 import type { BracketRound, BracketScoreStat } from "@/features/bracket/types"
+import { BRACKET_SCORING } from "@/features/scoring/constants"
 import type { Database } from "@/lib/supabase/database.types"
 
 type BracketData = {
@@ -165,10 +166,10 @@ function buildRounds(picksBySlot: Map<string, string>, starters: string[], logoB
 }
 
 const STAGE_TO_SLOT_PREFIX: Record<string, { prefix: string; total: number; pts: number }> = {
-  "Round of 32":    { prefix: "R32_", total: 16, pts: 1 },
-  "Round of 16":    { prefix: "R16_", total: 8,  pts: 2 },
-  "Quarter-finals": { prefix: "QF_",  total: 4,  pts: 4 },
-  "Semi-finals":    { prefix: "SF_",  total: 2,  pts: 8 },
+  "Round of 32":    { prefix: "R32_", total: 16, pts: BRACKET_SCORING.R32 },
+  "Round of 16":    { prefix: "R16_", total: 8,  pts: BRACKET_SCORING.R16 },
+  "Quarter-finals": { prefix: "QF_",  total: 4,  pts: BRACKET_SCORING.QF },
+  "Semi-finals":    { prefix: "SF_",  total: 2,  pts: BRACKET_SCORING.SF },
 }
 
 function buildScoreStats(
@@ -194,7 +195,7 @@ function buildScoreStats(
   stats.push({
     label: "Final",
     got: finalWinners.size > 0 ? (finalCorrect ? "1/1" : "0/1") : (finalPick ? "1/1" : "0/1"),
-    pts: finalCorrect ? "+16" : finalWinners.size > 0 ? "—" : finalPick ? "pendiente" : "—",
+    pts: finalCorrect ? `+${BRACKET_SCORING.FINAL}` : finalWinners.size > 0 ? "—" : finalPick ? "pendiente" : "—",
     hot: Boolean(finalCorrect),
   })
 

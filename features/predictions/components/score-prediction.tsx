@@ -1,5 +1,7 @@
 'use client'
 
+import { MATCH_SCORING_LABELS } from "@/features/scoring/constants"
+
 const QUICK_PICKS: Array<[number, number]> = [
   [1, 0],
   [2, 1],
@@ -80,9 +82,9 @@ export function ScorePrediction({
       {!isLocked && showSubmit && (
         <>
           <div className="flex items-center justify-center gap-3 px-4 pb-3">
-            <span className="font-mono text-[11px] text-(--color-text3)">Resultado exacto · 5 pts</span>
+            <span className="font-mono text-[11px] text-(--color-text3)">{MATCH_SCORING_LABELS.exactScore}</span>
             <span className="text-(--color-text4)">·</span>
-            <span className="font-mono text-[11px] text-(--color-text3)">Solo resultado · 2 pts</span>
+            <span className="font-mono text-[11px] text-(--color-text3)">{MATCH_SCORING_LABELS.correctResult}</span>
           </div>
           <div className="border-t border-(--color-border-hi) px-4 pb-4 pt-3">
             <button

@@ -207,15 +207,25 @@ export async function getUserProfile(supabase: SupabaseClient<Database>, userId:
 }
 
 export async function getUserStats(supabase: SupabaseClient<Database>, userId: string): Promise<UserStats> {
-  const [predictionsResult, userResult] = await Promise.all([
+  const [predictionsResult, bracketResult, userResult] = await Promise.all([
     supabase.from("predictions").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+    supabase.from("bracket_picks").select("points").eq("user_id", userId),
     supabase.from("users").select("achievement_points").eq("id", userId).maybeSingle(),
   ])
   const data = predictionsResult.data ?? []
+  const bracketData = bracketResult.data ?? []
   const achievementPts = userResult.data?.achievement_points ?? 0
+  const bracketPts = bracketData.reduce((sum, row) => sum + (row.points ?? 0), 0)
 
   if (predictionsResult.error || data.length === 0) {
-    return { totalPts: achievementPts, predictionPts: 0, achievementPts, predictionCount: 0, accuracy: null, streak: 0 }
+    return {
+      totalPts: achievementPts + bracketPts,
+      predictionPts: 0,
+      achievementPts,
+      predictionCount: 0,
+      accuracy: null,
+      streak: 0,
+    }
   }
 
   const predictionPts = data.reduce((sum, row) => sum + (row.points ?? 0), 0)
@@ -230,7 +240,7 @@ export async function getUserStats(supabase: SupabaseClient<Database>, userId: s
   }
 
   return {
-    totalPts: predictionPts + achievementPts,
+    totalPts: predictionPts + achievementPts + bracketPts,
     predictionPts,
     achievementPts,
     predictionCount: data.length,

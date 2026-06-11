@@ -1,5 +1,7 @@
 'use client'
 
+import { MATCH_SCORING_LABELS } from "@/features/scoring/constants"
+
 type CleanSheetToggleProps = {
   matchId: string
   homeTeamCode: string
@@ -23,7 +25,7 @@ export function CleanSheetToggle({
   return (
     <div className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-4">
       <p className="mb-3 text-center font-mono text-[11px] tracking-wider text-(--color-text3) uppercase">
-        Arco en 0 · +2 pts
+        {MATCH_SCORING_LABELS.cleanSheet}
       </p>
       <div className="mb-2 flex justify-center gap-2">
         {[homeTeamCode, awayTeamCode].map((code) => {

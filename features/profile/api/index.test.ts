@@ -210,6 +210,13 @@ describe("getUserStats", () => {
             }),
           }
         }
+        if (table === "bracket_picks") {
+          return {
+            select: () => ({
+              eq: () => ({ data: [], error: null }),
+            }),
+          }
+        }
         if (table === "users") {
           return {
             select: () => ({

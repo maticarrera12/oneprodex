@@ -98,7 +98,7 @@ export function resolveR32Pairs(
 ): Array<{ home: string; away: string }> {
   const thirds = resolveThirdPlaceAssignments(groupRankings, bestThirds)
 
-  return SLOTS_32.slice(0, 16).map((slot) => R32_SLOT_DEFS[slot]).map((def) => ({
+  return (SLOTS_32.slice(0, 16) as Array<keyof typeof R32_SLOT_DEFS>).map((slot) => R32_SLOT_DEFS[slot]).map((def) => ({
     home: getRankedTeam(groupRankings, def.home.group, def.home.rank),
     away: def.away.type === "fixed"
       ? getRankedTeam(groupRankings, def.away.group, def.away.rank)

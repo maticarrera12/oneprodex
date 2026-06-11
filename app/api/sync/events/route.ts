@@ -3,6 +3,7 @@ import { mapMatchEvent } from '@/lib/api-football/mappers'
 import { APIFootballError } from '@/lib/api-football/types'
 import { createServiceClient } from '@/lib/supabase/service'
 import { calcCardPts, calcCleanSheetPts, calcPlayerScorerPts, calcScorePts } from '@/features/predictions/utils/scoring'
+import { scoreBracketForMatch } from '@/features/scoring/sync-bracket'
 import { evaluateAllUsers } from '@/lib/achievements/evaluate'
 import { NextResponse } from 'next/server'
 
@@ -86,7 +87,16 @@ export async function POST(request: Request) {
 
 async function scoreMatch(
   supabase: ReturnType<typeof createServiceClient>,
-  match: { id: string; home_score: number | null; away_score: number | null; home_team_code: string; away_team_code: string },
+  match: {
+    id: string
+    home_score: number | null
+    away_score: number | null
+    home_team_code: string
+    away_team_code: string
+    status: string
+    kickoff: string | null
+    stage: string
+  },
   teamCodeMap: Map<number, string>,
 ): Promise<void> {
   const [predsResult, eventsResult] = await Promise.all([
@@ -173,4 +183,6 @@ async function scoreMatch(
       .update({ points: totalPts })
       .eq('id', pred.id)
   }
+
+  await scoreBracketForMatch(supabase, match)
 }

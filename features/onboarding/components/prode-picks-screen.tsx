@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Flag } from "@/features/home/components/flag"
 import { formatDayHeading, formatKickoffParts, getKickoffDayKey, parseKickoff } from "@/features/matches/utils/kickoff"
+import { MATCH_SCORING_LABELS } from "@/features/scoring/constants"
 import type { GroupCode } from "@/features/onboarding/types"
 
 export type GroupStageMatch = {
@@ -336,7 +337,7 @@ export function ProdePicksScreen({ matchesByGroup, filled, total, onSave, onSave
 
       <div className="border-t border-(--color-border-hi) pt-4">
         <p className="mb-3 text-center text-xs text-muted-foreground">
-          Resultado exacto = 5 pts · Solo ganador/empate = 2 pts
+          {MATCH_SCORING_LABELS.prodeHint}
         </p>
         <button
           type="button"

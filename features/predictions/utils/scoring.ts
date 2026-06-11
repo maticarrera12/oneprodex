@@ -1,14 +1,18 @@
+import { MATCH_SCORING } from "@/features/scoring/constants"
+
 export function calcScorePts(
   pred: { home_score: number; away_score: number },
   result: { home: number | null; away: number | null },
 ): number {
   if (result.home === null || result.away === null) return 0
 
-  if (pred.home_score === result.home && pred.away_score === result.away) return 5
+  if (pred.home_score === result.home && pred.away_score === result.away) {
+    return MATCH_SCORING.exactScore
+  }
 
   const predWinner = Math.sign(pred.home_score - pred.away_score)
   const actualWinner = Math.sign(result.home - result.away)
-  if (predWinner === actualWinner) return 2
+  if (predWinner === actualWinner) return MATCH_SCORING.correctResult
 
   return 0
 }
@@ -16,7 +20,7 @@ export function calcScorePts(
 export function calcPlayerScorerPts(predictedApiIds: number[], goalScorerApiIds: number[]): number {
   const scorerSet = new Set(goalScorerApiIds)
   const correct = predictedApiIds.filter((id) => scorerSet.has(id)).length
-  return correct * 3
+  return correct * MATCH_SCORING.scorer
 }
 
 export function calcCardPts(
@@ -29,7 +33,7 @@ export function calcCardPts(
   const redSet = new Set(redCardedIds)
   const correctYellow = predictedYellowIds.filter((id) => yellowSet.has(id)).length
   const correctRed = predictedRedIds.filter((id) => redSet.has(id)).length
-  return correctYellow * 1 + correctRed * 2
+  return correctYellow * MATCH_SCORING.yellowCard + correctRed * MATCH_SCORING.redCard
 }
 
 /**
@@ -50,11 +54,11 @@ export function calcCleanSheetPts(
   let pts = 0
 
   if (predictedTeamCodes.includes(homeTeamCode) && homeScore === 0) {
-    pts += 2
+    pts += MATCH_SCORING.cleanSheet
   }
 
   if (predictedTeamCodes.includes(awayTeamCode) && awayScore === 0) {
-    pts += 2
+    pts += MATCH_SCORING.cleanSheet
   }
 
   return pts
