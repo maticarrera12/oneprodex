@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import type { SlotId } from "@/features/onboarding/types"
+import { buildTeamToGroupMap } from "@/features/onboarding/utils/team-groups"
 import { createServiceClient } from "@/lib/supabase/service"
 import { createClient } from "@/lib/supabase/server"
 import { evaluateUser } from "@/lib/achievements/evaluate"
@@ -382,20 +383,6 @@ export async function saveMatchScorePick(formData: FormData): Promise<void> {
   revalidatePath("/standings")
 }
 
-const GROUP_NUM_TO_CODE: Record<string, string> = {
-  "1": "A", "2": "B", "3": "C", "4": "D",
-  "5": "E", "6": "F", "7": "G", "8": "H",
-  "9": "I", "10": "J", "11": "K", "12": "L",
-}
-
-function groupFromStage(stage: string): string | null {
-  const letter = stage.match(/Group\s+([A-L])\b/i)
-  if (letter) return letter[1].toUpperCase()
-  const num = stage.match(/Group Stage\s*-\s*(\d+)/i)
-  if (num) return GROUP_NUM_TO_CODE[num[1]] ?? null
-  return null
-}
-
 export async function deriveAndPersistGroupRankings(userId: string): Promise<void> {
   const service = createServiceClient()
 
@@ -410,18 +397,28 @@ export async function deriveAndPersistGroupRankings(userId: string): Promise<voi
 
   const matchIds = predictionRows.map((row) => row.match_id)
 
-  const { data: rawMatchRows, error: matchError } = await service
-    .from("matches")
-    .select("id,home_team_code,away_team_code,stage")
-    .in("id", matchIds)
+  const [matchesResult, standingsResult, teamsResult] = await Promise.all([
+    service.from("matches").select("id,home_team_code,away_team_code").in("id", matchIds),
+    service.from("standings").select("group_code,team_code"),
+    service.from("teams").select("api_id,code"),
+  ])
 
-  if (matchError || !rawMatchRows) return
+  if (matchesResult.error || !matchesResult.data) return
 
-  // Derive group from stage field ("Group Stage - Group A" → "A")
-  const matchRows = rawMatchRows.map((m) => ({
-    ...m,
-    group_code: groupFromStage(m.stage) ?? null,
-  }))
+  // matches.stage only encodes the matchday ("Group Stage - 1/2/3"), so the
+  // group must come from the standings team→group mapping.
+  const teamToGroup = buildTeamToGroupMap(standingsResult.data ?? [], teamsResult.data ?? [])
+
+  const matchRows = matchesResult.data.map((m) => {
+    const home = m.home_team_code.trim().toUpperCase()
+    const away = m.away_team_code.trim().toUpperCase()
+    return {
+      id: m.id,
+      home_team_code: home,
+      away_team_code: away,
+      group_code: teamToGroup.get(home) ?? teamToGroup.get(away) ?? null,
+    }
+  })
 
   // Compute group standings using pure function
   const { computeGroupStandings } = await import("@/features/onboarding/utils/group-standings")

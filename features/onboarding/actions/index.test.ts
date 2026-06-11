@@ -365,7 +365,7 @@ describe("onboarding actions", () => {
       const matchSelectChain = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "match-1", stage: "Group Stage - Group A" }, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "match-1", stage: "Group Stage - 1" }, error: null }),
       }
       const predSelectChain = {
         select: vi.fn().mockReturnThis(),
@@ -440,7 +440,7 @@ describe("onboarding actions", () => {
       const matchSelectChain = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "m1", stage: "Group Stage - Group A" }, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "m1", stage: "Group Stage - 1" }, error: null }),
       }
       const predSelectChain = {
         select: vi.fn().mockReturnThis(),
@@ -484,6 +484,58 @@ describe("onboarding actions", () => {
       expect(upsertFn).not.toHaveBeenCalled()
     })
 
+    function buildDeriveServiceClient({
+      predictions,
+      matchRows,
+      standings,
+      teams,
+      insertFn,
+    }: {
+      predictions: Array<{ match_id: string; home_score: number; away_score: number; matches: { stage: string } }>
+      matchRows: Array<{ id: string; home_team_code: string; away_team_code: string }>
+      standings: Array<{ group_code: string; team_code: string }>
+      teams: Array<{ api_id: number | null; code: string }>
+      insertFn: ReturnType<typeof vi.fn>
+    }) {
+      const predSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        ilike: vi.fn().mockResolvedValue({ data: predictions, error: null }),
+      }
+      const matchSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        in: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
+      }
+      const deleteChain = {
+        eq: vi.fn().mockReturnThis(),
+        in: vi.fn().mockResolvedValue({ error: null }),
+      }
+
+      return {
+        from: vi.fn((table: string) => {
+          if (table === "predictions") return { select: vi.fn().mockReturnValue(predSelectChain) }
+          if (table === "matches") return matchSelectChain
+          if (table === "standings") return { select: vi.fn().mockResolvedValue({ data: standings, error: null }) }
+          if (table === "teams") return { select: vi.fn().mockResolvedValue({ data: teams, error: null }) }
+          if (table === "group_picks") return { delete: vi.fn().mockReturnValue(deleteChain), insert: insertFn }
+          return {}
+        }),
+      }
+    }
+
+    const GROUP_A_STANDINGS = [
+      { group_code: "Group A", team_code: "A1" },
+      { group_code: "Group A", team_code: "A2" },
+      { group_code: "Group A", team_code: "A3" },
+      { group_code: "Group A", team_code: "A4" },
+    ]
+    const GROUP_A_TEAMS = [
+      { api_id: 1, code: "A1" },
+      { api_id: 2, code: "A2" },
+      { api_id: 3, code: "A3" },
+      { api_id: 4, code: "A4" },
+    ]
+
     it("upserts 4 group_picks rows for a group with 3 predictions (partial fill)", async () => {
       // Group A has 3 predictions: A1 beats A2, A1 beats A3, A2 draws A3
       const predictions = [
@@ -492,39 +544,20 @@ describe("onboarding actions", () => {
         { match_id: "m3", home_score: 1, away_score: 1, matches: { stage: "Group Stage - 1" } },
       ]
       const matchRows = [
-        { id: "m1", stage: "Group Stage - 1", home_team_code: "A1", away_team_code: "A2" },
-        { id: "m2", stage: "Group Stage - 1", home_team_code: "A1", away_team_code: "A3" },
-        { id: "m3", stage: "Group Stage - 1", home_team_code: "A2", away_team_code: "A3" },
+        { id: "m1", home_team_code: "A1", away_team_code: "A2" },
+        { id: "m2", home_team_code: "A1", away_team_code: "A3" },
+        { id: "m3", home_team_code: "A2", away_team_code: "A3" },
       ]
 
-      const upsertFn = vi.fn().mockResolvedValue({ error: null })
-      const predSelectChain = {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        ilike: vi.fn().mockResolvedValue({ data: predictions, error: null }),
-      }
-      const matchSelectChain = {
-        select: vi.fn().mockReturnThis(),
-        in: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
-      }
-      const deleteChain = {
-        eq: vi.fn().mockReturnThis(),
-        in: vi.fn().mockResolvedValue({ error: null }),
-      }
-
-      mocks.createServiceClient.mockReturnValue({
-        from: vi.fn((table: string) => {
-          if (table === "predictions") return { select: vi.fn().mockReturnValue(predSelectChain) }
-          if (table === "matches") return matchSelectChain
-          if (table === "group_picks") return { delete: vi.fn().mockReturnValue(deleteChain), insert: upsertFn }
-          return {}
-        }),
-      })
+      const insertFn = vi.fn().mockResolvedValue({ error: null })
+      mocks.createServiceClient.mockReturnValue(
+        buildDeriveServiceClient({ predictions, matchRows, standings: GROUP_A_STANDINGS, teams: GROUP_A_TEAMS, insertFn })
+      )
 
       await deriveAndPersistGroupRankings("user-1")
 
-      expect(upsertFn).toHaveBeenCalledTimes(1)
-      const upsertedRows = upsertFn.mock.calls[0]?.[0] as Array<{ group_code: string; position: number; team_code: string }>
+      expect(insertFn).toHaveBeenCalledTimes(1)
+      const upsertedRows = insertFn.mock.calls[0]?.[0] as Array<{ group_code: string; position: number; team_code: string }>
       const groupARows = upsertedRows.filter((r) => r.group_code === "A")
       // Only 3 teams have predictions (A1, A2, A3) — A4 not seen so 3 rows
       expect(groupARows).toHaveLength(3)
@@ -532,42 +565,41 @@ describe("onboarding actions", () => {
       expect(groupARows.find((r) => r.position === 1)?.team_code).toBe("A1")
     })
 
+    it("groups by standings team→group mapping, not by the matchday number in stage", async () => {
+      // Real API-Football data: "Group Stage - N" is the MATCHDAY, not the group.
+      // A matchday-3 match between Group A teams must land in group A, never group C.
+      const predictions = [
+        { match_id: "m1", home_score: 1, away_score: 0, matches: { stage: "Group Stage - 3" } },
+      ]
+      const matchRows = [{ id: "m1", home_team_code: "A1", away_team_code: "A2" }]
+
+      const insertFn = vi.fn().mockResolvedValue({ error: null })
+      mocks.createServiceClient.mockReturnValue(
+        buildDeriveServiceClient({ predictions, matchRows, standings: GROUP_A_STANDINGS, teams: GROUP_A_TEAMS, insertFn })
+      )
+
+      await deriveAndPersistGroupRankings("user-1")
+
+      const upsertedRows = insertFn.mock.calls[0]?.[0] as Array<{ group_code: string; team_code: string }>
+      expect(upsertedRows.every((r) => r.group_code === "A")).toBe(true)
+      expect(upsertedRows.some((r) => r.group_code === "C")).toBe(false)
+    })
+
     it("breaks pts+GD+GF tie alphabetically", async () => {
       // A1 and A2 draw each match they play — identical stats → alphabetical
       const predictions = [
         { match_id: "m1", home_score: 1, away_score: 1, matches: { stage: "Group Stage - 1" } },
       ]
-      const matchRows = [
-        { id: "m1", stage: "Group Stage - 1", home_team_code: "A1", away_team_code: "A2" },
-      ]
+      const matchRows = [{ id: "m1", home_team_code: "A1", away_team_code: "A2" }]
 
-      const upsertFn = vi.fn().mockResolvedValue({ error: null })
-      const predSelectChain = {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        ilike: vi.fn().mockResolvedValue({ data: predictions, error: null }),
-      }
-      const matchSelectChain = {
-        select: vi.fn().mockReturnThis(),
-        in: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
-      }
-      const deleteChain = {
-        eq: vi.fn().mockReturnThis(),
-        in: vi.fn().mockResolvedValue({ error: null }),
-      }
-
-      mocks.createServiceClient.mockReturnValue({
-        from: vi.fn((table: string) => {
-          if (table === "predictions") return { select: vi.fn().mockReturnValue(predSelectChain) }
-          if (table === "matches") return matchSelectChain
-          if (table === "group_picks") return { delete: vi.fn().mockReturnValue(deleteChain), insert: upsertFn }
-          return {}
-        }),
-      })
+      const insertFn = vi.fn().mockResolvedValue({ error: null })
+      mocks.createServiceClient.mockReturnValue(
+        buildDeriveServiceClient({ predictions, matchRows, standings: GROUP_A_STANDINGS, teams: GROUP_A_TEAMS, insertFn })
+      )
 
       await deriveAndPersistGroupRankings("user-1")
 
-      const upsertedRows = upsertFn.mock.calls[0]?.[0] as Array<{ group_code: string; position: number; team_code: string }>
+      const upsertedRows = insertFn.mock.calls[0]?.[0] as Array<{ group_code: string; position: number; team_code: string }>
       const groupARows = upsertedRows.filter((r) => r.group_code === "A")
       // Alphabetical: A1 first (position 1), A2 second (position 2)
       expect(groupARows.find((r) => r.position === 1)?.team_code).toBe("A1")

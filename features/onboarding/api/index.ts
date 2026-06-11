@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { BracketPick, GroupCode, GroupRankings, OnboardingState, OnboardingStep } from "@/features/onboarding/types"
 import type { Database } from "@/lib/supabase/database.types"
 import type { GroupStageMatch, MatchWithPrediction } from "@/features/onboarding/components/prode-picks-screen"
+import { buildTeamToGroupMap } from "@/features/onboarding/utils/team-groups"
 
 type GroupPickRow = Pick<Database["public"]["Tables"]["group_picks"]["Row"], "group_code" | "position" | "team_code">
 type BracketPickRow = Pick<Database["public"]["Tables"]["bracket_picks"]["Row"], "slot" | "team_code">
@@ -89,13 +90,6 @@ function mapTournamentPrediction(row: TournamentPredictionRow | null): Onboardin
   }
 }
 
-const VALID_GROUPS: GroupCode[] = ["A","B","C","D","E","F","G","H","I","J","K","L"]
-
-function normalizeGroupCode(raw: string): string {
-  const s = raw.trim().toUpperCase()
-  return s.startsWith("GROUP ") ? s.slice(6) : s
-}
-
 export async function getGroupStageMatchesWithPredictions(
   supabase: SupabaseClient<Database>,
   userId: string
@@ -115,24 +109,7 @@ export async function getGroupStageMatchesWithPredictions(
   ])
 
   // Resolve numeric api_id team codes → canonical code (same as getStandingsByGroup)
-  const byApiId = new Map<string, string>()
-  const byCode = new Set<string>()
-  for (const t of teamsResult.data ?? []) {
-    const canonical = t.code.trim().toUpperCase()
-    byCode.add(canonical)
-    if (t.api_id != null) byApiId.set(String(t.api_id), canonical)
-  }
-
-  const teamToGroup = new Map<string, GroupCode>()
-  for (const row of standingsResult.data ?? []) {
-    const g = normalizeGroupCode(row.group_code) as GroupCode
-    if (!VALID_GROUPS.includes(g)) continue
-    const raw = row.team_code.trim()
-    const canonical = byCode.has(raw.toUpperCase())
-      ? raw.toUpperCase()
-      : (byApiId.get(raw) ?? raw.toUpperCase())
-    teamToGroup.set(canonical, g)
-  }
+  const teamToGroup = buildTeamToGroupMap(standingsResult.data ?? [], teamsResult.data ?? [])
 
   const predByMatchId = new Map((predictionsResult.data ?? []).map((p) => [p.match_id, p]))
 
