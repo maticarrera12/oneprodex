@@ -341,6 +341,17 @@ export async function setOnboardingMode(formData: FormData): Promise<void> {
   revalidatePath("/onboarding")
 }
 
+export async function resetOnboardingMode(): Promise<void> {
+  const userId = await getAuthUserId()
+  const service = createServiceClient()
+  const { error } = await service
+    .from("users")
+    .update({ onboarding_mode: null, prode_picks_submitted_at: null })
+    .eq("id", userId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/onboarding")
+}
+
 export async function continueFromProdePicks(): Promise<void> {
   const userId = await getAuthUserId()
   const service = createServiceClient()

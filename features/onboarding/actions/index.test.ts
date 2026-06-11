@@ -28,7 +28,7 @@ vi.mock("@/lib/achievements/evaluate", () => ({
   evaluateUser: mocks.evaluateUser,
 }))
 
-import { saveBestThirds, saveBracketPicks, saveGroupPicks, setOnboardingMode, saveMatchScorePick, deriveAndPersistGroupRankings, saveTournamentPredictions, continueFromProdePicks } from "@/features/onboarding/actions"
+import { saveBestThirds, saveBracketPicks, saveGroupPicks, setOnboardingMode, resetOnboardingMode, saveMatchScorePick, deriveAndPersistGroupRankings, saveTournamentPredictions, continueFromProdePicks } from "@/features/onboarding/actions"
 
 const ALL_SLOTS = [
   "R32_P1",
@@ -268,6 +268,31 @@ describe("onboarding actions", () => {
       await expect(
         setOnboardingMode(buildMultiFormData({ mode: "wizard" }))
       ).rejects.toThrow()
+    })
+  })
+
+  describe("resetOnboardingMode", () => {
+    it("clears onboarding mode and prode submission for the authenticated user", async () => {
+      const updateChain = {
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      }
+      const update = vi.fn().mockReturnValue(updateChain)
+      const service = {
+        from: vi.fn((table: string) => {
+          if (table === "users") return { update }
+          throw new Error(`Unexpected table ${table}`)
+        }),
+      }
+      mocks.createServiceClient.mockReturnValue(service)
+
+      await resetOnboardingMode()
+
+      expect(update).toHaveBeenCalledWith({
+        onboarding_mode: null,
+        prode_picks_submitted_at: null,
+      })
+      expect(updateChain.eq).toHaveBeenCalledWith("id", "user-1")
+      expect(mocks.revalidatePath).toHaveBeenCalledWith("/onboarding")
     })
   })
 

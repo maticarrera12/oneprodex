@@ -12,6 +12,7 @@ type BracketStepProps = {
   initialPicks: BracketPick[] | null
   logoByCode: Map<string, string>
   onContinue: (formData: FormData) => Promise<void>
+  onBack?: () => Promise<void>
 }
 
 type RoundConfig = {
@@ -136,7 +137,7 @@ function clearDownstream(picks: Map<SlotId, string>, changed: SlotId) {
   return next
 }
 
-export function BracketStep({ groupRankings, bestThirds, initialPicks, logoByCode, onContinue }: BracketStepProps) {
+export function BracketStep({ groupRankings, bestThirds, initialPicks, logoByCode, onContinue, onBack }: BracketStepProps) {
   const initialMap = useMemo(
     () =>
       new Map<SlotId, string>(
@@ -148,6 +149,7 @@ export function BracketStep({ groupRankings, bestThirds, initialPicks, logoByCod
   )
   const [picks, setPicks] = useState<Map<SlotId, string>>(initialMap)
   const [isPending, startTransition] = useTransition()
+  const [isBackPending, startBackTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const matchesByRound = useMemo(() => buildMatches(picks, groupRankings, bestThirds), [bestThirds, groupRankings, picks])
 
@@ -160,6 +162,19 @@ export function BracketStep({ groupRankings, bestThirds, initialPicks, logoByCod
   }
 
   const canSubmit = picks.size === 32
+
+  function handleBack() {
+    if (!onBack) return
+    setError(null)
+    startBackTransition(async () => {
+      try {
+        await onBack()
+        window.location.assign(`/onboarding?continue=${Date.now()}`)
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "No se pudo volver atrás.")
+      }
+    })
+  }
 
   function handleContinue() {
     if (!canSubmit) return
@@ -249,6 +264,17 @@ export function BracketStep({ groupRankings, bestThirds, initialPicks, logoByCod
 
   return (
     <section className="space-y-3 rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-3">
+      {onBack ? (
+        <button
+          type="button"
+          disabled={isBackPending || isPending}
+          onClick={handleBack}
+          className="text-xs font-semibold text-(--color-text3) transition hover:text-foreground disabled:opacity-50"
+        >
+          {isBackPending ? "Volviendo..." : "← Cambiar modo"}
+        </button>
+      ) : null}
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold">Paso 3 · Armá tu bracket</h2>

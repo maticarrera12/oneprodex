@@ -21,7 +21,10 @@ const R16_SLOTS = Array.from({ length: 8 }, (_, i) => `R16_P${i + 1}`)
 const QF_SLOTS = Array.from({ length: 4 }, (_, i) => `QF_P${i + 1}`)
 const SF_SLOTS = ["SF_P1", "SF_P2"]
 
-function renderBracket(onContinue = vi.fn().mockResolvedValue(undefined)) {
+function renderBracket(
+  onContinue = vi.fn().mockResolvedValue(undefined),
+  onBack?: () => Promise<void>
+) {
   render(
     <BracketStep
       groupRankings={buildGroupRankings()}
@@ -29,6 +32,7 @@ function renderBracket(onContinue = vi.fn().mockResolvedValue(undefined)) {
       initialPicks={null}
       logoByCode={new Map()}
       onContinue={onContinue}
+      onBack={onBack}
     />
   )
   return onContinue
@@ -169,5 +173,16 @@ describe("BracketStep", () => {
 
     expect(await screen.findByText("No se pudo guardar el bracket.")).toBeInTheDocument()
     expect(screen.getByText("32/32")).toBeInTheDocument()
+  })
+
+  it("calls onBack when the user taps Cambiar modo", async () => {
+    const onBack = vi.fn().mockResolvedValue(undefined)
+    renderBracket(undefined, onBack)
+
+    fireEvent.click(screen.getByRole("button", { name: "← Cambiar modo" }))
+
+    await vi.waitFor(() => {
+      expect(onBack).toHaveBeenCalledTimes(1)
+    })
   })
 })

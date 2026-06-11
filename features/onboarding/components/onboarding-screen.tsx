@@ -9,6 +9,7 @@ import {
   setOnboardingMode,
   saveMatchScorePick,
   continueFromProdePicks,
+  resetOnboardingMode,
 } from "@/features/onboarding/actions"
 import { BestThirdsStep } from "@/features/onboarding/components/best-thirds-step"
 import { BracketStep } from "@/features/onboarding/components/bracket-step"
@@ -128,6 +129,7 @@ export function OnboardingScreen({ step, savedData, teamsByGroup, matchesByGroup
           initialPicks={savedData.bracketPicks}
           logoByCode={logoByCode}
           onContinue={saveBracketPicks}
+          onBack={resetOnboardingMode}
         />
       ) : null}
 
@@ -142,6 +144,7 @@ export function OnboardingScreen({ step, savedData, teamsByGroup, matchesByGroup
           initialPicks={savedData.bracketPicks}
           logoByCode={logoByCode}
           onContinue={saveBracketPicks}
+          onBack={resetOnboardingMode}
         />
       ) : null}
 
