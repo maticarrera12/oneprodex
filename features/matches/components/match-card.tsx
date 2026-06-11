@@ -56,8 +56,8 @@ export function MatchCard({ match, teams, index }: MatchCardProps) {
 
         {match.status === "FINISHED" && match.pred ? (
           <div className="mt-4 flex items-center justify-between text-sm">
-            <span className="text-(--color-text2)">
-              Tu pick: <span className="font-mono text-foreground">{match.pred.hs}-{match.pred.as}</span>
+            <span className="font-mono text-foreground">
+              {match.pred.hs}–{match.pred.as}
             </span>
             <span
               className={
@@ -74,8 +74,8 @@ export function MatchCard({ match, teams, index }: MatchCardProps) {
         ) : null}
 
         {match.status === "UPCOMING" && match.pred ? (
-          <p className="mt-4 text-sm text-(--color-text2)">
-            Tu pick: <span className="font-mono text-foreground">{match.pred.hs}-{match.pred.as}</span>
+          <p className="mt-4 font-mono text-sm text-foreground">
+            {match.pred.hs}–{match.pred.as}
           </p>
         ) : null}
 

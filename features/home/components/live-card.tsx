@@ -66,17 +66,18 @@ export function LiveCard({ match, teams }: LiveCardProps) {
         </div>
 
         <div className="mt-3 flex items-center justify-between rounded-lg border border-border/80 bg-white/5 px-2.5 py-2">
-          <div>
-            <p className="text-xs text-muted-foreground">Your pick</p>
-            <p className="justify-center font-mono text-sm font-semibold text-foreground">
-              {match.pred ? `${match.pred.hs}-${match.pred.as}` : "No pick"}
-            </p>
-          </div>
           {match.pred ? (
-            <p className={`text-xs font-semibold ${onTrack ? "text-primary" : "text-amber-400"}`}>
-              {exact ? "EXACTO" : onTrack ? "ON TRACK" : "EN RIESGO"}
-            </p>
-          ) : null}
+            <>
+              <p className="font-mono text-sm font-semibold text-foreground">
+                {match.pred.hs}–{match.pred.as}
+              </p>
+              <p className={`text-xs font-semibold ${onTrack ? "text-primary" : "text-amber-400"}`}>
+                {exact ? "EXACTO" : onTrack ? "ON TRACK" : "EN RIESGO"}
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">Sin predicción</p>
+          )}
         </div>
       </article>
     </Link>

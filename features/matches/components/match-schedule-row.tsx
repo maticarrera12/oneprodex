@@ -52,12 +52,25 @@ function KickoffBadge({ kickoff }: { kickoff: string }) {
   const { date, time } = formatKickoffParts(kickoff)
 
   return (
-    <div className="shrink-0 rounded-md border border-zinc-800 p-1">
-      <div className="flex items-center gap-1">
-        <HugeiconsIcon icon={Calendar02Icon} size={28} color="currentColor" strokeWidth={1.5} />
+    <div className="shrink-0 rounded-md border border-zinc-800 p-0.5 sm:p-1">
+      <div className="flex items-center gap-0.5 sm:gap-1">
+        <HugeiconsIcon
+          icon={Calendar02Icon}
+          size={18}
+          color="currentColor"
+          strokeWidth={1.5}
+          className="sm:hidden"
+        />
+        <HugeiconsIcon
+          icon={Calendar02Icon}
+          size={28}
+          color="currentColor"
+          strokeWidth={1.5}
+          className="hidden sm:block"
+        />
         <div className="flex flex-col items-center pr-0.5">
-          <p className="font-mono text-[10px] uppercase tracking-[0.04em] text-zinc-400">{date}</p>
-          <p className="mt-0.5 font-mono text-sm font-semibold">{time}</p>
+          <p className="font-mono text-[8px] uppercase tracking-[0.04em] text-zinc-400 sm:text-[10px]">{date}</p>
+          <p className="font-mono text-[11px] font-semibold leading-none sm:mt-0.5 sm:text-sm">{time}</p>
         </div>
       </div>
     </div>
@@ -98,12 +111,9 @@ function PredictionAction({
 
   if (hasPrediction) {
     return (
-      <div className={actionClass}>
-        <span className="inline-flex min-w-[74px] justify-center rounded-[10px] border border-primary/35 bg-primary/10 px-2.5 py-1 font-mono text-[13px] font-semibold text-primary">
-          {match.pred?.hs}–{match.pred?.as}
-        </span>
-        <p className="text-xs text-primary">TU PICK</p>
-      </div>
+      <span className="inline-flex min-w-[74px] justify-center rounded-[10px] border border-primary/35 bg-primary/10 px-2.5 py-1 font-mono text-[13px] font-semibold text-primary">
+        {match.pred?.hs}–{match.pred?.as}
+      </span>
     )
   }
 
@@ -145,13 +155,7 @@ export function MatchScheduleRow({ match, teams, layout = "stacked" }: MatchSche
               <span className="truncate text-sm font-semibold">{away?.code ?? match.away}</span>
             </div>
 
-            {isLive ? (
-              <LiveBadge minute={match.minute} />
-            ) : (
-              <div className="hidden shrink-0 sm:block">
-                <KickoffBadge kickoff={match.kickoff} />
-              </div>
-            )}
+            {isLive ? <LiveBadge minute={match.minute} /> : <KickoffBadge kickoff={match.kickoff} />}
 
             <div className="shrink-0">
               <PredictionAction match={match} hasPrediction={hasPrediction} points={points} compact />
