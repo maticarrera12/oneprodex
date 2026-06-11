@@ -145,7 +145,13 @@ export function MatchScheduleRow({ match, teams, layout = "stacked" }: MatchSche
               <span className="truncate text-sm font-semibold">{away?.code ?? match.away}</span>
             </div>
 
-            {isLive ? <LiveBadge minute={match.minute} /> : <KickoffBadge kickoff={match.kickoff} />}
+            {isLive ? (
+              <LiveBadge minute={match.minute} />
+            ) : (
+              <div className="hidden shrink-0 sm:block">
+                <KickoffBadge kickoff={match.kickoff} />
+              </div>
+            )}
 
             <div className="shrink-0">
               <PredictionAction match={match} hasPrediction={hasPrediction} points={points} compact />

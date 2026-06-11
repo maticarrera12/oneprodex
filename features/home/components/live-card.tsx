@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { Flag } from "@/features/home/components/flag"
 import { LiveBadge } from "@/features/home/components/live-badge"
+import { isLivePredictionExact, isLivePredictionOnTrack } from "@/features/matches/utils/live-prediction"
 import type { Match, Team } from "@/features/matches/types"
 
 type LiveCardProps = {
@@ -12,7 +13,8 @@ type LiveCardProps = {
 export function LiveCard({ match, teams }: LiveCardProps) {
   const home = teams[match.home]
   const away = teams[match.away]
-  const onTrack = Boolean(match.pred && match.pred.hs === match.hs && match.pred.as === match.as)
+  const onTrack = isLivePredictionOnTrack(match.pred, { hs: match.hs, as: match.as })
+  const exact = isLivePredictionExact(match.pred, { hs: match.hs, as: match.as })
   const stage = match.stage.split(" · ")[0]
 
   return (
@@ -70,9 +72,11 @@ export function LiveCard({ match, teams }: LiveCardProps) {
               {match.pred ? `${match.pred.hs}-${match.pred.as}` : "No pick"}
             </p>
           </div>
-          <p className={`text-xs font-semibold ${onTrack ? "text-primary" : "text-amber-400"}`}>
-            {onTrack ? "ON TRACK" : "EN RIESGO"}
-          </p>
+          {match.pred ? (
+            <p className={`text-xs font-semibold ${onTrack ? "text-primary" : "text-amber-400"}`}>
+              {exact ? "EXACTO" : onTrack ? "ON TRACK" : "EN RIESGO"}
+            </p>
+          ) : null}
         </div>
       </article>
     </Link>

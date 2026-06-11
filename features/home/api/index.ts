@@ -68,37 +68,37 @@ async function getStatDeltas(
   return { ptsDelta, accDelta, streak, streakDelta }
 }
 
-async function mergeUpcomingPredictions(
+async function mergeMatchPredictions(
   supabase: SupabaseClient<Database>,
   userId: string,
-  upcomingMatches: Match[]
+  matches: Match[],
 ): Promise<Match[]> {
-  if (upcomingMatches.length === 0) return upcomingMatches
+  if (matches.length === 0) return matches
 
-  const matchIds = upcomingMatches.map((match) => match.id)
+  const matchIds = matches.map((match) => match.id)
   const { data, error } = await supabase
     .from("predictions")
     .select("match_id,home_score,away_score")
     .eq("user_id", userId)
     .in("match_id", matchIds)
 
-  if (error || !data) return upcomingMatches
+  if (error || !data) return matches
 
   const predictionByMatchId = new Map(
     (data as PredictionRow[]).map((prediction) => [
       prediction.match_id,
       { hs: prediction.home_score, as: prediction.away_score },
-    ] as const)
+    ] as const),
   )
 
-  return upcomingMatches.map((match) => ({
+  return matches.map((match) => ({
     ...match,
     pred: predictionByMatchId.get(match.id) ?? match.pred,
   }))
 }
 
 export async function getHomeData(supabase: SupabaseClient<Database>, userId: string, preferredGroupId?: string): Promise<HomeData> {
-  const [liveMatches, upcomingBase, allGroups, userStats, deltas] = await Promise.all([
+  const [liveBase, upcomingBase, allGroups, userStats, deltas] = await Promise.all([
     getLiveMatches(supabase),
     getUpcomingMatches(supabase),
     getUserGroups(supabase, userId),
@@ -109,7 +109,10 @@ export async function getHomeData(supabase: SupabaseClient<Database>, userId: st
   const groupId = preferredGroupId && allGroups.some((g) => g.id === preferredGroupId)
     ? preferredGroupId
     : allGroups[0]?.id ?? null
-  const upcomingMatches = await mergeUpcomingPredictions(supabase, userId, upcomingBase)
+  const [liveMatches, upcomingMatches] = await Promise.all([
+    mergeMatchPredictions(supabase, userId, liveBase),
+    mergeMatchPredictions(supabase, userId, upcomingBase),
+  ])
 
   if (!groupId) {
     return {

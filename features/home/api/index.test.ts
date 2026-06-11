@@ -97,4 +97,41 @@ describe("features/home/api", () => {
     expect(result.top3).toEqual([])
     expect(result.you).toBeUndefined()
   })
+
+  it("merges user predictions into live matches", async () => {
+    mocks.getLiveMatches.mockResolvedValueOnce([
+      { id: "live-1", home: "ARG", away: "BRA", status: "LIVE", hs: 1, as: 0, kickoff: "", stage: "Group Stage" },
+    ])
+    mocks.getUpcomingMatches.mockResolvedValueOnce([])
+    mocks.getUserGroups.mockResolvedValueOnce([])
+    mocks.getUserStats.mockResolvedValueOnce({ totalPts: 0, predictionPts: 0, achievementPts: 0, predictionCount: 0, accuracy: null, streak: 0 })
+
+    const supabase = {
+      from: (table: string) => {
+        if (table === "predictions") {
+          return {
+            select: () => ({
+              eq: () => ({
+                in: () =>
+                  Promise.resolve({
+                    data: [{ match_id: "live-1", home_score: 2, away_score: 1 }],
+                    error: null,
+                  }),
+                not: () => ({
+                  order: () => ({
+                    limit: () => Promise.resolve({ data: [], error: null }),
+                  }),
+                }),
+              }),
+            }),
+          }
+        }
+        return buildSupabase().from(table)
+      },
+    }
+
+    const result = await getHomeData(supabase as never, "user-3")
+
+    expect(result.liveMatches[0]?.pred).toEqual({ hs: 2, as: 1 })
+  })
 })
