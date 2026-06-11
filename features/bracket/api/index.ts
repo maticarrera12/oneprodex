@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GroupCode, GroupRankings } from "@/features/onboarding/types"
-import { resolveSlots } from "@/features/onboarding/utils/slot-resolver"
+import { resolveR32Pairs } from "@/features/onboarding/utils/slot-resolver"
 import type { BracketRound, BracketScoreStat } from "@/features/bracket/types"
 import type { Database } from "@/lib/supabase/database.types"
 
@@ -95,11 +95,7 @@ function buildRankings(rows: GroupPickRow[]): GroupRankings | null {
 
 function getStarterTeams(rankings: GroupRankings | null, bestThirds: string[]): string[] {
   if (!rankings) return Array.from({ length: 32 }, (_, idx) => `T${idx + 1}`)
-  const resolved = resolveSlots(rankings, bestThirds)
-  const list = Object.values(resolved).filter(Boolean)
-  if (list.length >= 32) return list.slice(0, 32)
-  while (list.length < 32) list.push(`T${list.length + 1}`)
-  return list
+  return resolveR32Pairs(rankings, bestThirds).flatMap(({ home, away }) => [home, away])
 }
 
 function buildRounds(picksBySlot: Map<string, string>, starters: string[], logoByCode: Map<string, string | null>): BracketRound[] {
