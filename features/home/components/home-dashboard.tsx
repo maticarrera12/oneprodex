@@ -3,6 +3,7 @@ import { HomeHeroCard } from "@/features/home/components/home-hero-card"
 import { HomeRankCard } from "@/features/home/components/home-rank-card"
 import type { GroupInfo } from "@/features/groups/types"
 import type { RankingEntry } from "@/features/rankings/types"
+import { AR_TIME_ZONE } from "@/features/matches/utils/kickoff"
 
 type HomeDashboardProps = {
   matchday: string
@@ -13,7 +14,7 @@ type HomeDashboardProps = {
 }
 
 function getWeekdayLabel() {
-  return new Intl.DateTimeFormat("es-AR", { weekday: "long" }).format(new Date())
+  return new Intl.DateTimeFormat("es-AR", { timeZone: AR_TIME_ZONE, weekday: "long" }).format(new Date())
 }
 
 export function HomeDashboard({ matchday, group, allGroups, you, ptsFallback }: HomeDashboardProps) {

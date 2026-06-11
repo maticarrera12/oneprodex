@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
+import { normalizeSearchText } from "@/lib/search"
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
-  const query = (url.searchParams.get("q") ?? "").trim()
+  const query = normalizeSearchText(url.searchParams.get("q") ?? "")
   const youngOnly = url.searchParams.get("young") === "1"
 
   if (query.length < 2) {
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
   let dbQuery = service
     .from("players")
     .select("api_id,name,photo_url,team_code")
-    .ilike("name", `%${query}%`)
+    .ilike("name_search", `%${query}%`)
     .order("name", { ascending: true })
     .limit(10)
 

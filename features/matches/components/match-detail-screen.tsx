@@ -14,6 +14,7 @@ import type { MatchEvent, MatchPredictionState, PlayerDetail } from "@/features/
 import { MAX_RED_CARDS, MAX_SCORERS, MAX_YELLOW_CARDS } from "@/features/predictions/types"
 import type { Match } from "@/features/matches/types"
 import { canPickScorerForTeam, derivePredictionFlow } from "@/features/matches/utils/prediction-flow"
+import { formatKickoffParts } from "@/features/matches/utils/kickoff"
 
 type MatchDetailScreenProps = {
   match: Match
@@ -21,26 +22,6 @@ type MatchDetailScreenProps = {
   players: { home: PlayerDetail[]; away: PlayerDetail[] }
   events: MatchEvent[]
   consensusGroups: MatchConsensusGroup[]
-}
-
-function formatKickoff(kickoff: string): { date: string; time: string } {
-  const parsed = new Date(kickoff)
-  if (Number.isNaN(parsed.getTime())) {
-    const fallback = kickoff.split(" · ")
-    return { date: fallback[0] ?? kickoff, time: fallback[1] ?? "" }
-  }
-
-  const date = new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-  }).format(parsed)
-  const time = new Intl.DateTimeFormat("es-AR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(parsed)
-
-  return { date, time }
 }
 
 export function MatchDetailScreen({ match, predictionState, players, events, consensusGroups }: MatchDetailScreenProps) {
@@ -53,7 +34,7 @@ export function MatchDetailScreen({ match, predictionState, players, events, con
     hasScore: Boolean(predictionState.score),
     editLocked,
   })
-  const kickoff = formatKickoff(match.kickoff)
+  const kickoff = formatKickoffParts(match.kickoff)
   const [selectedSquad, setSelectedSquad] = useState<"home" | "away">("home")
 
   const { optimistic, toggleScorer, toggleYellowCard, toggleRedCard, toggleCleanSheet, handleScoreSubmit, handleExtrasSubmit } = usePrediction(

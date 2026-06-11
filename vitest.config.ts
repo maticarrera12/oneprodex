@@ -9,5 +9,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: ['./vitest.setup.ts'],
+    // Run in UTC like Vercel so timezone bugs surface locally too
+    env: { TZ: 'UTC' },
   },
 })

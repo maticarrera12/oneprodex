@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import type { SlotId } from "@/features/onboarding/types"
 import { buildTeamToGroupMap } from "@/features/onboarding/utils/team-groups"
+import { normalizeSearchText } from "@/lib/search"
 import { createServiceClient } from "@/lib/supabase/service"
 import { createClient } from "@/lib/supabase/server"
 import { evaluateUser } from "@/lib/achievements/evaluate"
@@ -517,14 +518,14 @@ function computeTeamStats(
 }
 
 export async function searchPlayers(query: string): Promise<SearchPlayer[]> {
-  const text = query.trim()
+  const text = normalizeSearchText(query)
   if (text.length < 2) return []
 
   const service = createServiceClient()
   const { data, error } = await service
     .from("players")
     .select("api_id,name,photo_url,team_code")
-    .ilike("name", `%${text}%`)
+    .ilike("name_search", `%${text}%`)
     .order("name", { ascending: true })
     .limit(10)
 
@@ -533,7 +534,7 @@ export async function searchPlayers(query: string): Promise<SearchPlayer[]> {
 }
 
 export async function searchYoungPlayers(query: string): Promise<SearchPlayer[]> {
-  const text = query.trim()
+  const text = normalizeSearchText(query)
   if (text.length < 2) return []
 
   const service = createServiceClient()
@@ -541,7 +542,7 @@ export async function searchYoungPlayers(query: string): Promise<SearchPlayer[]>
     .from("players")
     .select("api_id,name,photo_url,team_code")
     .gte("date_of_birth", "2005-01-01")
-    .ilike("name", `%${text}%`)
+    .ilike("name_search", `%${text}%`)
     .order("name", { ascending: true })
     .limit(10)
 

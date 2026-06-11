@@ -8,6 +8,7 @@ import type {
   ProfileUser,
 } from "@/features/profile/types"
 import type { Database } from "@/lib/supabase/database.types"
+import { AR_TIME_ZONE } from "@/features/matches/utils/kickoff"
 
 type UserRow = Database["public"]["Tables"]["users"]["Row"]
 type PredictionRow = Database["public"]["Tables"]["predictions"]["Row"]
@@ -171,7 +172,9 @@ export function mapUserProfile(user: UserRow, stats: UserStats, championPick: Ch
   return {
     name: user.display_name,
     handle: user.handle,
-    joinedAt: user.created_at ? `Joined ${new Date(user.created_at).toLocaleDateString("es-AR")}` : "Joined",
+    joinedAt: user.created_at
+      ? `Joined ${new Date(user.created_at).toLocaleDateString("es-AR", { timeZone: AR_TIME_ZONE })}`
+      : "Joined",
     level: 1,
     levelTitle: "Pundit",
     nextLevelTitle: "Tactician",

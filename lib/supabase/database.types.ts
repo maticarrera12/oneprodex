@@ -298,6 +298,7 @@ export type Database = {
           date_of_birth: string | null
           id: string
           name: string
+          name_search: string | null
           photo_url: string | null
           position: string | null
           team_code: string | null
