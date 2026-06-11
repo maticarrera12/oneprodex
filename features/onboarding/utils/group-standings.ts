@@ -1,4 +1,9 @@
 import type { GroupCode, GroupRankings } from "@/features/onboarding/types"
+import {
+  sortTeamsByOlympicTiebreak,
+  type GroupMatchResult,
+  type TeamGroupStats,
+} from "@/features/standings/utils/group-tiebreak"
 
 export type MatchPrediction = {
   match_id: string
@@ -13,21 +18,9 @@ export type MatchInfo = {
   away_team_code: string
 }
 
-type TeamStats = {
-  pts: number
-  gf: number
-  ga: number
-  gd: number
-}
+type TeamStats = TeamGroupStats
 
 const GROUPS: GroupCode[] = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]
-
-function compareTeams(a: [string, TeamStats], b: [string, TeamStats]): number {
-  if (b[1].pts !== a[1].pts) return b[1].pts - a[1].pts
-  if (b[1].gd !== a[1].gd) return b[1].gd - a[1].gd
-  if (b[1].gf !== a[1].gf) return b[1].gf - a[1].gf
-  return a[0].localeCompare(b[0])
-}
 
 export function computeGroupStandings(
   predictions: MatchPrediction[],
@@ -39,9 +32,11 @@ export function computeGroupStandings(
   }
 
   const statsByGroup = new Map<GroupCode, Map<string, TeamStats>>()
+  const resultsByGroup = new Map<GroupCode, GroupMatchResult[]>()
 
   for (const group of GROUPS) {
     statsByGroup.set(group, new Map())
+    resultsByGroup.set(group, [])
   }
 
   for (const match of matches) {
@@ -73,6 +68,13 @@ export function computeGroupStandings(
     awayStats.ga += pred.home_score
     awayStats.gd += pred.away_score - pred.home_score
 
+    resultsByGroup.get(group)?.push({
+      home: match.home_team_code,
+      away: match.away_team_code,
+      homeScore: pred.home_score,
+      awayScore: pred.away_score,
+    })
+
     if (pred.home_score > pred.away_score) {
       homeStats.pts += 3
     } else if (pred.home_score === pred.away_score) {
@@ -86,12 +88,12 @@ export function computeGroupStandings(
   const result = {} as GroupRankings
   for (const group of GROUPS) {
     const groupStats = statsByGroup.get(group) ?? new Map()
-    const sorted = [...groupStats.entries()].sort(compareTeams)
+    const sorted = sortTeamsByOlympicTiebreak(groupStats, resultsByGroup.get(group) ?? [])
     result[group] = [
-      sorted[0]?.[0] ?? "",
-      sorted[1]?.[0] ?? "",
-      sorted[2]?.[0] ?? "",
-      sorted[3]?.[0] ?? "",
+      sorted[0] ?? "",
+      sorted[1] ?? "",
+      sorted[2] ?? "",
+      sorted[3] ?? "",
     ]
   }
   return result

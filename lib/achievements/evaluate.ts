@@ -1,4 +1,9 @@
 import { createServiceClient } from '@/lib/supabase/service'
+import {
+  sortTeamsByOlympicTiebreak,
+  type GroupMatchResult,
+  type TeamGroupStats,
+} from '@/features/standings/utils/group-tiebreak'
 
 type SupabaseClient = ReturnType<typeof createServiceClient>
 
@@ -276,38 +281,44 @@ export async function evalJuegaDavid(
 
     if (!groupMatches.data) continue
 
-    const dynamicStandings = new Map<string, { pts: number; gd: number; gf: number }>()
+    const dynamicStandings = new Map<string, TeamGroupStats>()
+    const groupResults: GroupMatchResult[] = []
 
     for (const m of groupMatches.data) {
       if (m.home_score === null || m.away_score === null) continue
 
       if (!dynamicStandings.has(m.home_team_code)) {
-        dynamicStandings.set(m.home_team_code, { pts: 0, gd: 0, gf: 0 })
+        dynamicStandings.set(m.home_team_code, { pts: 0, gd: 0, gf: 0, ga: 0 })
       }
       if (!dynamicStandings.has(m.away_team_code)) {
-        dynamicStandings.set(m.away_team_code, { pts: 0, gd: 0, gf: 0 })
+        dynamicStandings.set(m.away_team_code, { pts: 0, gd: 0, gf: 0, ga: 0 })
       }
 
       const home = dynamicStandings.get(m.home_team_code)!
       const away = dynamicStandings.get(m.away_team_code)!
 
       home.gf += m.home_score
+      home.ga += m.away_score
       home.gd += m.home_score - m.away_score
       away.gf += m.away_score
+      away.ga += m.home_score
       away.gd += m.away_score - m.home_score
 
       if (m.home_score > m.away_score) { home.pts += 3 }
       else if (m.away_score > m.home_score) { away.pts += 3 }
       else { home.pts += 1; away.pts += 1 }
+
+      groupResults.push({
+        home: m.home_team_code,
+        away: m.away_team_code,
+        homeScore: m.home_score,
+        awayScore: m.away_score,
+      })
     }
 
-    const sorted = [...dynamicStandings.entries()].sort(([, a], [, b]) => {
-      if (b.pts !== a.pts) return b.pts - a.pts
-      if (b.gd !== a.gd) return b.gd - a.gd
-      return b.gf - a.gf
-    })
+    const sorted = sortTeamsByOlympicTiebreak(dynamicStandings, groupResults)
 
-    const actualWinnerIdx = sorted.findIndex(([code]) => code === actualWinner)
+    const actualWinnerIdx = sorted.indexOf(actualWinner!)
     if (actualWinnerIdx < 2) continue
 
     const predictedWinner =
@@ -394,37 +405,47 @@ export async function evalDeMemoria(
 
   if (!groupMatches) return null
 
-  const accum = new Map<string, { gc: string; pts: number; gd: number; gf: number }>()
+  const accum = new Map<string, TeamGroupStats & { gc: string }>()
+  const resultsByGroup = new Map<string, GroupMatchResult[]>()
 
   for (const m of groupMatches) {
     if (m.home_score === null || m.away_score === null || !m.group_code) continue
 
-    if (!accum.has(m.home_team_code)) accum.set(m.home_team_code, { gc: m.group_code, pts: 0, gd: 0, gf: 0 })
-    if (!accum.has(m.away_team_code)) accum.set(m.away_team_code, { gc: m.group_code, pts: 0, gd: 0, gf: 0 })
+    if (!accum.has(m.home_team_code)) accum.set(m.home_team_code, { gc: m.group_code, pts: 0, gd: 0, gf: 0, ga: 0 })
+    if (!accum.has(m.away_team_code)) accum.set(m.away_team_code, { gc: m.group_code, pts: 0, gd: 0, gf: 0, ga: 0 })
 
     const home = accum.get(m.home_team_code)!
     const away = accum.get(m.away_team_code)!
 
     home.gf += m.home_score
+    home.ga += m.away_score
     home.gd += m.home_score - m.away_score
     away.gf += m.away_score
+    away.ga += m.home_score
     away.gd += m.away_score - m.home_score
 
     if (m.home_score > m.away_score) { home.pts += 3 }
     else if (m.away_score > m.home_score) { away.pts += 3 }
     else { home.pts += 1; away.pts += 1 }
+
+    const existing = resultsByGroup.get(m.group_code) ?? []
+    existing.push({
+      home: m.home_team_code,
+      away: m.away_team_code,
+      homeScore: m.home_score,
+      awayScore: m.away_score,
+    })
+    resultsByGroup.set(m.group_code, existing)
   }
 
   const groupRankings = new Map<string, string[]>()
   for (const gc of groupCodes) {
-    const teams = [...accum.entries()]
-      .filter(([, v]) => v.gc === gc)
-      .sort(([, a], [, b]) => {
-        if (b.pts !== a.pts) return b.pts - a.pts
-        if (b.gd !== a.gd) return b.gd - a.gd
-        return b.gf - a.gf
-      })
-      .map(([code]) => code)
+    const teamStats = new Map<string, TeamGroupStats>()
+    for (const [code, value] of accum.entries()) {
+      if (value.gc !== gc) continue
+      teamStats.set(code, { pts: value.pts, gf: value.gf, ga: value.ga, gd: value.gd })
+    }
+    const teams = sortTeamsByOlympicTiebreak(teamStats, resultsByGroup.get(gc) ?? [])
     groupRankings.set(gc, teams)
   }
 

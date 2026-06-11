@@ -37,7 +37,7 @@ describe("computeGroupStandings", () => {
     expect(result.A[1]).toBe("A4")
   })
 
-  it("breaks pts tie by goal difference", () => {
+  it("breaks pts tie by goal difference when head-to-head is a draw", () => {
     // Two teams, each 3pts. Team A1: GD +3, Team A2: GD +1
     // Use only 2 teams to keep it simple — A1 beats A2 (won't meet again)
     // But we need 4 teams for group, pad with A3,A4
@@ -63,7 +63,26 @@ describe("computeGroupStandings", () => {
     expect(result.A[1]).toBe("A2")
   })
 
-  it("breaks GD tie by goals scored (GF)", () => {
+  it("uses head-to-head before overall goal difference when two teams are tied on points", () => {
+    const matches: MatchInfo[] = [
+      match("m1", "A1", "A2"),
+      match("m2", "A1", "A3"),
+      match("m3", "A2", "A3"),
+      match("m4", "A4", "A1"),
+      match("m5", "A4", "A2"),
+      match("m6", "A4", "A3"),
+    ]
+    const predictions: MatchPrediction[] = [
+      pred("m1", 0, 1),
+      pred("m2", 3, 0),
+    ]
+
+    const result = computeGroupStandings(predictions, matches)
+    expect(result.A[0]).toBe("A2")
+    expect(result.A[1]).toBe("A1")
+  })
+
+  it("breaks GD tie by goals scored (GF) after head-to-head draw", () => {
     // Teams A1 and A2 tied on pts and GD, A1 scores more
     const matches: MatchInfo[] = [
       match("m1", "A1", "A3"),

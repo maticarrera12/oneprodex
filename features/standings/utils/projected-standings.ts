@@ -1,3 +1,8 @@
+import {
+  sortTeamsByOlympicTiebreak,
+  type GroupMatchResult,
+} from "@/features/standings/utils/group-tiebreak"
+
 export type ProjectedMatch = {
   id: string
   groupCode: string
@@ -24,6 +29,7 @@ export type ProjectedTeamAccum = {
 
 type ComputeProjectedStandingRowsInput<Row> = {
   groupToTeams: Map<string, string[]>
+  teamAliasesByGroup?: Map<string, Map<string, string>>
   matches: ProjectedMatch[]
   predictions: ProjectedPrediction[]
   buildRow: (teamCode: string, accum: ProjectedTeamAccum, position: number) => Row
@@ -33,18 +39,53 @@ function emptyAccum(): ProjectedTeamAccum {
   return { pj: 0, g: 0, e: 0, p: 0, gf: 0, ga: 0, gd: 0, pts: 0 }
 }
 
-function compareRows(a: [string, ProjectedTeamAccum], b: [string, ProjectedTeamAccum]): number {
-  return b[1].pts - a[1].pts || b[1].gd - a[1].gd || b[1].gf - a[1].gf
+export function buildGroupTeamAliasMap(
+  groupToTeams: Map<string, string[]>,
+  teamApiIdByCode: Map<string, number | null | undefined>,
+): Map<string, Map<string, string>> {
+  const aliasesByGroup = new Map<string, Map<string, string>>()
+
+  for (const [groupCode, roster] of groupToTeams) {
+    const aliases = new Map<string, string>()
+    for (const teamCode of roster) {
+      const canonical = teamCode.trim().toUpperCase()
+      aliases.set(canonical, canonical)
+      const apiId = teamApiIdByCode.get(canonical)
+      if (apiId != null) aliases.set(String(apiId), canonical)
+    }
+    aliasesByGroup.set(groupCode, aliases)
+  }
+
+  return aliasesByGroup
+}
+
+export function resolveRosterTeamCode(
+  groupCode: string,
+  teamCode: string,
+  groupToTeams: Map<string, string[]>,
+  teamAliasesByGroup: Map<string, Map<string, string>>,
+): string | null {
+  const roster = groupToTeams.get(groupCode)
+  if (!roster) return null
+
+  const normalized = teamCode.trim().toUpperCase()
+  const aliases = teamAliasesByGroup.get(groupCode)
+  const canonical = aliases?.get(normalized) ?? aliases?.get(teamCode.trim()) ?? normalized
+
+  return roster.includes(canonical) ? canonical : null
 }
 
 export function computeProjectedStandingRowsByGroup<Row>({
   groupToTeams,
+  teamAliasesByGroup,
   matches,
   predictions,
   buildRow,
 }: ComputeProjectedStandingRowsInput<Row>): Map<string, Row[]> {
+  const aliasesByGroup = teamAliasesByGroup ?? buildGroupTeamAliasMap(groupToTeams, new Map())
   const predictionByMatchId = new Map(predictions.map((prediction) => [prediction.matchId, prediction]))
   const accumByGroup = new Map<string, Map<string, ProjectedTeamAccum>>()
+  const resultsByGroup = new Map<string, GroupMatchResult[]>()
 
   for (const [groupCode, teams] of groupToTeams) {
     const groupAccum = new Map<string, ProjectedTeamAccum>()
@@ -52,6 +93,7 @@ export function computeProjectedStandingRowsByGroup<Row>({
       groupAccum.set(teamCode, emptyAccum())
     }
     accumByGroup.set(groupCode, groupAccum)
+    resultsByGroup.set(groupCode, [])
   }
 
   for (const match of matches) {
@@ -61,11 +103,12 @@ export function computeProjectedStandingRowsByGroup<Row>({
     const groupAccum = accumByGroup.get(match.groupCode)
     if (!groupAccum) continue
 
-    if (!groupAccum.has(match.home)) groupAccum.set(match.home, emptyAccum())
-    if (!groupAccum.has(match.away)) groupAccum.set(match.away, emptyAccum())
+    const home = resolveRosterTeamCode(match.groupCode, match.home, groupToTeams, aliasesByGroup)
+    const away = resolveRosterTeamCode(match.groupCode, match.away, groupToTeams, aliasesByGroup)
+    if (!home || !away) continue
 
-    const homeAccum = groupAccum.get(match.home)!
-    const awayAccum = groupAccum.get(match.away)!
+    const homeAccum = groupAccum.get(home)!
+    const awayAccum = groupAccum.get(away)!
 
     homeAccum.pj += 1
     awayAccum.pj += 1
@@ -90,13 +133,21 @@ export function computeProjectedStandingRowsByGroup<Row>({
       awayAccum.pts += 3
       homeAccum.p += 1
     }
+
+    resultsByGroup.get(match.groupCode)?.push({
+      home,
+      away,
+      homeScore: prediction.homeScore,
+      awayScore: prediction.awayScore,
+    })
   }
 
   const rowsByGroup = new Map<string, Row[]>()
   for (const [groupCode, groupAccum] of accumByGroup) {
-    const rows = Array.from(groupAccum.entries())
-      .sort(compareRows)
-      .map(([teamCode, accum], index) => buildRow(teamCode, accum, index))
+    const roster = groupToTeams.get(groupCode) ?? []
+    const rosterStats = new Map(roster.map((teamCode) => [teamCode, groupAccum.get(teamCode) ?? emptyAccum()]))
+    const sortedTeams = sortTeamsByOlympicTiebreak(rosterStats, resultsByGroup.get(groupCode) ?? [])
+    const rows = sortedTeams.map((teamCode, index) => buildRow(teamCode, rosterStats.get(teamCode)!, index))
     rowsByGroup.set(groupCode, rows)
   }
 
