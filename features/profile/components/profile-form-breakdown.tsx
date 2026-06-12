@@ -1,35 +1,39 @@
+import type { ProfileHistoryKind } from "@/features/profile/types"
+
 type ProfileFormBreakdownProps = {
-  values: number[]
+  values: ProfileHistoryKind[]
 }
 
 export function ProfileFormBreakdown({ values }: ProfileFormBreakdownProps) {
-  const exact = values.filter((v) => v === 5).length
-  const result = values.filter((v) => v === 2).length
-  const missed = values.filter((v) => v === 0).length
+  const exact = values.filter((v) => v === "exact").length
+  const result = values.filter((v) => v === "result").length
+  const missed = values.filter((v) => v === "miss").length
 
   return (
-    <section>
+    <section className="flex h-full flex-col">
       <h2 className="mb-2 text-xs font-semibold tracking-wider text-(--color-text2) uppercase">
         Form · Últimos 7 Partidos
       </h2>
-      <div className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-4">
-        <div className="mb-4 flex items-center justify-between gap-2">
-          {values.map((value, index) => (
-            <FormCircle key={index} value={value} />
-          ))}
+      <div className="flex flex-1 flex-col rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-4">
+        <div className="mb-4 flex flex-1 items-center justify-between gap-2">
+          {values.length === 0 ? (
+            <p className="font-mono text-xs text-(--color-text4)">Sin partidos puntuados todavía</p>
+          ) : (
+            values.map((kind, index) => <FormCircle key={index} kind={kind} />)
+          )}
         </div>
         <div className="grid grid-cols-3 gap-2">
           <FormStat n={exact} label="Exactos" toneClass="text-(--color-primary)" />
           <FormStat n={result} label="Solo Resultado" toneClass="text-(--color-amber)" />
-          <FormStat n={missed} label="Fallados" toneClass="text-(--color-text3)" />
+          <FormStat n={missed} label="Fallados" toneClass="text-red-400" />
         </div>
       </div>
     </section>
   )
 }
 
-function FormCircle({ value }: { value: number }) {
-  if (value === 5) {
+function FormCircle({ kind }: { kind: ProfileHistoryKind }) {
+  if (kind === "exact") {
     return (
       <span className="inline-flex size-12 items-center justify-center rounded-full border-2 border-(--color-primary) bg-(--color-lime-bg) text-(--color-primary)">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -38,7 +42,7 @@ function FormCircle({ value }: { value: number }) {
       </span>
     )
   }
-  if (value === 2) {
+  if (kind === "result") {
     return (
       <span className="inline-flex size-12 items-center justify-center rounded-full border-2 border-(--color-amber) bg-(--color-amber)/10 text-(--color-amber)">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -48,7 +52,7 @@ function FormCircle({ value }: { value: number }) {
     )
   }
   return (
-    <span className="inline-flex size-12 items-center justify-center rounded-full border-2 border-white/20 bg-white/6 text-(--color-text3)">
+    <span className="inline-flex size-12 items-center justify-center rounded-full border-2 border-red-400/70 bg-red-400/10 text-red-400">
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
         <path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
       </svg>

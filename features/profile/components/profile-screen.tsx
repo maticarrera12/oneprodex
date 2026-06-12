@@ -19,8 +19,10 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
       <ProfileHeader />
       <ProfileIdentity user={data.user} accentColor={userColor} />
       <ProfileHeroStats stats={data.heroStats} />
-      <ProfileLevelProgress user={data.user} />
-      <ProfileFormBreakdown values={data.formLast7} />
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
+        <ProfileLevelProgress user={data.user} />
+        <ProfileFormBreakdown values={data.formLast7} />
+      </div>
       <ProfileAchievementsGrid achievements={data.achievements} />
       <ProfileHistoryList entries={data.history} />
     </div>

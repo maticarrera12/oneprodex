@@ -48,8 +48,10 @@ export interface ProfileHistoryEntry {
   date: string
   homeTeam: string
   homeFlag: string
+  homeLogo?: string | null
   awayTeam: string
   awayFlag: string
+  awayLogo?: string | null
   myPrediction: string
   result: string
   pts: number

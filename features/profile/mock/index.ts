@@ -28,7 +28,7 @@ export const PROFILE_HERO_STATS: ProfileHeroStat[] = [
   { label: "Aciertos seguidos", value: "5", fire: true },
 ]
 
-export const PROFILE_FORM_LAST7 = [5, 5, 5, 5, 2, 0, 0]
+export const PROFILE_FORM_LAST7 = ["exact", "exact", "exact", "exact", "result", "miss", "miss"] as const
 
 
 export const PROFILE_HISTORY: ProfileHistoryEntry[] = [

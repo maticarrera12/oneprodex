@@ -9,24 +9,33 @@ export function ProfileLevelProgress({ user }: ProfileLevelProgressProps) {
   const missing = Math.max(0, user.levelTarget - user.levelCurrent)
 
   return (
-    <section className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-4">
-      <div className="mb-3 flex items-center gap-3">
-        <HexShield level={user.level} />
-        <div className="min-w-0 flex-1">
-          <p className="font-mono text-[10px] tracking-wider text-(--color-text3) uppercase">
-            Level {user.level} · {user.levelTitle}
-          </p>
-          <p className="mt-0.5 text-sm">{missing} pts para Level {user.level + 1} · {user.nextLevelTitle}</p>
+    <section className="flex h-full flex-col">
+      <h2 className="mb-2 text-xs font-semibold tracking-wider text-(--color-text2) uppercase">
+        Level · Progreso
+      </h2>
+      <div className="flex flex-1 flex-col rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-4">
+        <div className="flex flex-1 flex-col justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <HexShield level={user.level} />
+            <div className="min-w-0 flex-1">
+              <p className="font-mono text-[10px] tracking-wider text-(--color-text3) uppercase">
+                Level {user.level} · {user.levelTitle}
+              </p>
+              <p className="mt-0.5 text-sm">
+                {missing} pts para Level {user.level + 1} · {user.nextLevelTitle}
+              </p>
+            </div>
+            <p className="shrink-0 font-mono text-xs font-semibold text-(--color-primary)">
+              {user.levelCurrent} / {user.levelTarget}
+            </p>
+          </div>
+          <div className="h-2 overflow-hidden rounded bg-white/6">
+            <div
+              className="h-full rounded bg-linear-to-r from-(--color-lime-deep) to-(--color-primary) shadow-[0_0_10px_rgba(190,242,100,0.4)]"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
         </div>
-        <p className="font-mono text-xs font-semibold text-(--color-primary) shrink-0">
-          {user.levelCurrent} / {user.levelTarget}
-        </p>
-      </div>
-      <div className="h-2 overflow-hidden rounded bg-white/6">
-        <div
-          className="h-full rounded bg-linear-to-r from-(--color-lime-deep) to-(--color-primary) shadow-[0_0_10px_rgba(190,242,100,0.4)]"
-          style={{ width: `${pct}%` }}
-        />
       </div>
     </section>
   )

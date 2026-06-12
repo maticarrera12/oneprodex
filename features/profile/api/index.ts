@@ -4,9 +4,11 @@ import type {
   ProfileAchievementTone,
   ProfileHeroStat,
   ProfileHistoryEntry,
+  ProfileHistoryKind,
   ProfileHistoryPhase,
   ProfileUser,
 } from "@/features/profile/types"
+import { computePredictionKind } from "@/features/profile/utils/prediction-kind"
 import type { Database } from "@/lib/supabase/database.types"
 import { AR_TIME_ZONE } from "@/features/matches/utils/kickoff"
 
@@ -163,7 +165,7 @@ export type UserStats = {
 export type ProfileData = {
   user: ProfileUser
   heroStats: ProfileHeroStat[]
-  formLast7: number[]
+  formLast7: ProfileHistoryKind[]
   achievements: ProfileAchievement[]
   history: ProfileHistoryEntry[]
 }
@@ -288,18 +290,24 @@ const STAGE_TO_PHASE: Record<string, ProfileHistoryPhase> = {
   THIRD: "final",
 }
 
-async function getFormLast7(supabase: SupabaseClient<Database>, userId: string): Promise<number[]> {
+async function getFormLast7(supabase: SupabaseClient<Database>, userId: string): Promise<ProfileHistoryKind[]> {
   const { data } = await supabase
     .from("predictions")
-    .select("points, matches(kickoff)")
+    .select("home_score, away_score, matches(home_score, away_score, kickoff, status)")
     .eq("user_id", userId)
     .not("points", "is", null)
     .order("kickoff", { referencedTable: "matches", ascending: false })
-    .limit(7)
+    .limit(20)
 
-  if (!data || data.length === 0) return []
+  if (!data) return []
 
-  return [...data].reverse().map((row) => row.points ?? 0)
+  const kinds = data.flatMap((row) => {
+    const m = row.matches as MatchJoinRow | null
+    if (!m || m.status !== "FINISHED" || m.home_score === null || m.away_score === null) return []
+    return [computePredictionKind(row.home_score, row.away_score, m.home_score, m.away_score)]
+  })
+
+  return kinds.slice(0, 7).reverse()
 }
 
 type MatchJoinRow = {
@@ -310,6 +318,39 @@ type MatchJoinRow = {
   kickoff: string
   stage: string
   status: string
+}
+
+type TeamLookupRow = Pick<Database["public"]["Tables"]["teams"]["Row"], "api_id" | "code" | "name" | "logo">
+
+function normalizeTeamCode(code: string): string {
+  return code.trim().toUpperCase()
+}
+
+function normalizeLogoUrl(logo: string | null): string | null {
+  if (!logo) return null
+  const trimmed = logo.trim()
+  if (trimmed.startsWith("https://")) return trimmed
+  if (trimmed.startsWith("http://")) return `https://${trimmed.slice("http://".length)}`
+  if (trimmed.startsWith("//")) return `https:${trimmed}`
+  return trimmed
+}
+
+function buildTeamsLookup(teams: TeamLookupRow[]) {
+  const byCode = new Map(teams.map((team) => [normalizeTeamCode(team.code), team] as const))
+  const byApiId = new Map(
+    teams
+      .filter((team): team is TeamLookupRow & { api_id: number } => typeof team.api_id === "number")
+      .map((team) => [String(team.api_id), team] as const),
+  )
+  return { byCode, byApiId }
+}
+
+function resolveTeam(
+  value: string,
+  lookup: ReturnType<typeof buildTeamsLookup>,
+): TeamLookupRow | undefined {
+  const raw = value.trim()
+  return lookup.byCode.get(normalizeTeamCode(raw)) ?? lookup.byApiId.get(raw)
 }
 
 async function getProfileHistory(
@@ -326,42 +367,34 @@ async function getProfileHistory(
 
   if (!data) return []
 
-  const allCodes = [...new Set(
-    data.flatMap((row) => {
-      const m = row.matches as MatchJoinRow | null
-      return m ? [m.home_team_code, m.away_team_code] : []
-    })
-  )]
-
-  const { data: teams } = allCodes.length > 0
-    ? await supabase.from("teams").select("code, name").in("code", allCodes)
-    : { data: [] }
-
-  const teamName = new Map((teams ?? []).map((t) => [t.code, t.name]))
+  const { data: teamsData } = await supabase.from("teams").select("api_id, code, name, logo")
+  const lookup = buildTeamsLookup(teamsData ?? [])
 
   return data.flatMap((row) => {
     const m = row.matches as MatchJoinRow | null
     if (!m || m.status !== "FINISHED" || m.home_score === null || m.away_score === null) return []
+
+    const homeTeam = resolveTeam(m.home_team_code, lookup)
+    const awayTeam = resolveTeam(m.away_team_code, lookup)
 
     const predictedHome = row.home_score
     const predictedAway = row.away_score
     const actualHome = m.home_score
     const actualAway = m.away_score
 
-    const predictedWinner = predictedHome > predictedAway ? "home" : predictedHome < predictedAway ? "away" : "draw"
-    const actualWinner = actualHome > actualAway ? "home" : actualHome < actualAway ? "away" : "draw"
-    const exactScore = predictedHome === actualHome && predictedAway === actualAway
-    const kind = exactScore ? "exact" : predictedWinner === actualWinner ? "result" : "miss"
+    const kind = computePredictionKind(predictedHome, predictedAway, actualHome, actualAway)
 
     const date = new Date(m.kickoff)
     const dateStr = `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1).toString().padStart(2, "0")}`
 
     return [{
       date: dateStr,
-      homeTeam: teamName.get(m.home_team_code) ?? m.home_team_code,
-      homeFlag: m.home_team_code,
-      awayTeam: teamName.get(m.away_team_code) ?? m.away_team_code,
-      awayFlag: m.away_team_code,
+      homeTeam: homeTeam?.name ?? m.home_team_code,
+      homeFlag: homeTeam?.code ?? normalizeTeamCode(m.home_team_code),
+      homeLogo: normalizeLogoUrl(homeTeam?.logo ?? null),
+      awayTeam: awayTeam?.name ?? m.away_team_code,
+      awayFlag: awayTeam?.code ?? normalizeTeamCode(m.away_team_code),
+      awayLogo: normalizeLogoUrl(awayTeam?.logo ?? null),
       myPrediction: `${predictedHome} - ${predictedAway}`,
       result: `${actualHome} - ${actualAway}`,
       pts: row.points ?? 0,

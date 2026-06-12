@@ -1,4 +1,5 @@
 import Link from "next/link"
+import type { ReactNode } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Calendar02Icon } from "@hugeicons/core-free-icons"
 
@@ -77,43 +78,56 @@ function KickoffBadge({ kickoff }: { kickoff: string }) {
   )
 }
 
+function PredictionBadge({
+  children,
+  tone = "pick",
+}: {
+  children: ReactNode
+  tone?: "pick" | "exact" | "winner" | "miss" | "neutral"
+}) {
+  const toneClass =
+    tone === "exact"
+      ? "border-primary/35 bg-primary/10 text-primary"
+      : tone === "winner"
+        ? "border-(--color-amber)/35 bg-(--color-amber)/10 text-(--color-amber)"
+        : tone === "miss"
+          ? "border-border/80 bg-white/5 text-muted-foreground"
+          : tone === "pick"
+            ? "border-primary/35 bg-primary/10 text-primary"
+            : "border-border/80 bg-white/5 text-foreground/80"
+
+  return (
+    <span
+      className={`inline-flex min-w-7 justify-center rounded-[10px] border px-1.5 py-0.5 font-mono text-sm font-semibold ${toneClass}`}
+    >
+      {children}
+    </span>
+  )
+}
+
+function predictionTone(points: ReturnType<typeof calcPoints> | null): "exact" | "winner" | "miss" | "pick" {
+  if (!points) return "pick"
+  if (points.exact) return "exact"
+  if (points.winner) return "winner"
+  return "miss"
+}
+
 function PredictionAction({
   match,
   hasPrediction,
   points,
-  compact,
 }: {
   match: Match
   hasPrediction: boolean
   points: ReturnType<typeof calcPoints> | null
-  compact?: boolean
 }) {
-  const actionClass = compact ? "flex items-center gap-2" : "flex items-center gap-2 sm:flex-col sm:gap-1"
-
-  if (match.status === "FINISHED" && hasPrediction) {
-    return (
-      <div className={actionClass}>
-        <span
-          className={`inline-flex min-w-[74px] justify-center rounded-[10px] border px-2.5 py-1 font-mono text-[13px] font-semibold ${
-            points?.exact
-              ? "border-primary/35 bg-primary/10 text-primary"
-              : points?.winner
-                ? "border-(--color-amber)/35 bg-(--color-amber)/10 text-(--color-amber)"
-                : "border-border/80 bg-white/5 text-muted-foreground"
-          }`}
-        >
-          {match.pred?.hs}–{match.pred?.as}
-        </span>
-        <p className="text-xs text-muted-foreground">{points?.pts ?? 0} pts</p>
-      </div>
-    )
-  }
+  const tone = match.status === "FINISHED" ? predictionTone(points) : "pick"
 
   if (hasPrediction) {
     return (
-      <span className="inline-flex min-w-[74px] justify-center rounded-[10px] border border-primary/35 bg-primary/10 px-2.5 py-1 font-mono text-[13px] font-semibold text-primary">
+      <PredictionBadge tone={tone}>
         {match.pred?.hs}–{match.pred?.as}
-      </span>
+      </PredictionBadge>
     )
   }
 
@@ -124,13 +138,99 @@ function PredictionAction({
   )
 }
 
-export function MatchScheduleRow({ match, teams, layout = "stacked" }: MatchScheduleRowProps) {
+function MatchStatusBadge({ isLive, minute, kickoff }: { isLive: boolean; minute: number | null | undefined; kickoff: string }) {
+  return isLive ? <LiveBadge minute={minute} /> : <KickoffBadge kickoff={kickoff} />
+}
+
+type MatchScheduleRowBodyProps = {
+  match: Match
+  teams: Record<string, Team>
+  layout: "inline" | "stacked"
+}
+
+function MatchScheduleRowBody({ match, teams, layout }: MatchScheduleRowBodyProps) {
   const home = teams[match.home]
   const away = teams[match.away]
   const hasPrediction = Boolean(match.pred)
   const points = match.status === "FINISHED" ? calcPoints(match) : null
   const isLive = match.status === "LIVE"
   const showScore = isLive || match.status === "FINISHED"
+
+  if (layout === "inline") {
+    const showPoints = hasPrediction && match.status === "FINISHED"
+
+    return (
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 sm:gap-x-3">
+        <div className="col-start-1 flex min-w-0 items-center gap-1.5">
+          <TeamBadge code={match.home} name={home?.name} logo={match.homeLogo} />
+          <span className="shrink-0 text-sm font-semibold">{home?.code ?? match.home}</span>
+          {showScore ? (
+            <span className="shrink-0 px-0.5 font-mono text-sm font-semibold text-foreground">
+              {match.hs ?? "-"}–{match.as ?? "-"}
+            </span>
+          ) : (
+            <span className="shrink-0 font-mono text-[11px] text-muted-foreground">vs</span>
+          )}
+          <TeamBadge code={match.away} name={away?.name} logo={match.awayLogo} />
+          <span className="truncate text-sm font-semibold">{away?.code ?? match.away}</span>
+        </div>
+
+        <div className="col-start-2 flex justify-center">
+          <MatchStatusBadge isLive={isLive} minute={match.minute} kickoff={match.kickoff} />
+        </div>
+
+        <div className="col-start-3 flex items-center justify-end gap-2">
+          <PredictionAction match={match} hasPrediction={hasPrediction} points={points} />
+          {showPoints ? <p className="text-xs text-muted-foreground">{points?.pts ?? 0} pts</p> : null}
+        </div>
+      </div>
+    )
+  }
+
+  const predTone = match.status === "FINISHED" ? predictionTone(points) : "pick"
+  const showPoints = hasPrediction && match.status === "FINISHED"
+
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_auto_1fr_auto] items-center gap-x-2 gap-y-2">
+      <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-2">
+        <TeamBadge code={match.home} name={home?.name} logo={match.homeLogo} />
+        <span className="text-sm font-semibold">{home?.code ?? match.home}</span>
+      </div>
+
+      <div className="col-start-2 row-start-1 row-span-2 flex items-center justify-center px-0.5">
+        <MatchStatusBadge isLive={isLive} minute={match.minute} kickoff={match.kickoff} />
+      </div>
+
+      {hasPrediction ? (
+        <>
+          <div className="col-start-3 row-start-1 flex items-center justify-end gap-2">
+            {showScore ? <span className="w-4 text-right font-mono text-sm font-semibold text-foreground">{match.hs ?? "-"}</span> : null}
+            <PredictionBadge tone={predTone}>{match.pred?.hs}</PredictionBadge>
+          </div>
+          <div className="col-start-3 row-start-2 flex items-center justify-end gap-2">
+            {showScore ? <span className="w-4 text-right font-mono text-sm font-semibold text-foreground">{match.as ?? "-"}</span> : null}
+            <PredictionBadge tone={predTone}>{match.pred?.as}</PredictionBadge>
+          </div>
+          {showPoints ? (
+            <p className="col-start-4 row-start-1 row-span-2 self-center text-xs text-muted-foreground">{points?.pts ?? 0} pts</p>
+          ) : null}
+        </>
+      ) : (
+        <div className="col-start-3 row-start-1 row-span-2 flex items-center justify-end">
+          <PredictionAction match={match} hasPrediction={hasPrediction} points={points} />
+        </div>
+      )}
+
+      <div className="col-start-1 row-start-2 flex min-w-0 items-center gap-2">
+        <TeamBadge code={match.away} name={away?.name} logo={match.awayLogo} />
+        <span className="text-sm font-semibold">{away?.code ?? match.away}</span>
+      </div>
+    </div>
+  )
+}
+
+export function MatchScheduleRow({ match, teams, layout = "stacked" }: MatchScheduleRowProps) {
+  const isLive = match.status === "LIVE"
 
   return (
     <Link href={`/partidos/${match.id}`} className="block">
@@ -140,52 +240,16 @@ export function MatchScheduleRow({ match, teams, layout = "stacked" }: MatchSche
         }`}
       >
         {layout === "inline" ? (
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex min-w-0 flex-1 items-center gap-1.5">
-              <TeamBadge code={match.home} name={home?.name} logo={match.homeLogo} />
-              <span className="shrink-0 text-sm font-semibold">{home?.code ?? match.home}</span>
-              {showScore ? (
-                <span className="shrink-0 px-0.5 font-mono text-sm font-semibold text-foreground">
-                  {match.hs ?? "-"}–{match.as ?? "-"}
-                </span>
-              ) : (
-                <span className="shrink-0 font-mono text-[11px] text-muted-foreground">vs</span>
-              )}
-              <TeamBadge code={match.away} name={away?.name} logo={match.awayLogo} />
-              <span className="truncate text-sm font-semibold">{away?.code ?? match.away}</span>
-            </div>
-
-            {isLive ? <LiveBadge minute={match.minute} /> : <KickoffBadge kickoff={match.kickoff} />}
-
-            <div className="shrink-0">
-              <PredictionAction match={match} hasPrediction={hasPrediction} points={points} compact />
-            </div>
-          </div>
+          <MatchScheduleRowBody match={match} teams={teams} layout="inline" />
         ) : (
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-            <div className="min-w-0 space-y-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <TeamBadge code={match.home} name={home?.name} logo={match.homeLogo} />
-                <span className="min-w-10 text-sm font-semibold">{home?.code ?? match.home}</span>
-                <span className="ml-auto font-mono text-sm font-semibold text-foreground">
-                  {showScore ? (match.hs ?? "-") : ""}
-                </span>
-              </div>
-              <div className="flex min-w-0 items-center gap-2">
-                <TeamBadge code={match.away} name={away?.name} logo={match.awayLogo} />
-                <span className="min-w-10 text-sm font-semibold">{away?.code ?? match.away}</span>
-                <span className="ml-auto font-mono text-sm font-semibold text-foreground">
-                  {showScore ? (match.as ?? "-") : ""}
-                </span>
-              </div>
+          <>
+            <div className="md:hidden">
+              <MatchScheduleRowBody match={match} teams={teams} layout="stacked" />
             </div>
-
-            {isLive ? <LiveBadge minute={match.minute} /> : null}
-
-            <div className={isLive ? "col-span-2 flex justify-end sm:col-span-1" : "flex justify-end"}>
-              <PredictionAction match={match} hasPrediction={hasPrediction} points={points} />
+            <div className="hidden md:block">
+              <MatchScheduleRowBody match={match} teams={teams} layout="inline" />
             </div>
-          </div>
+          </>
         )}
       </article>
     </Link>
