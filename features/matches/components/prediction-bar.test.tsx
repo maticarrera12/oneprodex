@@ -71,3 +71,15 @@ describe("PredictionBar", () => {
     expect(screen.getByLabelText("Home team: 0% win probability")).toBeInTheDocument()
   })
 })
+
+describe("PredictionBar — advice", () => {
+  it("shows the API advice text below the bar when provided", () => {
+    render(<PredictionBar homePct={50} drawPct={50} awayPct={0} advice="Double chance : USA or draw" />)
+    expect(screen.getByText("Double chance : USA or draw")).toBeInTheDocument()
+  })
+
+  it("renders no advice element when advice is absent", () => {
+    render(<PredictionBar homePct={50} drawPct={30} awayPct={20} />)
+    expect(screen.queryByTestId("prediction-advice")).not.toBeInTheDocument()
+  })
+})

@@ -207,6 +207,7 @@ export function MatchDetailScreen({ match, predictionState, players, events, con
           awayPct={predictions.away_pct}
           homeColor={match.homeC1 ?? null}
           awayColor={match.awayC1 ?? null}
+          advice={predictions.advice}
         />
       ) : null}
 

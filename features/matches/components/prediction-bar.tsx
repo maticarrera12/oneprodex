@@ -6,10 +6,12 @@ type PredictionBarProps = {
   awayPct: number
   homeColor?: string | null
   awayColor?: string | null
+  advice?: string | null
 }
 
-export function PredictionBar({ homePct, drawPct, awayPct, homeColor, awayColor }: PredictionBarProps) {
+export function PredictionBar({ homePct, drawPct, awayPct, homeColor, awayColor, advice }: PredictionBarProps) {
   return (
+    <div className="space-y-1">
     <div
       role="img"
       aria-label={`Win probability: Home ${homePct}%, Draw ${drawPct}%, Away ${awayPct}%`}
@@ -45,6 +47,12 @@ export function PredictionBar({ homePct, drawPct, awayPct, homeColor, awayColor 
       >
         {awayPct > 0 ? `${awayPct}%` : <span className="sr-only">{awayPct}%</span>}
       </div>
+    </div>
+    {advice ? (
+      <p data-testid="prediction-advice" className="text-center font-mono text-[10px] text-(--color-text3)">
+        {advice}
+      </p>
+    ) : null}
     </div>
   )
 }
