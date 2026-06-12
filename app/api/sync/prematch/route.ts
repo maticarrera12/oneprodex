@@ -1,5 +1,5 @@
-import { fetchPredictions } from '@/lib/api-football/client'
-import { mapPrediction } from '@/lib/api-football/mappers'
+import { fetchLineups, fetchPredictions } from '@/lib/api-football/client'
+import { mapLineup, mapPrediction } from '@/lib/api-football/mappers'
 import { APIFootballError } from '@/lib/api-football/types'
 import { createServiceClient } from '@/lib/supabase/service'
 import { applyWorldCupSeasonKickoffFilter } from '@/lib/world-cup/season'
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const now = new Date()
     const window48h = new Date(now.getTime() + 48 * 3_600_000).toISOString()
 
-    // Phase 1: Predictions — upcoming matches in 48h window
+    // Phase 1: Predictions — UPCOMING matches in 48h window
     const matchesResult = await applyWorldCupSeasonKickoffFilter(
       supabase.from('matches').select('id,home_team_code,away_team_code,status'),
     )
@@ -75,8 +75,53 @@ export async function POST(request: Request) {
       }
     }
 
-    // Phase 2 stub — lineups implemented in Slice 2
-    return NextResponse.json({ predictions, failed }, { status: 200 })
+    // Phase 2: Lineups — UPCOMING matches in kickoff window [-10min, +70min]
+    // Lineups change up to kickoff so we UPSERT (not DO NOTHING).
+    const lineupWindowStart = new Date(now.getTime() - 10 * 60_000).toISOString()
+    const lineupWindowEnd = new Date(now.getTime() + 70 * 60_000).toISOString()
+
+    const lineupMatchesResult = await applyWorldCupSeasonKickoffFilter(
+      supabase.from('matches').select('id'),
+    )
+      .gte('kickoff', lineupWindowStart)
+      .lte('kickoff', lineupWindowEnd)
+      .eq('status', 'UPCOMING')
+
+    const lineupMatches = (lineupMatchesResult as { data: Array<{ id: string }> | null }).data ?? []
+
+    let lineups = 0
+
+    // Build a teamCodeMap from teams table for mapLineup (empty fallback — team_code falls back to String(apiId))
+    const teamsResult = await supabase.from('teams').select('api_id,code')
+    const teamsData = (teamsResult as { data: Array<{ api_id: number | null; code: string }> | null }).data ?? []
+    const teamCodeMap = new Map<number, string>(
+      teamsData
+        .filter((t): t is { api_id: number; code: string } => typeof t.api_id === 'number')
+        .map((t) => [t.api_id, t.code]),
+    )
+
+    for (const match of lineupMatches) {
+      try {
+        const { data: lineupData } = await fetchLineups(match.id)
+        const rows = lineupData.response.flatMap((lineup) => mapLineup(match.id, lineup, teamCodeMap))
+
+        if (rows.length === 0) continue
+
+        const { error: writeError } = await supabase
+          .from('match_lineups')
+          .upsert(rows, { onConflict: 'match_id,team_code,player_api_id' })
+
+        if (writeError) {
+          failed++
+          continue
+        }
+        lineups += rows.length
+      } catch {
+        failed++
+      }
+    }
+
+    return NextResponse.json({ predictions, lineups, failed }, { status: 200 })
   } catch (error) {
     if (error instanceof APIFootballError) {
       return NextResponse.json({ error: error.detail }, { status: error.status })
