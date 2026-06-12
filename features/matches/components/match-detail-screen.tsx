@@ -17,7 +17,8 @@ import { canPickScorerForTeam, derivePredictionFlow } from "@/features/matches/u
 import { formatKickoffParts } from "@/features/matches/utils/kickoff"
 import { LineupsPanel } from "@/features/matches/components/lineups-panel"
 import { H2HPanel } from "@/features/matches/components/h2h-panel"
-import type { MatchLineupRow, MatchH2HRow } from "@/lib/api-football/types"
+import { PredictionBar } from "@/features/matches/components/prediction-bar"
+import type { MatchLineupRow, MatchH2HRow, MatchPredictionRow } from "@/lib/api-football/types"
 
 const TAB = {
   PREDECIR: "Predecir",
@@ -39,9 +40,11 @@ type MatchDetailScreenProps = {
   consensusGroups: MatchConsensusGroup[]
   lineups?: { home: MatchLineupRow[]; away: MatchLineupRow[] }
   h2h?: MatchH2HRow[]
+  predictions?: MatchPredictionRow | null
+  playersMap?: Map<number, string>
 }
 
-export function MatchDetailScreen({ match, predictionState, players, events, consensusGroups, lineups = EMPTY_LINEUPS, h2h = EMPTY_H2H }: MatchDetailScreenProps) {
+export function MatchDetailScreen({ match, predictionState, players, events, consensusGroups, lineups = EMPTY_LINEUPS, h2h = EMPTY_H2H, predictions = null, playersMap = new Map() }: MatchDetailScreenProps) {
   const router = useRouter()
   const isLive = match.status === "LIVE"
   const isFinished = match.status === "FINISHED"
@@ -197,6 +200,17 @@ export function MatchDetailScreen({ match, predictionState, players, events, con
         </div>
       </section>
 
+      {predictions ? (
+        <PredictionBar
+          homePct={predictions.home_pct}
+          drawPct={predictions.draw_pct}
+          awayPct={predictions.away_pct}
+          homeColor={match.homeC1 ?? null}
+          awayColor={match.awayC1 ?? null}
+          advice={predictions.advice}
+        />
+      ) : null}
+
       <div className="flex gap-2 overflow-x-auto scrollbar-none">
         {([TAB.PREDECIR, TAB.ALINEACIONES, TAB.H2H, TAB.GRUPO] as ActiveTab[]).map((tab) => (
           <button
@@ -215,7 +229,7 @@ export function MatchDetailScreen({ match, predictionState, players, events, con
       </div>
 
       {activeTab === TAB.ALINEACIONES && (
-        <LineupsPanel lineups={lineups} playersMap={new Map()} />
+        <LineupsPanel lineups={lineups} playersMap={playersMap} />
       )}
 
       {activeTab === TAB.H2H && (

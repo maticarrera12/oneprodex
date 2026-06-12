@@ -2,11 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Match } from "@/features/matches/types"
 import type { Database } from "@/lib/supabase/database.types"
 import { applyWorldCupSeasonKickoffFilter } from "@/lib/world-cup/season"
-import type { MatchLineupRow, MatchH2HRow } from "@/lib/api-football/types"
+import type { MatchLineupRow, MatchH2HRow, MatchPredictionRow } from "@/lib/api-football/types"
 
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"]
 type PredictionRow = Database["public"]["Tables"]["predictions"]["Row"]
-type TeamLookupRow = Pick<Database["public"]["Tables"]["teams"]["Row"], "api_id" | "code" | "logo">
+type TeamLookupRow = Pick<Database["public"]["Tables"]["teams"]["Row"], "api_id" | "code" | "logo" | "c1">
 const SIMULATED_NOW = process.env.SIMULATED_NOW
 const SIMULATED_MATCH_WINDOW_MINUTES = 130
 
@@ -65,7 +65,7 @@ function normalizeLogoUrl(logo: string | null): string | null {
 async function getTeamsLookup(
   supabase: SupabaseClient<Database>
 ): Promise<{ byCode: Map<string, TeamLookupRow>; byApiId: Map<string, TeamLookupRow> }> {
-  const { data, error } = await supabase.from("teams").select("api_id,code,logo")
+  const { data, error } = await supabase.from("teams").select("api_id,code,logo,c1")
   if (error || !data) {
     return { byCode: new Map(), byApiId: new Map() }
   }
@@ -107,6 +107,8 @@ function mapMatchRow(
     away: awayTeam?.code ?? normalizeTeamCode(row.away_team_code),
     homeLogo: normalizeLogoUrl(homeTeam?.logo ?? null),
     awayLogo: normalizeLogoUrl(awayTeam?.logo ?? null),
+    homeC1: homeTeam?.c1 ?? null,
+    awayC1: awayTeam?.c1 ?? null,
     hs: row.home_score,
     as: row.away_score,
     pred: prediction
@@ -257,4 +259,19 @@ export async function getMatchH2H(
   if (error || !data) return []
 
   return data as unknown as MatchH2HRow[]
+}
+
+export async function getMatchPredictions(
+  supabase: SupabaseClient<Database>,
+  matchId: string,
+): Promise<MatchPredictionRow | null> {
+  const { data, error } = await supabase
+    .from("match_predictions")
+    .select("*")
+    .eq("match_id", matchId)
+    .maybeSingle()
+
+  if (error || !data) return null
+
+  return data as unknown as MatchPredictionRow
 }

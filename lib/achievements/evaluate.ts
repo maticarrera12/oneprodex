@@ -4,7 +4,6 @@ import {
   type GroupMatchResult,
   type TeamGroupStats,
 } from '@/features/standings/utils/group-tiebreak'
-import { buildTeamToGroupMap } from '@/features/onboarding/utils/team-groups'
 
 type SupabaseClient = ReturnType<typeof createServiceClient>
 
@@ -246,95 +245,46 @@ export async function evalJuegaDavid(
 
   const matchIds = preds.map((p) => p.match_id)
 
-  // matches.group_code is NULL in real data and stage is "Group Stage - N":
-  // groups must be resolved through the standings table.
-  const [matchesResult, allGroupMatchesResult, standingsResult, teamsResult] = await Promise.all([
-    supabase
-      .from('matches')
-      .select('id, home_team_code, away_team_code, home_score, away_score, kickoff')
-      .in('id', matchIds)
-      .eq('status', 'FINISHED')
-      .ilike('stage', 'Group Stage%'),
-    supabase
-      .from('matches')
-      .select('id, home_team_code, away_team_code, home_score, away_score, kickoff')
-      .eq('status', 'FINISHED')
-      .ilike('stage', 'Group Stage%'),
-    supabase.from('standings').select('group_code,team_code'),
-    supabase.from('teams').select('api_id,code'),
-  ])
+  const { data: matches, error: matchesError } = await supabase
+    .from('matches')
+    .select('id, home_team_code, away_team_code, home_score, away_score')
+    .in('id', matchIds)
+    .eq('status', 'FINISHED')
 
-  const matches = matchesResult.data
-  if (matchesResult.error || !matches || matches.length === 0) {
+  if (matchesError || !matches || matches.length === 0) {
     return { achievement_id: 'juega_david', tier: null, progress_json: { current: 0 } }
   }
 
-  const teamToGroup = buildTeamToGroupMap(standingsResult.data ?? [], teamsResult.data ?? [])
-  const allGroupMatches = allGroupMatchesResult.data ?? []
-  const groupOf = (code: string) => teamToGroup.get(code.trim().toUpperCase())
+  const finishedMatchIds = matches.map((m) => m.id)
 
+  const { data: mpRows } = await supabase
+    .from('match_predictions')
+    .select('match_id, home_pct, away_pct')
+    .in('match_id', finishedMatchIds)
+
+  const mpMap = new Map((mpRows ?? []).map((r) => [r.match_id, r]))
   const predMap = new Map(preds.map((p) => [p.match_id, p]))
+
   let upsetCount = 0
 
   for (const match of matches) {
-    const group = groupOf(match.home_team_code) ?? groupOf(match.away_team_code)
-    if (!group) continue
+    const mp = mpMap.get(match.id)
+    if (!mp) continue // no stored API prediction → skip
+
+    if (mp.home_pct === mp.away_pct) continue // no clear favorite → skip
+
+    if (match.home_score === null || match.away_score === null) continue
+
+    // Actual winner — draws do not count
+    let actualWinner: string | null = null
+    if (match.home_score > match.away_score) actualWinner = match.home_team_code
+    else if (match.away_score > match.home_score) actualWinner = match.away_team_code
+    else continue // draw result → skip
 
     const pred = predMap.get(match.id)
     if (!pred) continue
 
-    if (match.home_score === null || match.away_score === null) continue
-    let actualWinner: string | null = null
-    if (match.home_score > match.away_score) actualWinner = match.home_team_code
-    else if (match.away_score > match.home_score) actualWinner = match.away_team_code
-    else continue
-
-    const priorGroupMatches = allGroupMatches.filter(
-      (m) =>
-        m.kickoff < match.kickoff &&
-        (groupOf(m.home_team_code) === group || groupOf(m.away_team_code) === group),
-    )
-
-    const dynamicStandings = new Map<string, TeamGroupStats>()
-    const groupResults: GroupMatchResult[] = []
-
-    for (const m of priorGroupMatches) {
-      if (m.home_score === null || m.away_score === null) continue
-
-      if (!dynamicStandings.has(m.home_team_code)) {
-        dynamicStandings.set(m.home_team_code, { pts: 0, gd: 0, gf: 0, ga: 0 })
-      }
-      if (!dynamicStandings.has(m.away_team_code)) {
-        dynamicStandings.set(m.away_team_code, { pts: 0, gd: 0, gf: 0, ga: 0 })
-      }
-
-      const home = dynamicStandings.get(m.home_team_code)!
-      const away = dynamicStandings.get(m.away_team_code)!
-
-      home.gf += m.home_score
-      home.ga += m.away_score
-      home.gd += m.home_score - m.away_score
-      away.gf += m.away_score
-      away.ga += m.home_score
-      away.gd += m.away_score - m.home_score
-
-      if (m.home_score > m.away_score) { home.pts += 3 }
-      else if (m.away_score > m.home_score) { away.pts += 3 }
-      else { home.pts += 1; away.pts += 1 }
-
-      groupResults.push({
-        home: m.home_team_code,
-        away: m.away_team_code,
-        homeScore: m.home_score,
-        awayScore: m.away_score,
-      })
-    }
-
-    const sorted = sortTeamsByOlympicTiebreak(dynamicStandings, groupResults)
-
-    const actualWinnerIdx = sorted.indexOf(actualWinner!)
-    if (actualWinnerIdx < 2) continue
-
+    // Predicted winner — draws (equal scores) produce null → skip
     const predictedWinner =
       pred.home_score > pred.away_score
         ? match.home_team_code
@@ -342,7 +292,15 @@ export async function evalJuegaDavid(
           ? match.away_team_code
           : null
 
-    if (predictedWinner === actualWinner) upsetCount++
+    if (!predictedWinner) continue // user predicted draw → skip
+
+    // API favorite is the team with higher win percentage
+    const apiFavorite = mp.home_pct > mp.away_pct ? match.home_team_code : match.away_team_code
+
+    // Upset: user picked non-favorite AND non-favorite won
+    if (predictedWinner !== apiFavorite && predictedWinner === actualWinner) {
+      upsetCount++
+    }
   }
 
   return {
