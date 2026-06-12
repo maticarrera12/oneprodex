@@ -319,82 +319,26 @@ describe("onboarding actions", () => {
   describe("saveMatchScorePick", () => {
     it("upserts a prediction row and revalidates path", async () => {
       const upsertFn = vi.fn().mockResolvedValue({ error: null })
-      const countChain = {
-        eq: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-      }
-      // simulate count query after upsert returning < 72
-      const selectCountResult = { count: 10, error: null }
-      const selectChain = {
-        eq: vi.fn().mockReturnThis(),
-        select: vi.fn().mockResolvedValue(selectCountResult),
-      }
-      const service = {
-        from: vi.fn((table: string) => {
-          if (table === "predictions") {
-            return {
-              upsert: upsertFn,
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnThis(),
-                count: 10,
-              }),
-            }
-          }
-          return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis() }
-        }),
-      }
-      // Separate mock to track count
-      const countResult = { count: 10, error: null }
-      const serviceWithCount = {
-        from: vi.fn((table: string) => {
-          if (table === "predictions") {
-            return {
-              upsert: vi.fn().mockResolvedValue({ error: null }),
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnThis(),
-                head: true,
-              }),
-            }
-          }
-          return {}
-        }),
-      }
-
-      // We need to handle: upsert then count query
-      const upsert2 = vi.fn().mockResolvedValue({ error: null })
-      const countSelectChain = {
-        eq: vi.fn().mockReturnThis(),
-        select: vi.fn().mockResolvedValue({ count: 10, error: null }),
-      }
-      let upsertCalled = false
-      const service2 = {
-        from: vi.fn((table: string) => {
-          if (table === "predictions") {
-            return {
-              upsert: (payload: unknown, opts: unknown) => {
-                upsert2(payload, opts)
-                upsertCalled = true
-                return Promise.resolve({ error: null })
-              },
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnThis(),
-                // when count is requested
-                then: vi.fn().mockResolvedValue({ count: 10, error: null }),
-              }),
-            }
-          }
-          return {}
-        }),
-      }
 
       const futureKickoff = new Date(Date.now() + 60 * 60 * 1000).toISOString()
-      const matchSelectChain = {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({
-          data: { id: "match-1", stage: "Group Stage - 1", status: "UPCOMING", kickoff: futureKickoff },
-          error: null,
-        }),
+      // matches table queried twice: lock check then derive widened fetch
+      let matchCallCount = 0
+      const matchesFactory = () => {
+        matchCallCount += 1
+        if (matchCallCount === 1) {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: "match-1", stage: "Group Stage - 1", status: "UPCOMING", kickoff: futureKickoff },
+              error: null,
+            }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          ilike: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }
       }
       const predSelectChain = {
         select: vi.fn().mockReturnThis(),
@@ -404,7 +348,7 @@ describe("onboarding actions", () => {
 
       mocks.createServiceClient.mockReturnValue({
         from: vi.fn((table: string) => {
-          if (table === "matches") return matchSelectChain
+          if (table === "matches") return matchesFactory()
           if (table === "predictions") {
             return {
               upsert: upsertFn,
@@ -421,7 +365,6 @@ describe("onboarding actions", () => {
         away_score: "1",
       })
 
-      // We expect the action to upsert without throwing
       await expect(saveMatchScorePick(formData)).resolves.not.toThrow()
       expect(upsertFn).toHaveBeenCalledWith(
         expect.objectContaining({ match_id: "match-1", home_score: 2, away_score: 1 }),
@@ -467,13 +410,27 @@ describe("onboarding actions", () => {
     it("calls revalidatePath for /standings in addition to /onboarding", async () => {
       const upsertFn = vi.fn().mockResolvedValue({ error: null })
       const futureKickoff = new Date(Date.now() + 60 * 60 * 1000).toISOString()
-      const matchSelectChain = {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({
-          data: { id: "m1", stage: "Group Stage - 1", status: "UPCOMING", kickoff: futureKickoff },
-          error: null,
-        }),
+      // matches table is queried twice: once for the lock check (.eq().maybeSingle())
+      // and once inside deriveAndPersistGroupRankings (.ilike("stage", ...))
+      let matchCallCount = 0
+      const matchesFactory = () => {
+        matchCallCount += 1
+        if (matchCallCount === 1) {
+          // First call: lock-check lookup
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: "m1", stage: "Group Stage - 1", status: "UPCOMING", kickoff: futureKickoff },
+              error: null,
+            }),
+          }
+        }
+        // Second call: widened group-stage fetch for derive
+        return {
+          select: vi.fn().mockReturnThis(),
+          ilike: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }
       }
       const predSelectChain = {
         select: vi.fn().mockReturnThis(),
@@ -482,7 +439,7 @@ describe("onboarding actions", () => {
       }
       mocks.createServiceClient.mockReturnValue({
         from: vi.fn((table: string) => {
-          if (table === "matches") return matchSelectChain
+          if (table === "matches") return matchesFactory()
           if (table === "predictions") return { upsert: upsertFn, select: vi.fn().mockReturnValue(predSelectChain) }
           if (table === "group_picks") return { upsert: vi.fn().mockResolvedValue({ error: null }) }
           return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis() }
@@ -544,13 +501,24 @@ describe("onboarding actions", () => {
     it("accepts UPCOMING match with a future kickoff", async () => {
       const futureKickoff = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
       const upsertFn = vi.fn().mockResolvedValue({ error: null })
-      const matchSelectChain = {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({
-          data: { id: "m-ok", stage: "Group Stage - 3", status: "UPCOMING", kickoff: futureKickoff },
-          error: null,
-        }),
+      // matches table is queried twice: once for lock check, once inside derive
+      let matchCallCount = 0
+      const matchesFactory = () => {
+        matchCallCount += 1
+        if (matchCallCount === 1) {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: "m-ok", stage: "Group Stage - 3", status: "UPCOMING", kickoff: futureKickoff },
+              error: null,
+            }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          ilike: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }
       }
       const predSelectChain = {
         select: vi.fn().mockReturnThis(),
@@ -559,7 +527,7 @@ describe("onboarding actions", () => {
       }
       mocks.createServiceClient.mockReturnValue({
         from: vi.fn((table: string) => {
-          if (table === "matches") return matchSelectChain
+          if (table === "matches") return matchesFactory()
           if (table === "predictions") return { upsert: upsertFn, select: vi.fn().mockReturnValue(predSelectChain) }
           if (table === "group_picks") return { upsert: vi.fn().mockResolvedValue({ error: null }) }
           return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis() }
@@ -576,16 +544,27 @@ describe("onboarding actions", () => {
   })
 
   describe("deriveAndPersistGroupRankings", () => {
-    it("returns early without upserting when there are 0 predictions", async () => {
+    it("returns early without upserting when there are 0 predictions and no finished group-stage matches", async () => {
       const upsertFn = vi.fn()
       const predSelectChain = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         ilike: vi.fn().mockResolvedValue({ data: [], error: null }),
       }
+      // Widened matches fetch returns all-UPCOMING matches → no finished ones
+      const matchSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        ilike: vi.fn().mockResolvedValue({
+          data: [
+            { id: "m1", home_team_code: "A1", away_team_code: "A2", status: "UPCOMING", home_score: null, away_score: null },
+          ],
+          error: null,
+        }),
+      }
       mocks.createServiceClient.mockReturnValue({
         from: vi.fn((table: string) => {
           if (table === "predictions") return { select: vi.fn().mockReturnValue(predSelectChain) }
+          if (table === "matches") return matchSelectChain
           if (table === "group_picks") return { upsert: upsertFn }
           return {}
         }),
@@ -593,6 +572,47 @@ describe("onboarding actions", () => {
 
       await deriveAndPersistGroupRankings("user-1")
       expect(upsertFn).not.toHaveBeenCalled()
+    })
+
+    it("proceeds with 0 predictions when finished group-stage matches exist (full late joiner)", async () => {
+      // Late joiner: 0 predictions, but all 3 Group A matches are FINISHED with real scores
+      const predSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        ilike: vi.fn().mockResolvedValue({ data: [], error: null }),
+      }
+      const finishedMatches = [
+        { id: "m1", home_team_code: "A1", away_team_code: "A2", status: "FINISHED", home_score: 2, away_score: 0 },
+        { id: "m2", home_team_code: "A1", away_team_code: "A3", status: "FINISHED", home_score: 1, away_score: 0 },
+        { id: "m3", home_team_code: "A2", away_team_code: "A3", status: "FINISHED", home_score: 1, away_score: 1 },
+      ]
+      const matchSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        ilike: vi.fn().mockResolvedValue({ data: finishedMatches, error: null }),
+      }
+      const insertFn = vi.fn().mockResolvedValue({ error: null })
+
+      mocks.createServiceClient.mockReturnValue({
+        from: vi.fn((table: string) => {
+          if (table === "predictions") return { select: vi.fn().mockReturnValue(predSelectChain) }
+          if (table === "matches") return matchSelectChain
+          if (table === "standings") return { select: vi.fn().mockResolvedValue({ data: GROUP_A_STANDINGS, error: null }) }
+          if (table === "teams") return { select: vi.fn().mockResolvedValue({ data: GROUP_A_TEAMS, error: null }) }
+          if (table === "group_picks") return { upsert: insertFn }
+          return {}
+        }),
+      })
+
+      await deriveAndPersistGroupRankings("user-1")
+
+      // upsert must have been called — late joiner gets group_picks from real results
+      expect(insertFn).toHaveBeenCalledTimes(1)
+      const upsertedRows = insertFn.mock.calls[0]?.[0] as Array<{ group_code: string; position: number; team_code: string }>
+      const groupARows = upsertedRows.filter((r) => r.group_code === "A")
+      // All 3 teams seen: A1 (6pts), A2 (1pt), A3 (1pt)
+      expect(groupARows.length).toBeGreaterThanOrEqual(2)
+      // A1 wins both games → first place
+      expect(groupARows.find((r) => r.position === 1)?.team_code).toBe("A1")
     })
 
     function buildDeriveServiceClient({
