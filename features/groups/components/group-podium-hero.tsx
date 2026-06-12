@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import Image from "next/image"
 
 import { LiveDot } from "@/features/home/components/live-dot"
@@ -10,6 +11,14 @@ type GroupPodiumHeroProps = {
   totalMembers: number
 }
 
+const PODIUM_SLOTS = {
+  second:
+    "bottom-[22%] left-[16%] -translate-x-1/2 translate-y-2 md:bottom-[26%] md:left-[32%] md:translate-y-3",
+  first: "bottom-[30%] left-1/2 -translate-x-1/2 translate-y-3 md:bottom-[33%] md:translate-y-4",
+  third:
+    "bottom-[18%] left-[84%] -translate-x-1/2 translate-y-1 md:bottom-[21%] md:left-[68%] md:translate-y-2",
+} as const
+
 function HeroStat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-xl border border-white/8 bg-background/35 px-3 py-2.5 backdrop-blur-sm">
@@ -18,6 +27,10 @@ function HeroStat({ label, value, hint }: { label: string; value: string; hint?:
       {hint ? <p className="mt-1 text-[10px] text-(--color-text3)">{hint}</p> : null}
     </div>
   )
+}
+
+function PodiumSlot({ className, children }: { className: string; children: ReactNode }) {
+  return <div className={`absolute z-10 ${className}`}>{children}</div>
 }
 
 export function GroupPodiumHero({ podium, you, totalMembers }: GroupPodiumHeroProps) {
@@ -29,7 +42,7 @@ export function GroupPodiumHero({ podium, you, totalMembers }: GroupPodiumHeroPr
         fill
         priority
         sizes="(max-width: 768px) 100vw, 1080px"
-        className="object-cover object-center"
+        className="object-cover object-[center_42%]"
       />
       <div
         aria-hidden="true"
@@ -47,8 +60,8 @@ export function GroupPodiumHero({ podium, you, totalMembers }: GroupPodiumHeroPr
         2026
       </p>
 
-      <div className="relative grid min-h-[400px] grid-cols-1 gap-4 p-4 md:min-h-[440px] md:grid-cols-[minmax(0,190px)_1fr_minmax(0,170px)] md:items-end md:gap-3 md:p-5 lg:p-6">
-        <div className="z-10 self-start md:self-end md:pb-6">
+      <div className="relative min-h-[400px] md:min-h-[440px]">
+        <div className="absolute top-4 left-4 z-20 max-w-[190px] md:top-5 md:left-5 lg:top-6 lg:left-6">
           <p className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-primary">
             <LiveDot />
             Live
@@ -58,30 +71,28 @@ export function GroupPodiumHero({ podium, you, totalMembers }: GroupPodiumHeroPr
             <br />
             Mundial 2026
           </h2>
-          <p className="mt-2 max-w-[180px] text-xs leading-relaxed text-muted-foreground">
-            La competencia está en vivo
-          </p>
-        </div>
-
-        <div className="z-10 mx-auto grid w-full max-w-lg grid-cols-3 items-end justify-items-center gap-1 pb-2 md:max-w-none md:pb-4">
-          <div className="flex w-full justify-center pb-4 md:pb-8">
-            <GroupPodiumItem entry={podium[1]} position={2} />
-          </div>
-          <div className="flex w-full justify-center">
-            <GroupPodiumItem entry={podium[0]} position={1} isLeader />
-          </div>
-          <div className="flex w-full justify-center pb-6 md:pb-10">
-            <GroupPodiumItem entry={podium[2]} position={3} />
-          </div>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">La competencia está en vivo</p>
         </div>
 
         {you ? (
-          <div className="z-10 hidden flex-col gap-2.5 md:flex md:pb-6">
+          <div className="absolute top-4 right-4 z-20 hidden w-[170px] flex-col gap-2.5 md:flex md:top-5 md:right-5 lg:top-6 lg:right-6">
             <HeroStat label="Posición actual" value={`${you.rank}º / ${totalMembers}`} />
             <HeroStat label="Precisión general" value={`${you.acc}%`} />
             <HeroStat label="Racha" value={`${you.streak} aciertos`} />
           </div>
         ) : null}
+
+        <div className="absolute inset-0">
+          <PodiumSlot className={PODIUM_SLOTS.second}>
+            <GroupPodiumItem entry={podium[1]} position={2} />
+          </PodiumSlot>
+          <PodiumSlot className={PODIUM_SLOTS.first}>
+            <GroupPodiumItem entry={podium[0]} position={1} isLeader />
+          </PodiumSlot>
+          <PodiumSlot className={PODIUM_SLOTS.third}>
+            <GroupPodiumItem entry={podium[2]} position={3} />
+          </PodiumSlot>
+        </div>
       </div>
     </section>
   )

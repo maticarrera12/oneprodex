@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GroupInfo } from "@/features/groups/types"
 import type { RankingEntry } from "@/features/rankings/types"
 import { normalizeInviteCode } from "@/features/groups/utils/invite-code"
+import { computeMemberLeaderboardStats } from "@/features/groups/utils/leaderboard-stats"
 import type { Database } from "@/lib/supabase/database.types"
 
 type GroupRow = Database["public"]["Tables"]["groups"]["Row"]
@@ -20,7 +21,12 @@ function mapGroupToInfo(group: GroupRow, membersCount: number): GroupInfo {
   }
 }
 
-function mapLeaderboardRow(row: LeaderboardRpcRow, rank: number, userId: string): RankingEntry {
+function mapLeaderboardRow(
+  row: LeaderboardRpcRow,
+  rank: number,
+  userId: string,
+  stats: { acc: number; streak: number },
+): RankingEntry {
   return {
     rank: rank + 1,
     handle: row.handle,
@@ -28,11 +34,48 @@ function mapLeaderboardRow(row: LeaderboardRpcRow, rank: number, userId: string)
     color: "hsl(83 81% 62%)",
     pts: row.total_pts,
     hits: row.correct_count,
-    acc: 0,
-    streak: 0,
+    acc: stats.acc,
+    streak: stats.streak,
     delta: 0,
     isYou: row.user_id === userId,
   }
+}
+
+async function getMemberLeaderboardStats(
+  supabase: SupabaseClient<Database>,
+  userIds: string[],
+): Promise<Map<string, { acc: number; streak: number }>> {
+  const stats = new Map<string, { acc: number; streak: number }>()
+  if (userIds.length === 0) return stats
+
+  const [predictionsResult, bracketResult] = await Promise.all([
+    supabase.from("predictions").select("user_id,points,created_at").in("user_id", userIds),
+    supabase.from("bracket_picks").select("user_id,points").in("user_id", userIds),
+  ])
+
+  const predictionsByUser = new Map<string, Array<{ points: number | null; created_at: string }>>()
+  for (const row of predictionsResult.data ?? []) {
+    if (!row.created_at) continue
+    const list = predictionsByUser.get(row.user_id) ?? []
+    list.push({ points: row.points, created_at: row.created_at })
+    predictionsByUser.set(row.user_id, list)
+  }
+
+  const bracketByUser = new Map<string, Array<{ points: number | null }>>()
+  for (const row of bracketResult.data ?? []) {
+    const list = bracketByUser.get(row.user_id) ?? []
+    list.push({ points: row.points })
+    bracketByUser.set(row.user_id, list)
+  }
+
+  for (const memberId of userIds) {
+    stats.set(
+      memberId,
+      computeMemberLeaderboardStats(predictionsByUser.get(memberId) ?? [], bracketByUser.get(memberId) ?? []),
+    )
+  }
+
+  return stats
 }
 
 export async function getUserGroups(supabase: SupabaseClient<Database>, userId: string): Promise<GroupInfo[]> {
@@ -111,5 +154,11 @@ export async function getGroupLeaderboard(
 ): Promise<RankingEntry[]> {
   const { data, error } = await supabase.rpc("get_group_leaderboard", { p_group_id: groupId })
   if (error || !data) return []
-  return data.map((row, index) => mapLeaderboardRow(row, index, userId))
+
+  const memberIds = data.map((row) => row.user_id)
+  const statsByUser = await getMemberLeaderboardStats(supabase, memberIds)
+
+  return data.map((row, index) =>
+    mapLeaderboardRow(row, index, userId, statsByUser.get(row.user_id) ?? { acc: 0, streak: 0 }),
+  )
 }

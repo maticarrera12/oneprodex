@@ -1,5 +1,3 @@
-import Image from "next/image"
-
 import type { RankingEntry } from "@/features/rankings/types"
 import { GroupAvatar } from "@/features/groups/components/group-avatar"
 
@@ -40,36 +38,12 @@ export function GroupPodiumItem({ entry, position, isLeader = false }: GroupPodi
   if (!entry) return null
 
   const theme = POSITION_THEME[position]
-  const size = isLeader ? 88 : 64
-  const outer = size + (isLeader ? 22 : 18)
+  const size = isLeader ? 72 : 54
+  const outer = size + (isLeader ? 16 : 14)
   const displayName = `${entry.name.split(" ")[0]} ${entry.name.split(" ")[1]?.slice(0, 1) ?? ""}.`.trim()
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      {isLeader ? (
-        <div className="relative mb-1 flex h-14 w-full items-end justify-center">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 200 200"
-            className="absolute bottom-0 size-16 text-primary/55 drop-shadow-[0_0_24px_var(--color-lime-mid)]"
-          >
-            <polygon
-              points="100,12 178,57 178,143 100,188 22,143 22,57"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-            />
-          </svg>
-          <Image
-            src="/world-cup.png"
-            alt=""
-            width={56}
-            height={56}
-            className="relative z-10 size-14 object-contain drop-shadow-[0_0_20px_var(--color-lime-mid)]"
-          />
-        </div>
-      ) : null}
-
+    <div className="pointer-events-auto flex flex-col items-center gap-1.5">
       <div className="relative flex items-center justify-center" style={{ width: outer, height: outer }}>
         <span
           aria-hidden="true"
@@ -91,8 +65,8 @@ export function GroupPodiumItem({ entry, position, isLeader = false }: GroupPodi
         <span
           className="relative inline-flex items-center justify-center rounded-full"
           style={{
-            width: size + (isLeader ? 14 : 10),
-            height: size + (isLeader ? 14 : 10),
+            width: size + (isLeader ? 10 : 8),
+            height: size + (isLeader ? 10 : 8),
             border: `3px solid ${theme.ring}`,
             boxShadow: theme.glow,
           }}
@@ -100,15 +74,15 @@ export function GroupPodiumItem({ entry, position, isLeader = false }: GroupPodi
           <GroupAvatar name={entry.name} color={entry.color} size={size} />
         </span>
         <span
-          className={`absolute -bottom-3 z-10 inline-flex min-w-9 items-center justify-center rounded-full px-2 py-0.5 font-mono text-xl font-bold leading-none ${theme.badge}`}
+          className={`absolute -bottom-2.5 z-10 inline-flex min-w-8 items-center justify-center rounded-full px-1.5 py-0.5 font-mono text-lg font-bold leading-none ${theme.badge}`}
         >
           {position}
         </span>
       </div>
 
-      <div className="mt-1 text-center">
-        <p className={`font-semibold tracking-tight ${isLeader ? "text-lg" : "text-sm"}`}>{displayName}</p>
-        <p className={`font-mono text-sm font-semibold ${theme.points}`}>
+      <div className="mt-0.5 max-w-[4.5rem] text-center md:max-w-none">
+        <p className={`truncate font-semibold tracking-tight ${isLeader ? "text-base" : "text-xs"}`}>{displayName}</p>
+        <p className={`font-mono text-xs font-semibold ${theme.points}`}>
           {entry.pts.toLocaleString("es-AR")} pts
         </p>
       </div>
