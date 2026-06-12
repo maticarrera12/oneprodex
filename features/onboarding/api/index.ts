@@ -3,6 +3,7 @@ import type { BracketPick, GroupCode, GroupRankings, OnboardingState, Onboarding
 import type { Database } from "@/lib/supabase/database.types"
 import type { GroupStageMatch, MatchWithPrediction } from "@/features/onboarding/components/prode-picks-screen"
 import { buildTeamToGroupMap } from "@/features/onboarding/utils/team-groups"
+import { applyWorldCupSeasonKickoffFilter } from "@/lib/world-cup/season"
 
 type GroupPickRow = Pick<Database["public"]["Tables"]["group_picks"]["Row"], "group_code" | "position" | "team_code">
 type BracketPickRow = Pick<Database["public"]["Tables"]["bracket_picks"]["Row"], "slot" | "team_code">
@@ -98,11 +99,12 @@ export async function getGroupStageMatchesWithPredictions(
   const [standingsResult, teamsResult, matchesResult, predictionsResult] = await Promise.all([
     supabase.from("standings").select("group_code,team_code"),
     supabase.from("teams").select("api_id,code"),
-    supabase
-      .from("matches")
-      .select("id,home_team_code,away_team_code,kickoff,stage,status,home_score,away_score")
-      .ilike("stage", "Group Stage%")
-      .order("kickoff", { ascending: true }),
+    applyWorldCupSeasonKickoffFilter(
+      supabase
+        .from("matches")
+        .select("id,home_team_code,away_team_code,kickoff,stage,status,home_score,away_score")
+        .ilike("stage", "Group Stage%"),
+    ).order("kickoff", { ascending: true }),
     supabase
       .from("predictions")
       .select("match_id,home_score,away_score")
@@ -162,11 +164,13 @@ export async function getOnboardingState(
       .eq("user_id", userId)
       .maybeSingle(),
     // Step 1 of two-step openUnpredictedCount: fetch all open group-stage match IDs (kickoff > now)
-    supabase
-      .from("matches")
-      .select("id")
-      .ilike("stage", "Group Stage%")
-      .gt("kickoff", now),
+    applyWorldCupSeasonKickoffFilter(
+      supabase
+        .from("matches")
+        .select("id")
+        .ilike("stage", "Group Stage%")
+        .gt("kickoff", now),
+    ),
   ])
 
   const tournamentPrediction = tournamentResult.error ? null : tournamentResult.data

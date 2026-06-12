@@ -2,9 +2,8 @@ import { fetchLiveFixtures } from '@/lib/api-football/client'
 import { mapFixtureLiveUpdate } from '@/lib/api-football/mappers'
 import { APIFootballError } from '@/lib/api-football/types'
 import { createServiceClient } from '@/lib/supabase/service'
+import { WORLD_CUP_LEAGUE_ID } from '@/lib/world-cup/season'
 import { NextResponse } from 'next/server'
-
-const WORLD_CUP_LEAGUE_ID = 1
 
 function guardAuth(request: Request): NextResponse | null {
   const syncSecret = process.env.SYNC_SECRET

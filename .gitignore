@@ -39,6 +39,8 @@ bun.lockb
 *.tsbuildinfo
 next-env.d.ts
 
+# saved reference pages (local only)
+2026 FIFA World Cup knockout stage - Wikipedia.html
+2026 FIFA World Cup knockout stage - Wikipedia_files/
 
-/DesignSystem/.env
 .claude/worktrees/

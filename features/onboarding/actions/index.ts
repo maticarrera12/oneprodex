@@ -8,6 +8,7 @@ import { normalizeSearchText } from "@/lib/search"
 import { createServiceClient } from "@/lib/supabase/service"
 import { createClient } from "@/lib/supabase/server"
 import { evaluateUser } from "@/lib/achievements/evaluate"
+import { applyWorldCupSeasonKickoffFilter } from "@/lib/world-cup/season"
 
 type GroupPickInput = {
   group_code: string
@@ -373,9 +374,9 @@ export async function saveMatchScorePick(formData: FormData): Promise<void> {
   const service = createServiceClient()
 
   // Verify this is a group-stage match and that it has not yet kicked off
-  const { data: matchRow, error: matchLookupError } = await service
-    .from("matches")
-    .select("id,stage,kickoff,status")
+  const { data: matchRow, error: matchLookupError } = await applyWorldCupSeasonKickoffFilter(
+    service.from("matches").select("id,stage,kickoff,status"),
+  )
     .eq("id", matchId)
     .maybeSingle()
 
@@ -411,10 +412,12 @@ export async function deriveAndPersistGroupRankings(userId: string): Promise<voi
   if (predError) return
 
   // Fetch ALL group-stage matches (needed for gap-filling real results)
-  const { data: allMatchData, error: matchesError } = await service
-    .from("matches")
-    .select("id,home_team_code,away_team_code,status,home_score,away_score")
-    .ilike("stage", "Group Stage%")
+  const { data: allMatchData, error: matchesError } = await applyWorldCupSeasonKickoffFilter(
+    service
+      .from("matches")
+      .select("id,home_team_code,away_team_code,status,home_score,away_score")
+      .ilike("stage", "Group Stage%"),
+  )
 
   if (matchesError || !allMatchData) return
 

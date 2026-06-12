@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { calcCardPts, calcCleanSheetPts, calcPlayerScorerPts, calcScorePts } from '@/features/predictions/utils/scoring'
 import { scoreBracketForMatch } from '@/features/scoring/sync-bracket'
 import { evaluateAllUsers } from '@/lib/achievements/evaluate'
+import { applyWorldCupSeasonKickoffFilter } from '@/lib/world-cup/season'
 import { NextResponse } from 'next/server'
 
 // Window in which a finished match keeps being re-scored, so late event
@@ -36,9 +37,7 @@ export async function POST(request: Request) {
     const rescoreCutoff = new Date(Date.now() - RESCORE_WINDOW_HOURS * 3_600_000).toISOString()
 
     const [matchesResult, teamsResult] = await Promise.all([
-      supabase
-        .from('matches')
-        .select('*')
+      applyWorldCupSeasonKickoffFilter(supabase.from('matches').select('*'))
         .eq('status', 'FINISHED')
         .or(`scored_at.is.null,kickoff.gte.${rescoreCutoff}`),
       supabase.from('teams').select('api_id,code').not('api_id', 'is', null),

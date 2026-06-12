@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Match } from "@/features/matches/types"
 import type { Database } from "@/lib/supabase/database.types"
+import { applyWorldCupSeasonKickoffFilter } from "@/lib/world-cup/season"
 
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"]
 type PredictionRow = Database["public"]["Tables"]["predictions"]["Row"]
@@ -120,8 +121,12 @@ function mapMatchRow(
   }
 }
 
+function matchesTable(supabase: SupabaseClient<Database>) {
+  return applyWorldCupSeasonKickoffFilter(supabase.from("matches").select("*"))
+}
+
 export async function getMatches(supabase: SupabaseClient<Database>): Promise<Match[]> {
-  const { data, error } = await supabase.from("matches").select("*").order("kickoff", { ascending: true })
+  const { data, error } = await matchesTable(supabase).order("kickoff", { ascending: true })
   if (error || !data) return []
   const now = getReferenceNow()
   const lookup = await getTeamsLookup(supabase)
@@ -129,7 +134,9 @@ export async function getMatches(supabase: SupabaseClient<Database>): Promise<Ma
 }
 
 export async function getLiveMatches(supabase: SupabaseClient<Database>): Promise<Match[]> {
-  const { data, error } = await supabase.from("matches").select("*").eq("status", "LIVE").order("kickoff", { ascending: true })
+  const { data, error } = await applyWorldCupSeasonKickoffFilter(supabase.from("matches").select("*"))
+    .eq("status", "LIVE")
+    .order("kickoff", { ascending: true })
   if (error || !data) return []
   const now = getReferenceNow()
   const lookup = await getTeamsLookup(supabase)
@@ -137,7 +144,7 @@ export async function getLiveMatches(supabase: SupabaseClient<Database>): Promis
 }
 
 export async function getUpcomingMatches(supabase: SupabaseClient<Database>): Promise<Match[]> {
-  const { data, error } = await supabase.from("matches").select("*").order("kickoff", { ascending: true })
+  const { data, error } = await matchesTable(supabase).order("kickoff", { ascending: true })
   if (error || !data) return []
   const now = getReferenceNow()
   const lookup = await getTeamsLookup(supabase)
@@ -157,14 +164,18 @@ export async function getMatchById(
 
   if (userId) {
     const [matchResult, predResult] = await Promise.all([
-      supabase.from("matches").select("*").eq("id", matchId).maybeSingle(),
+      applyWorldCupSeasonKickoffFilter(supabase.from("matches").select("*"))
+        .eq("id", matchId)
+        .maybeSingle(),
       supabase.from("predictions").select("*").eq("match_id", matchId).eq("user_id", userId).maybeSingle(),
     ])
     if (!matchResult.data) return null
     return mapMatchRow(matchResult.data, predResult.data ?? null, now, lookup)
   }
 
-  const { data } = await supabase.from("matches").select("*").eq("id", matchId).maybeSingle()
+  const { data } = await applyWorldCupSeasonKickoffFilter(supabase.from("matches").select("*"))
+    .eq("id", matchId)
+    .maybeSingle()
   if (!data) return null
   return mapMatchRow(data, null, now, lookup)
 }
@@ -174,7 +185,7 @@ export async function getMatchesWithPredictions(
   userId: string
 ): Promise<Match[]> {
   const [matchesResult, predictionsResult] = await Promise.all([
-    supabase.from("matches").select("*").order("kickoff", { ascending: true }),
+    matchesTable(supabase).order("kickoff", { ascending: true }),
     supabase.from("predictions").select("*").eq("user_id", userId),
   ])
 

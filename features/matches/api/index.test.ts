@@ -27,6 +27,8 @@ type PredictionRow = {
 function buildChain<T>(rows: T) {
   const chain = {
     eq: vi.fn().mockReturnThis(),
+    gte: vi.fn().mockReturnThis(),
+    lt: vi.fn().mockReturnThis(),
     not: vi.fn().mockReturnThis(),
     order: vi.fn().mockResolvedValue({ data: rows, error: null } satisfies ChainResult<T>),
     limit: vi.fn().mockResolvedValue({ data: rows, error: null } satisfies ChainResult<T>),

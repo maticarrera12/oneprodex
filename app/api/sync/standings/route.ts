@@ -2,10 +2,10 @@ import { fetchStandings } from '@/lib/api-football/client'
 import { mapStanding } from '@/lib/api-football/mappers'
 import { APIFootballError, type AFStanding } from '@/lib/api-football/types'
 import { createServiceClient } from '@/lib/supabase/service'
+import { getWorldCupSeason, WORLD_CUP_LEAGUE_ID } from '@/lib/world-cup/season'
 import { NextResponse } from 'next/server'
 
-const WORLD_CUP_LEAGUE_ID = 1
-const WORLD_CUP_SEASON = Number(process.env.FOOTBALL_SEASON ?? 2026)
+const WORLD_CUP_SEASON = getWorldCupSeason()
 
 function guardAuth(request: Request): NextResponse | null {
   const syncSecret = process.env.SYNC_SECRET

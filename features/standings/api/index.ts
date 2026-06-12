@@ -8,6 +8,7 @@ import {
 import { computeProjectedStandingRowsByGroup, buildGroupTeamAliasMap, resolveRosterTeamCode } from "@/features/standings/utils/projected-standings"
 import { mergeWithRealResults } from "@/features/onboarding/utils/real-result-merge"
 import type { Database } from "@/lib/supabase/database.types"
+import { applyWorldCupSeasonKickoffFilter } from "@/lib/world-cup/season"
 
 type MatchRow = Pick<
   Database["public"]["Tables"]["matches"]["Row"],
@@ -127,10 +128,12 @@ export async function getStandingsByGroup(
         .from("standings")
         .select("group_code, team_code")
         .order("group_code", { ascending: true }),
-      supabase
-        .from("matches")
-        .select("id,home_team_code,away_team_code,home_score,away_score,status,kickoff,minute,stage,group_code")
-        .ilike("stage", "Group Stage%"),
+      applyWorldCupSeasonKickoffFilter(
+        supabase
+          .from("matches")
+          .select("id,home_team_code,away_team_code,home_score,away_score,status,kickoff,minute,stage,group_code")
+          .ilike("stage", "Group Stage%"),
+      ),
       supabase.from("teams").select("api_id,code,logo,name,c1,c2,c3"),
       userId
         ? supabase

@@ -2,10 +2,10 @@ import { fetchFixtures } from '@/lib/api-football/client'
 import { mapFixture } from '@/lib/api-football/mappers'
 import { APIFootballError } from '@/lib/api-football/types'
 import { createServiceClient } from '@/lib/supabase/service'
+import { getWorldCupSeason, pruneOutOfSeasonMatches, WORLD_CUP_LEAGUE_ID } from '@/lib/world-cup/season'
 import { NextResponse } from 'next/server'
 
-const WORLD_CUP_LEAGUE_ID = 1
-const WORLD_CUP_SEASON = Number(process.env.FOOTBALL_SEASON ?? 2026)
+const WORLD_CUP_SEASON = getWorldCupSeason()
 
 function guardAuth(request: Request): NextResponse | null {
   const syncSecret = process.env.SYNC_SECRET
@@ -46,7 +46,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ updated: 0, failed: rows.length, error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ updated: rows.length, failed: 0 }, { status: 200 })
+    const { deleted, error: pruneError } = await pruneOutOfSeasonMatches(supabase, WORLD_CUP_SEASON)
+    if (pruneError) {
+      return NextResponse.json(
+        { updated: rows.length, failed: 0, pruned: 0, error: pruneError },
+        { status: 500 },
+      )
+    }
+
+    return NextResponse.json({ updated: rows.length, failed: 0, pruned: deleted }, { status: 200 })
   } catch (error) {
     if (error instanceof APIFootballError) {
       return NextResponse.json({ error: error.detail }, { status: error.status })

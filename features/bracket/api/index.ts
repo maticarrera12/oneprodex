@@ -4,6 +4,7 @@ import { resolveR32Pairs } from "@/features/onboarding/utils/slot-resolver"
 import type { BracketRound, BracketScoreStat } from "@/features/bracket/types"
 import { BRACKET_SCORING } from "@/features/scoring/constants"
 import type { Database } from "@/lib/supabase/database.types"
+import { applyWorldCupSeasonKickoffFilter } from "@/lib/world-cup/season"
 
 type BracketData = {
   rounds: BracketRound[]
@@ -223,16 +224,19 @@ export async function getBracketData(
       .eq("advances_as_third", true)
       .order("group_code", { ascending: true }),
     supabase.from("bracket_picks").select("slot,team_code").eq("user_id", userId).order("slot", { ascending: true }),
-    supabase
-      .from("matches")
-      .select("home_team_code,away_team_code,home_score,away_score,stage")
-      .eq("status", "FINISHED")
-      .in("stage", Object.keys(STAGE_TO_SLOT_PREFIX).concat(["Final"])),
-    supabase
-      .from("matches")
-      .select("id,home_team_code,away_team_code,home_score,away_score,status,kickoff,stage")
-      .in("stage", KNOCKOUT_STAGES.map((s) => s.stage))
-      .order("kickoff", { ascending: true }),
+    applyWorldCupSeasonKickoffFilter(
+      supabase
+        .from("matches")
+        .select("home_team_code,away_team_code,home_score,away_score,stage")
+        .eq("status", "FINISHED")
+        .in("stage", Object.keys(STAGE_TO_SLOT_PREFIX).concat(["Final"])),
+    ),
+    applyWorldCupSeasonKickoffFilter(
+      supabase
+        .from("matches")
+        .select("id,home_team_code,away_team_code,home_score,away_score,status,kickoff,stage")
+        .in("stage", KNOCKOUT_STAGES.map((s) => s.stage)),
+    ).order("kickoff", { ascending: true }),
   ])
 
   if (picksResult.error) return null
