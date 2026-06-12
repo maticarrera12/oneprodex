@@ -250,6 +250,41 @@ export type Database = {
           },
         ]
       }
+      match_predictions: {
+        Row: {
+          match_id: string
+          home_pct: number
+          draw_pct: number
+          away_pct: number
+          advice: string | null
+          synced_at: string
+        }
+        Insert: {
+          match_id: string
+          home_pct: number
+          draw_pct: number
+          away_pct: number
+          advice?: string | null
+          synced_at?: string
+        }
+        Update: {
+          match_id?: string
+          home_pct?: number
+          draw_pct?: number
+          away_pct?: number
+          advice?: string | null
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_predictions_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: true
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matches: {
         Row: {
           away_score: number | null
