@@ -6,6 +6,7 @@ import {
   type GroupMatchResult,
 } from "@/features/standings/utils/group-tiebreak"
 import { computeProjectedStandingRowsByGroup, buildGroupTeamAliasMap, resolveRosterTeamCode } from "@/features/standings/utils/projected-standings"
+import { mergeWithRealResults } from "@/features/onboarding/utils/real-result-merge"
 import type { Database } from "@/lib/supabase/database.types"
 
 type MatchRow = Pick<
@@ -263,6 +264,24 @@ export async function getStandingsByGroup(
   }
 
   const groups: StandingGroup[] = []
+
+  // When a user is present, fill prediction gaps for FINISHED matches before computing projections.
+  // This ensures projected standings reflect real results for matches the user did not predict.
+  const effectivePredictions = userId
+    ? mergeWithRealResults(
+      predictionData ?? [],
+      (matchData ?? []).map((m) => ({
+        id: m.id,
+        group_code: m.group_code ?? null,
+        home_team_code: m.home_team_code,
+        away_team_code: m.away_team_code,
+        status: m.status as string,
+        home_score: m.home_score,
+        away_score: m.away_score,
+      })),
+    )
+    : []
+
   const projectedRowsByGroup = userId
     ? computeProjectedStandingRowsByGroup({
       groupToTeams,
@@ -277,7 +296,7 @@ export async function getStandingsByGroup(
           away: match.away_team_code,
         }]
       }),
-      predictions: (predictionData ?? []).map((prediction) => ({
+      predictions: effectivePredictions.map((prediction) => ({
         matchId: prediction.match_id,
         homeScore: prediction.home_score,
         awayScore: prediction.away_score,
