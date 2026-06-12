@@ -14,6 +14,9 @@ export type GroupStageMatch = {
   away_team_code: string
   group_code: GroupCode
   kickoff: string
+  status?: string
+  home_score?: number | null
+  away_score?: number | null
 }
 
 export type MatchWithPrediction = {
