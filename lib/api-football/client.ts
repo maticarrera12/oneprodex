@@ -109,6 +109,10 @@ export function fetchSquad(teamId: number): Promise<APIFootballEnvelope<AFSquadR
   return apiFetch<AFSquadResponse>('/players/squads', { team: teamId })
 }
 
+export function fetchFixtureById(fixtureId: string): Promise<APIFootballEnvelope<AFFixturesResponse>> {
+  return apiFetch<AFFixturesResponse>('/fixtures', { id: fixtureId })
+}
+
 export function fetchMatchEvents(fixtureId: string): Promise<APIFootballEnvelope<AFMatchEventsResponse>> {
   return apiFetch<AFMatchEventsResponse>('/fixtures/events', { fixture: fixtureId })
 }
