@@ -1,5 +1,5 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 export default defineConfig({
   plugins: [react()],
@@ -11,5 +11,7 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     // Run in UTC like Vercel so timezone bugs surface locally too
     env: { TZ: 'UTC' },
+    // Agent worktrees carry full suite copies — never co-run them
+    exclude: [...configDefaults.exclude, '.claude/**'],
   },
 })
