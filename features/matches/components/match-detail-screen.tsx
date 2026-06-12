@@ -16,7 +16,8 @@ import type { Match } from "@/features/matches/types"
 import { canPickScorerForTeam, derivePredictionFlow } from "@/features/matches/utils/prediction-flow"
 import { formatKickoffParts } from "@/features/matches/utils/kickoff"
 import { LineupsPanel } from "@/features/matches/components/lineups-panel"
-import type { MatchLineupRow } from "@/lib/api-football/types"
+import { H2HPanel } from "@/features/matches/components/h2h-panel"
+import type { MatchLineupRow, MatchH2HRow } from "@/lib/api-football/types"
 
 const TAB = {
   PREDECIR: "Predecir",
@@ -28,6 +29,7 @@ const TAB = {
 type ActiveTab = (typeof TAB)[keyof typeof TAB]
 
 const EMPTY_LINEUPS: { home: MatchLineupRow[]; away: MatchLineupRow[] } = { home: [], away: [] }
+const EMPTY_H2H: MatchH2HRow[] = []
 
 type MatchDetailScreenProps = {
   match: Match
@@ -36,9 +38,10 @@ type MatchDetailScreenProps = {
   events: MatchEvent[]
   consensusGroups: MatchConsensusGroup[]
   lineups?: { home: MatchLineupRow[]; away: MatchLineupRow[] }
+  h2h?: MatchH2HRow[]
 }
 
-export function MatchDetailScreen({ match, predictionState, players, events, consensusGroups, lineups = EMPTY_LINEUPS }: MatchDetailScreenProps) {
+export function MatchDetailScreen({ match, predictionState, players, events, consensusGroups, lineups = EMPTY_LINEUPS, h2h = EMPTY_H2H }: MatchDetailScreenProps) {
   const router = useRouter()
   const isLive = match.status === "LIVE"
   const isFinished = match.status === "FINISHED"
@@ -216,9 +219,7 @@ export function MatchDetailScreen({ match, predictionState, players, events, con
       )}
 
       {activeTab === TAB.H2H && (
-        <div className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-6 text-center">
-          <p className="text-sm text-(--color-text3)">Sin historial disponible</p>
-        </div>
+        <H2HPanel h2h={h2h} />
       )}
 
       {(activeTab === TAB.PREDECIR || activeTab === TAB.GRUPO) && (
