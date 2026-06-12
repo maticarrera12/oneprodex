@@ -41,3 +41,4 @@ next-env.d.ts
 
 
 /DesignSystem/.env
+.claude/worktrees/
