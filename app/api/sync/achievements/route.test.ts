@@ -296,7 +296,9 @@ describe("evalDeTaquito", () => {
   })
 })
 
-// ─── evalJuegaDavid ───────────────────────────────────────────────────────────
+// ─── evalJuegaDavid — new API-predictions mechanic ───────────────────────────
+// Replaced standings-based mechanic. Strict mocks: match_predictions only returns
+// data when the query carries the real match_id filter values.
 
 const JUEGA_DAVID_CATALOG = [
   {
@@ -307,124 +309,117 @@ const JUEGA_DAVID_CATALOG = [
   },
 ]
 
-describe("evalJuegaDavid", () => {
-  // Real data shape: matches.group_code is NULL and stage is "Group Stage - N".
-  // Team→group must come from the standings table.
-  function buildDavidSupabase({
-    preds,
-    userMatches,
-    allGroupMatches,
-    standings,
-    teams,
-  }: {
-    preds: Array<{ id: string; match_id: string; home_score: number; away_score: number }>
-    userMatches: unknown[]
-    allGroupMatches: unknown[]
-    standings: Array<{ group_code: string; team_code: string }>
-    teams: Array<{ api_id: number | null; code: string }>
-  }) {
-    let matchesCall = 0
-    return {
-      from: vi.fn().mockImplementation((table: string) => {
-        if (table === "predictions") {
-          return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: preds, error: null }) }) }
-        }
-        if (table === "matches") {
-          matchesCall++
-          if (matchesCall === 1) {
-            // user's predicted matches: .in().eq(status).ilike(stage)
-            return {
-              select: vi.fn().mockReturnValue({
-                in: vi.fn().mockReturnValue({
-                  eq: vi.fn().mockReturnValue({
-                    ilike: vi.fn().mockResolvedValue({ data: userMatches, error: null }),
-                  }),
-                }),
-              }),
-            }
-          }
-          // all finished group-stage matches: .eq(status).ilike(stage)
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                ilike: vi.fn().mockResolvedValue({ data: allGroupMatches, error: null }),
-              }),
-            }),
-          }
-        }
-        if (table === "standings") {
-          return { select: vi.fn().mockResolvedValue({ data: standings, error: null }) }
-        }
-        if (table === "teams") {
-          return { select: vi.fn().mockResolvedValue({ data: teams, error: null }) }
-        }
-        throw new Error(`Unexpected table: ${table}`)
+type DavidPredRow = { id: string; match_id: string; home_score: number; away_score: number }
+type DavidMatchRow = { id: string; home_team_code: string; away_team_code: string; home_score: number | null; away_score: number | null }
+type DavidMpRow = { match_id: string; home_pct: number; away_pct: number }
+
+/**
+ * Strict-mock builder for evalJuegaDavid.
+ * match_predictions only returns rows whose match_id is in the .in() filter.
+ */
+function buildDavidSupabase(
+  predRows: DavidPredRow[],
+  matchRows: DavidMatchRow[],
+  mpRows: DavidMpRow[],
+): Parameters<typeof evalJuegaDavid>[1] {
+  function makeChain(resolver: (inFilter: string[]) => unknown) {
+    const capturedIn: string[] = []
+    const chain: Record<string, unknown> = {
+      eq: vi.fn().mockReturnThis(),
+      not: vi.fn().mockReturnThis(),
+      ilike: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      in: vi.fn((_col: string, vals: string[]) => {
+        capturedIn.push(...vals)
+        return chain
       }),
-    } as unknown as Parameters<typeof evalJuegaDavid>[1]
+    }
+    Object.defineProperty(chain, "then", {
+      get: () => (resolve: (v: unknown) => void, reject: (e: unknown) => void) => {
+        try { resolve(resolver(capturedIn)) } catch (e) { reject(e) }
+      },
+    })
+    return chain
   }
 
-  const GROUP_A_STANDINGS = [
-    { group_code: "Group A", team_code: "ARG" },
-    { group_code: "Group A", team_code: "BRZ" },
-    { group_code: "Group A", team_code: "CHI" },
-    { group_code: "Group A", team_code: "ECU" },
-  ]
-  const GROUP_A_TEAMS = [
-    { api_id: 1, code: "ARG" },
-    { api_id: 2, code: "BRZ" },
-    { api_id: 3, code: "CHI" },
-    { api_id: 4, code: "ECU" },
-  ]
+  return {
+    from: vi.fn((table: string) => {
+      if (table === "predictions") {
+        return makeChain(() => ({ data: predRows, error: null }))
+      }
+      if (table === "matches") {
+        return makeChain((ids) => ({
+          data: ids.length > 0 ? matchRows.filter((m) => ids.includes(m.id)) : matchRows,
+          error: null,
+        }))
+      }
+      if (table === "match_predictions") {
+        // STRICT: only return rows whose match_id is in the filter
+        return makeChain((ids) => ({
+          data: ids.length === 0 ? [] : mpRows.filter((r) => ids.includes(r.match_id)),
+          error: null,
+        }))
+      }
+      return makeChain(() => ({ data: [], error: null }))
+    }),
+  } as unknown as Parameters<typeof evalJuegaDavid>[1]
+}
 
+describe("evalJuegaDavid", () => {
   it("returns null when achievement not in catalog", async () => {
     const supabase = { from: vi.fn() } as unknown as Parameters<typeof evalJuegaDavid>[1]
     expect(await evalJuegaDavid("user-1", supabase, [])).toBeNull()
   })
 
-  it("counts an upset on real data where group_code is null and groups come from standings", async () => {
-    // BRZ leads (won earlier), ARG trails (lost earlier). User predicted ARG beats BRZ; ARG wins → upset.
-    const preds = [{ id: "p1", match_id: "m1", home_score: 1, away_score: 0 }]
-    const userMatches = [
-      { id: "m1", home_team_code: "ARG", away_team_code: "BRZ", home_score: 1, away_score: 0, kickoff: "2026-06-15T18:00:00Z" },
-    ]
-    const allGroupMatches = [
-      { id: "pm1", home_team_code: "BRZ", away_team_code: "CHI", home_score: 3, away_score: 0, kickoff: "2026-06-10T15:00:00Z" },
-      { id: "pm2", home_team_code: "ECU", away_team_code: "ARG", home_score: 2, away_score: 0, kickoff: "2026-06-10T12:00:00Z" },
-      ...userMatches,
-    ]
+  it("returns tier:null progress 0 when user has no predictions", async () => {
+    const supabase = buildDavidSupabase([], [], [])
+    const result = await evalJuegaDavid("user-1", supabase, JUEGA_DAVID_CATALOG)
+    expect(result).toEqual({ achievement_id: "juega_david", tier: null, progress_json: { current: 0 } })
+  })
 
-    const supabase = buildDavidSupabase({
-      preds,
-      userMatches,
-      allGroupMatches,
-      standings: GROUP_A_STANDINGS,
-      teams: GROUP_A_TEAMS,
-    })
+  it("counts upset: user picked underdog (away favorite, home wins)", async () => {
+    // home_pct=35, away_pct=65 → away is API favorite
+    // user predicted home win → home wins → upset
+    const preds: DavidPredRow[] = [{ id: "p1", match_id: "m1", home_score: 1, away_score: 0 }]
+    const matches: DavidMatchRow[] = [{ id: "m1", home_team_code: "ARG", away_team_code: "BRZ", home_score: 1, away_score: 0 }]
+    const mp: DavidMpRow[] = [{ match_id: "m1", home_pct: 35, away_pct: 65 }]
 
+    const supabase = buildDavidSupabase(preds, matches, mp)
     const result = await evalJuegaDavid("user-1", supabase, JUEGA_DAVID_CATALOG)
     expect(result?.tier).toBe("bronze")
     expect((result?.progress_json as { current: number })?.current).toBe(1)
   })
 
-  it("does not count when the favorite wins as predicted", async () => {
-    const preds = [{ id: "p1", match_id: "m1", home_score: 0, away_score: 1 }]
-    const userMatches = [
-      { id: "m1", home_team_code: "ARG", away_team_code: "BRZ", home_score: 0, away_score: 2, kickoff: "2026-06-15T18:00:00Z" },
-    ]
-    const allGroupMatches = [
-      { id: "pm1", home_team_code: "BRZ", away_team_code: "CHI", home_score: 3, away_score: 0, kickoff: "2026-06-10T15:00:00Z" },
-      { id: "pm2", home_team_code: "ECU", away_team_code: "ARG", home_score: 2, away_score: 0, kickoff: "2026-06-10T12:00:00Z" },
-      ...userMatches,
-    ]
+  it("does not count: user picked the API favorite and it won", async () => {
+    // home_pct=65, away_pct=35 → home is API favorite; user picks home; home wins → no upset
+    const preds: DavidPredRow[] = [{ id: "p1", match_id: "m1", home_score: 1, away_score: 0 }]
+    const matches: DavidMatchRow[] = [{ id: "m1", home_team_code: "ARG", away_team_code: "BRZ", home_score: 1, away_score: 0 }]
+    const mp: DavidMpRow[] = [{ match_id: "m1", home_pct: 65, away_pct: 35 }]
 
-    const supabase = buildDavidSupabase({
-      preds,
-      userMatches,
-      allGroupMatches,
-      standings: GROUP_A_STANDINGS,
-      teams: GROUP_A_TEAMS,
-    })
+    const supabase = buildDavidSupabase(preds, matches, mp)
+    const result = await evalJuegaDavid("user-1", supabase, JUEGA_DAVID_CATALOG)
+    expect(result?.tier).toBeNull()
+    expect((result?.progress_json as { current: number })?.current).toBe(0)
+  })
 
+  it("skips match when no match_predictions row exists (strict mock returns empty)", async () => {
+    const preds: DavidPredRow[] = [{ id: "p1", match_id: "m1", home_score: 1, away_score: 0 }]
+    const matches: DavidMatchRow[] = [{ id: "m1", home_team_code: "ARG", away_team_code: "BRZ", home_score: 1, away_score: 0 }]
+    const mp: DavidMpRow[] = [] // no row for m1
+
+    const supabase = buildDavidSupabase(preds, matches, mp)
+    const result = await evalJuegaDavid("user-1", supabase, JUEGA_DAVID_CATALOG)
+    expect(result?.tier).toBeNull()
+    expect((result?.progress_json as { current: number })?.current).toBe(0)
+  })
+
+  it("skips match when home_pct === away_pct", async () => {
+    const preds: DavidPredRow[] = [{ id: "p1", match_id: "m1", home_score: 1, away_score: 0 }]
+    const matches: DavidMatchRow[] = [{ id: "m1", home_team_code: "ARG", away_team_code: "BRZ", home_score: 1, away_score: 0 }]
+    const mp: DavidMpRow[] = [{ match_id: "m1", home_pct: 50, away_pct: 50 }]
+
+    const supabase = buildDavidSupabase(preds, matches, mp)
     const result = await evalJuegaDavid("user-1", supabase, JUEGA_DAVID_CATALOG)
     expect(result?.tier).toBeNull()
     expect((result?.progress_json as { current: number })?.current).toBe(0)
