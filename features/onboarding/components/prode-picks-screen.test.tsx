@@ -7,7 +7,10 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
 }))
 
-function buildItem(): MatchWithPrediction {
+const TOTAL = 5
+
+function buildItem(overrides?: Partial<MatchWithPrediction["match"]> & { prediction?: MatchWithPrediction["prediction"] }): MatchWithPrediction {
+  const { prediction = null, ...matchOverrides } = overrides ?? {}
   return {
     match: {
       id: "m1",
@@ -15,17 +18,18 @@ function buildItem(): MatchWithPrediction {
       away_team_code: "MEX",
       group_code: "A",
       kickoff: "2026-06-11T18:00:00+00:00",
+      ...matchOverrides,
     },
-    prediction: null,
+    prediction,
   }
 }
 
-function renderScreen(onSave: (formData: FormData) => Promise<void>) {
+function renderScreen(onSave: (formData: FormData) => Promise<void>, item?: MatchWithPrediction) {
   render(
     <ProdePicksScreen
-      matchesByGroup={{ A: [buildItem()] }}
+      matchesByGroup={{ A: [item ?? buildItem()] }}
       filled={0}
-      total={72}
+      total={TOTAL}
       onSave={onSave}
       onSaveAndExit={vi.fn().mockResolvedValue(undefined)}
     />
@@ -112,14 +116,14 @@ describe("ProdePicksScreen autosave", () => {
     const onSave = vi.fn((_formData: FormData) => Promise.resolve())
     renderScreen(onSave)
 
-    expect(screen.getByText("0 de 72 completados · Podés seguir antes de que arranque cada partido")).toBeInTheDocument()
+    expect(screen.getByText(`0 de ${TOTAL} completados · Podés seguir antes de que arranque cada partido`)).toBeInTheDocument()
 
     addHome()
     addAway()
     await act(async () => {
       await vi.advanceTimersByTimeAsync(600)
     })
-    expect(screen.getByText(/1 de 72 completados/)).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(`1 de ${TOTAL} completados`))).toBeInTheDocument()
 
     // editing the same match again must not double-count it
     addHome()
@@ -127,6 +131,63 @@ describe("ProdePicksScreen autosave", () => {
       await vi.advanceTimersByTimeAsync(600)
     })
     expect(onSave).toHaveBeenCalledTimes(2)
-    expect(screen.getByText(/1 de 72 completados/)).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(`1 de ${TOTAL} completados`))).toBeInTheDocument()
+  })
+})
+
+describe("MatchRow variants", () => {
+  it("LIVE match: shows 'En juego' badge and no stepper buttons", () => {
+    const item = buildItem({ status: "LIVE" })
+    renderScreen(vi.fn(), item)
+
+    expect(screen.getByText("En juego")).toBeInTheDocument()
+    expect(screen.queryByLabelText("Sumar gol local")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Sumar gol visitante")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Restar gol local")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Restar gol visitante")).not.toBeInTheDocument()
+  })
+
+  it("FINISHED match with no user prediction: shows real scores greyed with 'Resultado real' and no steppers", () => {
+    const item = buildItem({ status: "FINISHED", home_score: 2, away_score: 1, prediction: null })
+    renderScreen(vi.fn(), item)
+
+    expect(screen.getByText("Resultado real")).toBeInTheDocument()
+    // Real scores are displayed
+    expect(screen.getByText("2")).toBeInTheDocument()
+    expect(screen.getByText("1")).toBeInTheDocument()
+    // No stepper buttons
+    expect(screen.queryByLabelText("Sumar gol local")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Sumar gol visitante")).not.toBeInTheDocument()
+    // null is never rendered as a visible score value
+    expect(screen.queryByText("null")).not.toBeInTheDocument()
+  })
+
+  it("FINISHED match with user prediction: shows user's saved scores, no 'Resultado real', no steppers", () => {
+    const item = buildItem({
+      status: "FINISHED",
+      home_score: 2,
+      away_score: 1,
+      prediction: { home_score: 0, away_score: 0 },
+    })
+    renderScreen(vi.fn(), item)
+
+    // User's prediction is shown (0–0), NOT the real score (2–1)
+    const scoreDisplays = screen.getAllByText("0")
+    expect(scoreDisplays.length).toBeGreaterThanOrEqual(2)
+    // "Resultado real" must NOT appear
+    expect(screen.queryByText("Resultado real")).not.toBeInTheDocument()
+    // Stepper buttons must NOT appear
+    expect(screen.queryByLabelText("Sumar gol local")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Sumar gol visitante")).not.toBeInTheDocument()
+  })
+
+  it("UPCOMING match renders the standard open variant with steppers", () => {
+    const item = buildItem({ status: "UPCOMING" })
+    renderScreen(vi.fn(), item)
+
+    expect(screen.getByLabelText("Sumar gol local")).toBeInTheDocument()
+    expect(screen.getByLabelText("Sumar gol visitante")).toBeInTheDocument()
+    expect(screen.queryByText("En juego")).not.toBeInTheDocument()
+    expect(screen.queryByText("Resultado real")).not.toBeInTheDocument()
   })
 })

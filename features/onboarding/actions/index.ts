@@ -401,32 +401,39 @@ export async function saveMatchScorePick(formData: FormData): Promise<void> {
 export async function deriveAndPersistGroupRankings(userId: string): Promise<void> {
   const service = createServiceClient()
 
-  // Fetch all group-stage predictions for this user (partial fills are fine)
+  // Fetch user's group-stage predictions (may be empty for full late joiners)
   const { data: predictionRows, error: predError } = await service
     .from("predictions")
     .select("match_id,home_score,away_score,matches!inner(stage)")
     .eq("user_id", userId)
     .ilike("matches.stage", "Group Stage%")
 
-  if (predError || !predictionRows || predictionRows.length === 0) return
+  if (predError) return
 
-  const [matchesResult, standingsResult, teamsResult] = await Promise.all([
-    // Widen fetch to ALL group-stage matches so gap matches (not predicted by user) are included
-    service
-      .from("matches")
-      .select("id,home_team_code,away_team_code,status,home_score,away_score")
-      .ilike("stage", "Group Stage%"),
+  // Fetch ALL group-stage matches (needed for gap-filling real results)
+  const { data: allMatchData, error: matchesError } = await service
+    .from("matches")
+    .select("id,home_team_code,away_team_code,status,home_score,away_score")
+    .ilike("stage", "Group Stage%")
+
+  if (matchesError || !allMatchData) return
+
+  const userPredictions = predictionRows ?? []
+  const hasFinishedMatches = allMatchData.some((m) => m.status === "FINISHED")
+
+  // Nothing to compute: no user predictions and no finished matches to gap-fill from
+  if (userPredictions.length === 0 && !hasFinishedMatches) return
+
+  const [standingsResult, teamsResult] = await Promise.all([
     service.from("standings").select("group_code,team_code"),
     service.from("teams").select("api_id,code"),
   ])
-
-  if (matchesResult.error || !matchesResult.data) return
 
   // matches.stage only encodes the matchday ("Group Stage - 1/2/3"), so the
   // group must come from the standings team→group mapping.
   const teamToGroup = buildTeamToGroupMap(standingsResult.data ?? [], teamsResult.data ?? [])
 
-  const matchRows = matchesResult.data.map((m) => {
+  const matchRows = allMatchData.map((m) => {
     const home = m.home_team_code.trim().toUpperCase()
     const away = m.away_team_code.trim().toUpperCase()
     return {
@@ -435,14 +442,16 @@ export async function deriveAndPersistGroupRankings(userId: string): Promise<voi
       away_team_code: away,
       group_code: teamToGroup.get(home) ?? teamToGroup.get(away) ?? null,
       status: m.status as string,
-      home_score: m.home_score,
-      away_score: m.away_score,
+      home_score: m.home_score as number | null,
+      away_score: m.away_score as number | null,
     }
   })
 
   // Fill prediction gaps with real results for FINISHED matches before computing standings
   const { mergeWithRealResults } = await import("@/features/onboarding/utils/real-result-merge")
-  const effectivePredictions = mergeWithRealResults(predictionRows, matchRows)
+  const effectivePredictions = mergeWithRealResults(userPredictions, matchRows)
+
+  if (effectivePredictions.length === 0) return
 
   // Compute group standings using pure function
   const { computeGroupStandings } = await import("@/features/onboarding/utils/group-standings")
@@ -472,7 +481,7 @@ export async function deriveAndPersistGroupRankings(userId: string): Promise<voi
       })
       if (i === 2) {
         // position 3 (third-place teams)
-        const stats = computeTeamStats(predictionRows, matchRows, groupCode, teamCode)
+        const stats = computeTeamStats(effectivePredictions, matchRows, groupCode, teamCode)
         allThirds.push({ group_code: groupCode, team_code: teamCode, ...stats })
       }
     }

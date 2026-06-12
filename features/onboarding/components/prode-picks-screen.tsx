@@ -89,7 +89,139 @@ function ScoreButton({
   )
 }
 
+// Locked row shown when a match is currently LIVE
+function LiveLockedRow({ item, logoByCode }: { item: MatchWithPrediction; logoByCode?: Map<string, string> }) {
+  const kickoff = formatKickoffParts(item.match.kickoff)
+  return (
+    <article className="rounded-xl border border-border/80 border-l-2 border-l-amber-500/60 bg-amber-500/5 px-3.5 py-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <TeamLogo code={item.match.home_team_code} logo={logoByCode?.get(item.match.home_team_code)} size={24} />
+          <span className="text-sm font-semibold">{item.match.home_team_code}</span>
+        </div>
+
+        <div className="flex flex-col items-center justify-center gap-0.5">
+          <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-400">
+            En juego
+          </span>
+        </div>
+
+        <div className="flex min-w-0 items-center justify-end gap-1.5">
+          <span className="truncate text-sm font-semibold">{item.match.away_team_code}</span>
+          <TeamLogo code={item.match.away_team_code} logo={logoByCode?.get(item.match.away_team_code)} size={24} />
+        </div>
+
+        <div className="col-span-3 flex items-center justify-between border-t border-border/40 pt-2">
+          <p className="font-mono text-[10px] text-(--color-text3)">Kickoff · {kickoff.time}</p>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+// Locked row shown when a match is FINISHED and user has no prediction (shows real result)
+function FinishedGapRow({ item, logoByCode }: { item: MatchWithPrediction; logoByCode?: Map<string, string> }) {
+  const kickoff = formatKickoffParts(item.match.kickoff)
+  const homeScore = item.match.home_score ?? null
+  const awayScore = item.match.away_score ?? null
+  return (
+    <article className="rounded-xl border border-border/60 border-l-2 border-l-border/40 bg-muted/5 px-3.5 py-3 opacity-70">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <TeamLogo code={item.match.home_team_code} logo={logoByCode?.get(item.match.home_team_code)} size={24} />
+          <span className="text-sm font-semibold text-muted-foreground">{item.match.home_team_code}</span>
+        </div>
+
+        <div className="flex flex-col items-center justify-center gap-0.5">
+          <div className="flex items-center gap-1 font-mono text-base font-semibold text-muted-foreground">
+            <span>{homeScore !== null ? homeScore : "-"}</span>
+            <span className="text-sm">–</span>
+            <span>{awayScore !== null ? awayScore : "-"}</span>
+          </div>
+          <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground/70">
+            Resultado real
+          </span>
+        </div>
+
+        <div className="flex min-w-0 items-center justify-end gap-1.5">
+          <span className="truncate text-sm font-semibold text-muted-foreground">{item.match.away_team_code}</span>
+          <TeamLogo code={item.match.away_team_code} logo={logoByCode?.get(item.match.away_team_code)} size={24} />
+        </div>
+
+        <div className="col-span-3 flex items-center justify-between border-t border-border/40 pt-2">
+          <p className="font-mono text-[10px] text-(--color-text3)">Kickoff · {kickoff.time}</p>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+// Locked row shown when a match is FINISHED and user had a prediction (shows their saved pick)
+function FinishedWithPredictionRow({ item, logoByCode }: { item: MatchWithPrediction; logoByCode?: Map<string, string> }) {
+  const kickoff = formatKickoffParts(item.match.kickoff)
+  const homeScore = item.prediction!.home_score
+  const awayScore = item.prediction!.away_score
+  return (
+    <article className="rounded-xl border border-l-2 border-primary/40 bg-primary/5 px-3.5 py-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <TeamLogo code={item.match.home_team_code} logo={logoByCode?.get(item.match.home_team_code)} size={24} />
+          <span className="text-sm font-semibold">{item.match.home_team_code}</span>
+        </div>
+
+        <div className="flex items-center justify-center gap-1 font-mono text-base font-semibold">
+          <span>{homeScore}</span>
+          <span className="text-sm text-muted-foreground">–</span>
+          <span>{awayScore}</span>
+        </div>
+
+        <div className="flex min-w-0 items-center justify-end gap-1.5">
+          <span className="truncate text-sm font-semibold">{item.match.away_team_code}</span>
+          <TeamLogo code={item.match.away_team_code} logo={logoByCode?.get(item.match.away_team_code)} size={24} />
+        </div>
+
+        <div className="col-span-3 flex items-center justify-between border-t border-border/40 pt-2">
+          <p className="font-mono text-[10px] text-(--color-text3)">Kickoff · {kickoff.time}</p>
+          <span className="text-primary">✓</span>
+        </div>
+      </div>
+    </article>
+  )
+}
+
 function MatchRow({
+  item,
+  onSave,
+  onSaved,
+  logoByCode,
+}: {
+  item: MatchWithPrediction
+  onSave: (formData: FormData) => Promise<void>
+  onSaved: () => void
+  logoByCode?: Map<string, string>
+}) {
+  const matchStatus = item.match.status
+
+  // LIVE variant: match is currently in progress — locked, no steppers
+  if (matchStatus === "LIVE") {
+    return <LiveLockedRow item={item} logoByCode={logoByCode} />
+  }
+
+  // FINISHED variants
+  if (matchStatus === "FINISHED") {
+    if (!item.prediction) {
+      // Gap: no user prediction — show real result greyed
+      return <FinishedGapRow item={item} logoByCode={logoByCode} />
+    }
+    // User had a prediction before kickoff — show their saved pick locked
+    return <FinishedWithPredictionRow item={item} logoByCode={logoByCode} />
+  }
+
+  // UPCOMING / default: interactive stepper variant
+  return <OpenMatchRow item={item} onSave={onSave} onSaved={onSaved} logoByCode={logoByCode} />
+}
+
+function OpenMatchRow({
   item,
   onSave,
   onSaved,
