@@ -8,6 +8,13 @@ const mocks = vi.hoisted(() => ({
   evaluateUser: vi.fn(),
 }))
 
+// applyWorldCupSeasonKickoffFilter chains .gte/.lt — pass through in tests;
+// the filter itself is covered by lib/world-cup/season.test.ts
+vi.mock("@/lib/world-cup/season", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/world-cup/season")>()
+  return { ...actual, applyWorldCupSeasonKickoffFilter: (query: unknown) => query }
+})
+
 vi.mock("@/lib/supabase/server", () => ({
   createClient: mocks.createClient,
 }))

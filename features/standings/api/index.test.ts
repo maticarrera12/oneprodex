@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest"
 import { getStandingsByGroup } from "@/features/standings/api/index"
 
+// applyWorldCupSeasonKickoffFilter chains .gte/.lt — pass through in tests;
+// the filter itself is covered by lib/world-cup/season.test.ts
+vi.mock("@/lib/world-cup/season", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/world-cup/season")>()
+  return { ...actual, applyWorldCupSeasonKickoffFilter: (query: unknown) => query }
+})
+
 type MatchAggRow = {
   id: string
   home_team_code: string
