@@ -174,6 +174,12 @@ export function mapPrediction(
   if (advice === 'No predictions available') return null
   if (home === draw && draw === away) return null
 
+  // Stronger tell: comparison.total at 0%/0% means the model ran with NO
+  // data — its "double chance" output is arbitrary (it once favored Qatar
+  // over Switzerland). Reject until the model has real input.
+  const total = item.comparison?.total
+  if (total && parsePct(total.home) === 0 && parsePct(total.away) === 0) return null
+
   return {
     match_id: fixtureId,
     home_pct: home,

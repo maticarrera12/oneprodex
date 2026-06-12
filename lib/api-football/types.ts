@@ -241,6 +241,9 @@ export interface AFPredictionItem {
     percent: AFPredictionPercent
     advice: string
   }
+  comparison?: {
+    total?: { home: string; away: string }
+  }
 }
 
 export interface AFPredictionsResponse {

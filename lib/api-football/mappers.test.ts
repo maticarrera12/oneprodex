@@ -368,3 +368,28 @@ describe('mapPrediction — placeholder quality gate', () => {
     expect(row?.home_pct).toBe(60)
   })
 })
+
+describe('mapPrediction — model-without-data gate (comparison.total 0/0)', () => {
+  it('returns null when comparison.total is 0%/0% even if percent looks decisive', () => {
+    const item = {
+      predictions: { percent: { home: '50%', draw: '50%', away: '0%' }, advice: 'Double chance : Qatar or draw' },
+      comparison: { total: { home: '0%', away: '0%' } },
+    }
+    expect(mapPrediction('WC001', item)).toBeNull()
+  })
+
+  it('keeps predictions when comparison.total carries real model output', () => {
+    const item = {
+      predictions: { percent: { home: '60%', draw: '25%', away: '15%' }, advice: 'Winner: Brazil' },
+      comparison: { total: { home: '63.5%', away: '36.5%' } },
+    }
+    expect(mapPrediction('WC001', item)?.home_pct).toBe(60)
+  })
+
+  it('keeps predictions when comparison is absent (older API shapes)', () => {
+    const item = {
+      predictions: { percent: { home: '60%', draw: '25%', away: '15%' }, advice: 'Winner: Brazil' },
+    }
+    expect(mapPrediction('WC001', item)?.home_pct).toBe(60)
+  })
+})
