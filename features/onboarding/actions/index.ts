@@ -372,15 +372,18 @@ export async function saveMatchScorePick(formData: FormData): Promise<void> {
   const userId = await getAuthUserId()
   const service = createServiceClient()
 
-  // Verify this is a group-stage match before saving
+  // Verify this is a group-stage match and that it has not yet kicked off
   const { data: matchRow, error: matchLookupError } = await service
     .from("matches")
-    .select("id,stage")
+    .select("id,stage,kickoff,status")
     .eq("id", matchId)
     .maybeSingle()
 
   if (matchLookupError) throw new Error(matchLookupError.message)
   if (!matchRow?.stage?.toLowerCase().includes("group stage")) throw new Error("Not a group-stage match")
+  if (matchRow.status !== "UPCOMING" || new Date(matchRow.kickoff) <= new Date()) {
+    throw new Error("Match is locked and cannot be predicted")
+  }
 
   const { error } = await service.from("predictions").upsert(
     { user_id: userId, match_id: matchId, home_score: homeScore, away_score: awayScore },
@@ -407,10 +410,12 @@ export async function deriveAndPersistGroupRankings(userId: string): Promise<voi
 
   if (predError || !predictionRows || predictionRows.length === 0) return
 
-  const matchIds = predictionRows.map((row) => row.match_id)
-
   const [matchesResult, standingsResult, teamsResult] = await Promise.all([
-    service.from("matches").select("id,home_team_code,away_team_code").in("id", matchIds),
+    // Widen fetch to ALL group-stage matches so gap matches (not predicted by user) are included
+    service
+      .from("matches")
+      .select("id,home_team_code,away_team_code,status,home_score,away_score")
+      .ilike("stage", "Group Stage%"),
     service.from("standings").select("group_code,team_code"),
     service.from("teams").select("api_id,code"),
   ])
@@ -429,12 +434,19 @@ export async function deriveAndPersistGroupRankings(userId: string): Promise<voi
       home_team_code: home,
       away_team_code: away,
       group_code: teamToGroup.get(home) ?? teamToGroup.get(away) ?? null,
+      status: m.status as string,
+      home_score: m.home_score,
+      away_score: m.away_score,
     }
   })
 
+  // Fill prediction gaps with real results for FINISHED matches before computing standings
+  const { mergeWithRealResults } = await import("@/features/onboarding/utils/real-result-merge")
+  const effectivePredictions = mergeWithRealResults(predictionRows, matchRows)
+
   // Compute group standings using pure function
   const { computeGroupStandings } = await import("@/features/onboarding/utils/group-standings")
-  const rankings = computeGroupStandings(predictionRows, matchRows)
+  const rankings = computeGroupStandings(effectivePredictions, matchRows)
 
   // Upsert group_picks rows (positions 1-4 per group)
   const groupPicksPayload: Array<{

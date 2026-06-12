@@ -234,6 +234,53 @@ describe("features/standings/api — on-the-fly aggregation", () => {
     }
   })
 
+  it("projected standings include real scores for unpredicted FINISHED matches (gap-fill)", async () => {
+    // Group A: 4 teams, 6 matches. User predicted 5; match m6 (A3 vs A4, FINISHED 2-0) has no prediction.
+    // After gap-fill, A3 should appear with at least 3 pts in projectedRows (winning m6 earns 3 pts).
+    const groupAMatches: MatchAggRow[] = [
+      { id: "m1", home_team_code: "A1", away_team_code: "A2", home_score: null, away_score: null, group_code: "A", status: "UPCOMING", kickoff: "2026-06-01T12:00:00Z", minute: null, stage: "Group Stage - 1" },
+      { id: "m2", home_team_code: "A1", away_team_code: "A3", home_score: null, away_score: null, group_code: "A", status: "UPCOMING", kickoff: "2026-06-01T15:00:00Z", minute: null, stage: "Group Stage - 1" },
+      { id: "m3", home_team_code: "A2", away_team_code: "A3", home_score: null, away_score: null, group_code: "A", status: "UPCOMING", kickoff: "2026-06-02T12:00:00Z", minute: null, stage: "Group Stage - 2" },
+      { id: "m4", home_team_code: "A1", away_team_code: "A4", home_score: null, away_score: null, group_code: "A", status: "UPCOMING", kickoff: "2026-06-02T15:00:00Z", minute: null, stage: "Group Stage - 2" },
+      { id: "m5", home_team_code: "A2", away_team_code: "A4", home_score: null, away_score: null, group_code: "A", status: "UPCOMING", kickoff: "2026-06-03T12:00:00Z", minute: null, stage: "Group Stage - 3" },
+      // m6: FINISHED with real scores — user has NO prediction for this match
+      { id: "m6", home_team_code: "A3", away_team_code: "A4", home_score: 2, away_score: 0, group_code: "A", status: "FINISHED", kickoff: "2026-06-03T15:00:00Z", minute: null, stage: "Group Stage - 3" },
+    ]
+    // User predicted 5 of 6 matches; each as a draw (1-1) for simplicity
+    const userPredictions = [
+      { match_id: "m1", home_score: 1, away_score: 1 },
+      { match_id: "m2", home_score: 1, away_score: 1 },
+      { match_id: "m3", home_score: 1, away_score: 1 },
+      { match_id: "m4", home_score: 1, away_score: 1 },
+      { match_id: "m5", home_score: 1, away_score: 1 },
+      // m6 intentionally missing
+    ]
+
+    const standingsRows = [
+      { group_code: "A", team_code: "A1" },
+      { group_code: "A", team_code: "A2" },
+      { group_code: "A", team_code: "A3" },
+      { group_code: "A", team_code: "A4" },
+    ]
+
+    const supabase = buildSupabase(groupAMatches, [], { standingsRows, predictions: userPredictions, userId: "user-gap" })
+    const groups = await getStandingsByGroup(supabase as never, "user-gap")
+
+    const groupA = groups.find((g) => g.id === "A")
+    expect(groupA?.projectedRows).toBeDefined()
+    expect(groupA?.projectedRows).toHaveLength(4)
+
+    // After gap-fill: A3 wins m6 (2-0) so A3 earns 3 pts + 4 draw pts from m2+m3 = 7 pts total.
+    // A4 loses m6 so A4 earns 0 pts from m6 + 4 draw pts from m4+m5 = 4 pts.
+    // A3 must finish above A4 in projected standings.
+    const a3Projected = groupA?.projectedRows?.find((r) => r.team === "A3")
+    const a4Projected = groupA?.projectedRows?.find((r) => r.team === "A4")
+    expect(a3Projected).toBeDefined()
+    expect(a4Projected).toBeDefined()
+    // A3 won m6 → more pts than A4
+    expect(a3Projected!.pts).toBeGreaterThan(a4Projected!.pts)
+  })
+
   it("projects PJ=3 per team when standings use api ids and matches have null group_code", async () => {
     const groupAMatches: MatchAggRow[] = [
       { id: "m1", home_team_code: "MEX", away_team_code: "KOR", home_score: null, away_score: null, group_code: null, status: "UPCOMING", kickoff: "2026-06-01T12:00:00Z", minute: null, stage: "Group Stage - 1" },
