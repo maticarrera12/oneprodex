@@ -104,7 +104,7 @@ export async function POST(request: Request) {
           if (h2hRows.length > 0) {
             const { error: h2hWriteError } = await supabase
               .from('match_h2h')
-              .upsert(h2hRows, { onConflict: 'id', ignoreDuplicates: true })
+              .upsert(h2hRows, { onConflict: 'for_match_id,id', ignoreDuplicates: true })
 
             if (!h2hWriteError) {
               h2h += h2hRows.length

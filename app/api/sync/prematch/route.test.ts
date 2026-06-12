@@ -307,7 +307,7 @@ describe("POST /api/sync/prematch — phase 1 H2H sync", () => {
 
     expect(matchH2HFrom.upsert).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ id: "999", for_match_id: "WC001" })]),
-      { onConflict: "id", ignoreDuplicates: true },
+      { onConflict: "for_match_id,id", ignoreDuplicates: true },
     )
   })
 
