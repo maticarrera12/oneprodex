@@ -387,10 +387,14 @@ describe("onboarding actions", () => {
         }),
       }
 
+      const futureKickoff = new Date(Date.now() + 60 * 60 * 1000).toISOString()
       const matchSelectChain = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "match-1", stage: "Group Stage - 1" }, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: { id: "match-1", stage: "Group Stage - 1", status: "UPCOMING", kickoff: futureKickoff },
+          error: null,
+        }),
       }
       const predSelectChain = {
         select: vi.fn().mockReturnThis(),
@@ -462,10 +466,14 @@ describe("onboarding actions", () => {
 
     it("calls revalidatePath for /standings in addition to /onboarding", async () => {
       const upsertFn = vi.fn().mockResolvedValue({ error: null })
+      const futureKickoff = new Date(Date.now() + 60 * 60 * 1000).toISOString()
       const matchSelectChain = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "m1", stage: "Group Stage - 1" }, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: { id: "m1", stage: "Group Stage - 1", status: "UPCOMING", kickoff: futureKickoff },
+          error: null,
+        }),
       }
       const predSelectChain = {
         select: vi.fn().mockReturnThis(),
@@ -486,6 +494,84 @@ describe("onboarding actions", () => {
 
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/standings")
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/onboarding")
+    })
+
+    function buildLockedMatchService(matchData: { id: string; stage: string; status: string; kickoff: string }) {
+      const matchSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: matchData, error: null }),
+      }
+      return {
+        from: vi.fn((table: string) => {
+          if (table === "matches") return matchSelectChain
+          return { select: vi.fn().mockReturnThis(), upsert: vi.fn() }
+        }),
+      }
+    }
+
+    it("rejects LIVE match with an error containing 'locked'", async () => {
+      const pastKickoff = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+      mocks.createServiceClient.mockReturnValue(
+        buildLockedMatchService({ id: "m-live", stage: "Group Stage - 1", status: "LIVE", kickoff: pastKickoff })
+      )
+
+      const formData = buildMultiFormData({ match_id: "m-live", home_score: "1", away_score: "0" })
+      await expect(saveMatchScorePick(formData)).rejects.toThrow(/locked/i)
+    })
+
+    it("rejects FINISHED match with an error containing 'locked'", async () => {
+      const pastKickoff = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+      mocks.createServiceClient.mockReturnValue(
+        buildLockedMatchService({ id: "m-fin", stage: "Group Stage - 2", status: "FINISHED", kickoff: pastKickoff })
+      )
+
+      const formData = buildMultiFormData({ match_id: "m-fin", home_score: "0", away_score: "0" })
+      await expect(saveMatchScorePick(formData)).rejects.toThrow(/locked/i)
+    })
+
+    it("rejects UPCOMING match whose kickoff has already passed (sync-lag scenario)", async () => {
+      // Status says UPCOMING but kickoff is in the past — sync hasn't run yet
+      const pastKickoff = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+      mocks.createServiceClient.mockReturnValue(
+        buildLockedMatchService({ id: "m-lag", stage: "Group Stage - 1", status: "UPCOMING", kickoff: pastKickoff })
+      )
+
+      const formData = buildMultiFormData({ match_id: "m-lag", home_score: "2", away_score: "1" })
+      await expect(saveMatchScorePick(formData)).rejects.toThrow(/locked/i)
+    })
+
+    it("accepts UPCOMING match with a future kickoff", async () => {
+      const futureKickoff = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+      const upsertFn = vi.fn().mockResolvedValue({ error: null })
+      const matchSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: { id: "m-ok", stage: "Group Stage - 3", status: "UPCOMING", kickoff: futureKickoff },
+          error: null,
+        }),
+      }
+      const predSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        ilike: vi.fn().mockResolvedValue({ data: [], error: null }),
+      }
+      mocks.createServiceClient.mockReturnValue({
+        from: vi.fn((table: string) => {
+          if (table === "matches") return matchSelectChain
+          if (table === "predictions") return { upsert: upsertFn, select: vi.fn().mockReturnValue(predSelectChain) }
+          if (table === "group_picks") return { upsert: vi.fn().mockResolvedValue({ error: null }) }
+          return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis() }
+        }),
+      })
+
+      const formData = buildMultiFormData({ match_id: "m-ok", home_score: "1", away_score: "1" })
+      await expect(saveMatchScorePick(formData)).resolves.not.toThrow()
+      expect(upsertFn).toHaveBeenCalledWith(
+        expect.objectContaining({ match_id: "m-ok" }),
+        { onConflict: "user_id,match_id" }
+      )
     })
   })
 
@@ -517,7 +603,7 @@ describe("onboarding actions", () => {
       insertFn,
     }: {
       predictions: Array<{ match_id: string; home_score: number; away_score: number; matches: { stage: string } }>
-      matchRows: Array<{ id: string; home_team_code: string; away_team_code: string }>
+      matchRows: Array<{ id: string; home_team_code: string; away_team_code: string; status?: string; home_score?: number | null; away_score?: number | null }>
       standings: Array<{ group_code: string; team_code: string }>
       teams: Array<{ api_id: number | null; code: string }>
       insertFn: ReturnType<typeof vi.fn>
@@ -527,9 +613,10 @@ describe("onboarding actions", () => {
         eq: vi.fn().mockReturnThis(),
         ilike: vi.fn().mockResolvedValue({ data: predictions, error: null }),
       }
+      // New implementation uses .ilike("stage", "Group Stage%") instead of .in("id", matchIds)
       const matchSelectChain = {
         select: vi.fn().mockReturnThis(),
-        in: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
+        ilike: vi.fn().mockResolvedValue({ data: matchRows, error: null }),
       }
 
       return {
@@ -627,6 +714,66 @@ describe("onboarding actions", () => {
       // Alphabetical: A1 first (position 1), A2 second (position 2)
       expect(groupARows.find((r) => r.position === 1)?.team_code).toBe("A1")
       expect(groupARows.find((r) => r.position === 2)?.team_code).toBe("A2")
+    })
+
+    it("fills gap for unpredicted FINISHED match — 6th match real score contributes to group_picks", async () => {
+      // Group A: user predicted 5 of 6 matches; the 6th (A3 vs A4, FINISHED 3-1) has no user prediction.
+      // After gap-fill, A3 should earn 3 pts from that match.
+      const userPredictions = [
+        { match_id: "m1", home_score: 2, away_score: 0, matches: { stage: "Group Stage - 1" } }, // A1 beats A2
+        { match_id: "m2", home_score: 1, away_score: 0, matches: { stage: "Group Stage - 1" } }, // A1 beats A3
+        { match_id: "m3", home_score: 1, away_score: 1, matches: { stage: "Group Stage - 2" } }, // A2 draws A3
+        { match_id: "m4", home_score: 0, away_score: 0, matches: { stage: "Group Stage - 2" } }, // A1 draws A4
+        { match_id: "m5", home_score: 2, away_score: 2, matches: { stage: "Group Stage - 3" } }, // A2 draws A4
+        // m6 (A3 vs A4) intentionally absent — gap to be filled
+      ]
+      // All 6 group-stage matches returned by the widened fetch
+      const allGroupMatches = [
+        { id: "m1", home_team_code: "A1", away_team_code: "A2", status: "FINISHED", home_score: null, away_score: null },
+        { id: "m2", home_team_code: "A1", away_team_code: "A3", status: "FINISHED", home_score: null, away_score: null },
+        { id: "m3", home_team_code: "A2", away_team_code: "A3", status: "FINISHED", home_score: null, away_score: null },
+        { id: "m4", home_team_code: "A1", away_team_code: "A4", status: "FINISHED", home_score: null, away_score: null },
+        { id: "m5", home_team_code: "A2", away_team_code: "A4", status: "FINISHED", home_score: null, away_score: null },
+        // m6: FINISHED with real scores — no user prediction row
+        { id: "m6", home_team_code: "A3", away_team_code: "A4", status: "FINISHED", home_score: 3, away_score: 1 },
+      ]
+
+      const insertFn = vi.fn().mockResolvedValue({ error: null })
+
+      const predSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        ilike: vi.fn().mockResolvedValue({ data: userPredictions, error: null }),
+      }
+      // New wide fetch uses .ilike("stage", "Group Stage%") — no .in()
+      const matchSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        ilike: vi.fn().mockResolvedValue({ data: allGroupMatches, error: null }),
+      }
+
+      mocks.createServiceClient.mockReturnValue({
+        from: vi.fn((table: string) => {
+          if (table === "predictions") return { select: vi.fn().mockReturnValue(predSelectChain) }
+          if (table === "matches") return matchSelectChain
+          if (table === "standings") return { select: vi.fn().mockResolvedValue({ data: GROUP_A_STANDINGS, error: null }) }
+          if (table === "teams") return { select: vi.fn().mockResolvedValue({ data: GROUP_A_TEAMS, error: null }) }
+          if (table === "group_picks") return { upsert: insertFn }
+          return {}
+        }),
+      })
+
+      await deriveAndPersistGroupRankings("user-1")
+
+      expect(insertFn).toHaveBeenCalledTimes(1)
+      const upsertedRows = insertFn.mock.calls[0]?.[0] as Array<{ group_code: string; position: number; team_code: string }>
+      const groupARows = upsertedRows.filter((r) => r.group_code === "A")
+      // A3 won m6 (3-1) via gap-fill → A3 should earn points; A4 should be last
+      const a3Row = groupARows.find((r) => r.team_code === "A3")
+      const a4Row = groupARows.find((r) => r.team_code === "A4")
+      expect(a3Row).toBeDefined()
+      expect(a4Row).toBeDefined()
+      // A3 wins m6 so A3 must finish above A4
+      expect(a3Row!.position).toBeLessThan(a4Row!.position)
     })
   })
 
