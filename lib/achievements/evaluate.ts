@@ -4,6 +4,7 @@ import {
   type GroupMatchResult,
   type TeamGroupStats,
 } from '@/features/standings/utils/group-tiebreak'
+import { buildTeamToGroupMap } from '@/features/onboarding/utils/team-groups'
 
 type SupabaseClient = ReturnType<typeof createServiceClient>
 
@@ -245,23 +246,39 @@ export async function evalJuegaDavid(
 
   const matchIds = preds.map((p) => p.match_id)
 
-  const { data: matches, error: matchError } = await supabase
-    .from('matches')
-    .select('id, home_team_code, away_team_code, home_score, away_score, group_code, kickoff')
-    .in('id', matchIds)
-    .eq('status', 'FINISHED')
-    .eq('stage', 'GROUP')
+  // matches.group_code is NULL in real data and stage is "Group Stage - N":
+  // groups must be resolved through the standings table.
+  const [matchesResult, allGroupMatchesResult, standingsResult, teamsResult] = await Promise.all([
+    supabase
+      .from('matches')
+      .select('id, home_team_code, away_team_code, home_score, away_score, kickoff')
+      .in('id', matchIds)
+      .eq('status', 'FINISHED')
+      .ilike('stage', 'Group Stage%'),
+    supabase
+      .from('matches')
+      .select('id, home_team_code, away_team_code, home_score, away_score, kickoff')
+      .eq('status', 'FINISHED')
+      .ilike('stage', 'Group Stage%'),
+    supabase.from('standings').select('group_code,team_code'),
+    supabase.from('teams').select('api_id,code'),
+  ])
 
-  if (matchError || !matches || matches.length === 0) {
+  const matches = matchesResult.data
+  if (matchesResult.error || !matches || matches.length === 0) {
     return { achievement_id: 'juega_david', tier: null, progress_json: { current: 0 } }
   }
 
-  const matchMap = new Map(matches.map((m) => [m.id, m]))
+  const teamToGroup = buildTeamToGroupMap(standingsResult.data ?? [], teamsResult.data ?? [])
+  const allGroupMatches = allGroupMatchesResult.data ?? []
+  const groupOf = (code: string) => teamToGroup.get(code.trim().toUpperCase())
+
   const predMap = new Map(preds.map((p) => [p.match_id, p]))
   let upsetCount = 0
 
   for (const match of matches) {
-    if (!match.group_code) continue
+    const group = groupOf(match.home_team_code) ?? groupOf(match.away_team_code)
+    if (!group) continue
 
     const pred = predMap.get(match.id)
     if (!pred) continue
@@ -272,19 +289,16 @@ export async function evalJuegaDavid(
     else if (match.away_score > match.home_score) actualWinner = match.away_team_code
     else continue
 
-    const groupMatches = await supabase
-      .from('matches')
-      .select('id, home_team_code, away_team_code, home_score, away_score, kickoff')
-      .eq('group_code', match.group_code)
-      .eq('status', 'FINISHED')
-      .lt('kickoff', match.kickoff)
-
-    if (!groupMatches.data) continue
+    const priorGroupMatches = allGroupMatches.filter(
+      (m) =>
+        m.kickoff < match.kickoff &&
+        (groupOf(m.home_team_code) === group || groupOf(m.away_team_code) === group),
+    )
 
     const dynamicStandings = new Map<string, TeamGroupStats>()
     const groupResults: GroupMatchResult[] = []
 
-    for (const m of groupMatches.data) {
+    for (const m of priorGroupMatches) {
       if (m.home_score === null || m.away_score === null) continue
 
       if (!dynamicStandings.has(m.home_team_code)) {
@@ -485,7 +499,7 @@ export async function evalLlegoALaSemi(
   const { data: sfMatches } = await supabase
     .from('matches')
     .select('home_team_code, away_team_code')
-    .eq('stage', 'SEMI')
+    .eq('stage', 'Semi-finals')
     .eq('status', 'FINISHED')
 
   if (!sfMatches || sfMatches.length < 2) return null
@@ -519,7 +533,7 @@ export async function evalLoVeiaVenir(
   const { data: finalMatch } = await supabase
     .from('matches')
     .select('home_team_code, away_team_code, home_score, away_score')
-    .eq('stage', 'FINAL')
+    .in('stage', ['Final', 'FINAL'])
     .eq('status', 'FINISHED')
     .maybeSingle()
 
