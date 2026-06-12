@@ -346,3 +346,25 @@ describe('mapH2H', () => {
     expect(row.away_team_code).toBe('20')
   })
 })
+
+describe('mapPrediction — placeholder quality gate', () => {
+  function makeItem(percent: { home: string; draw: string; away: string }, advice: string | null): AFPredictionItem {
+    return { predictions: { percent, advice } }
+  }
+
+  it('returns null when the API has no real prediction (advice placeholder)', () => {
+    const item = makeItem({ home: '45%', draw: '25%', away: '30%' }, 'No predictions available')
+    expect(mapPrediction('WC001', item)).toBeNull()
+  })
+
+  it('returns null when percentages are uniform (no signal)', () => {
+    const item = makeItem({ home: '33%', draw: '33%', away: '33%' }, 'whatever')
+    expect(mapPrediction('WC001', item)).toBeNull()
+  })
+
+  it('keeps real predictions intact', () => {
+    const item = makeItem({ home: '60%', draw: '25%', away: '15%' }, 'Home win recommended')
+    const row = mapPrediction('WC001', item)
+    expect(row?.home_pct).toBe(60)
+  })
+})

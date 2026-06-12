@@ -1,5 +1,7 @@
-// Backfill match_predictions for all matches (FINISHED + UPCOMING) missing a prediction row.
-// Tolerant: skips matches where the API returns no prediction (null mapPrediction result).
+// Backfill match_predictions for FINISHED matches missing a prediction row.
+// Future fixtures get their snapshot from the prematch cron when they enter
+// the 48h window. Tolerant: skips matches where the API returns no real
+// prediction (mapPrediction's quality gate returns null on placeholders).
 // Usage: pnpm dlx tsx scripts/backfill-predictions.ts
 import { fetchPredictions } from '@/lib/api-football/client'
 import { mapPrediction } from '@/lib/api-football/mappers'
@@ -8,10 +10,10 @@ import { createServiceClient } from '@/lib/supabase/service'
 async function main() {
   const supabase = createServiceClient()
 
-  // Fetch all matches that are missing from match_predictions
   const { data: allMatches, error: matchesError } = await supabase
     .from('matches')
     .select('id,status')
+    .eq('status', 'FINISHED')
     .order('kickoff', { ascending: true })
 
   if (matchesError) {

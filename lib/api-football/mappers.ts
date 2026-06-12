@@ -163,12 +163,22 @@ export function mapPrediction(
   if (!item) return null
 
   const { percent, advice } = item.predictions
+  const home = parsePct(percent.home)
+  const draw = parsePct(percent.draw)
+  const away = parsePct(percent.away)
+
+  // Quality gate: API-Football serves placeholder rows (uniform percentages,
+  // "No predictions available") when its model has no output for a fixture.
+  // Treat those as missing so the snapshot stays unset and the cron retries
+  // until a real prediction exists — snapshots are immutable once stored.
+  if (advice === 'No predictions available') return null
+  if (home === draw && draw === away) return null
 
   return {
     match_id: fixtureId,
-    home_pct: parsePct(percent.home),
-    draw_pct: parsePct(percent.draw),
-    away_pct: parsePct(percent.away),
+    home_pct: home,
+    draw_pct: draw,
+    away_pct: away,
     advice: advice ?? null,
     synced_at: new Date().toISOString(),
   }
