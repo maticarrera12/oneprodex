@@ -250,6 +250,36 @@ export type Database = {
           },
         ]
       }
+      match_h2h: {
+        Row: {
+          id: string
+          for_match_id: string
+          home_team_code: string
+          away_team_code: string
+          home_score: number | null
+          away_score: number | null
+          kickoff: string
+        }
+        Insert: {
+          id: string
+          for_match_id: string
+          home_team_code: string
+          away_team_code: string
+          home_score?: number | null
+          away_score?: number | null
+          kickoff: string
+        }
+        Update: {
+          id?: string
+          for_match_id?: string
+          home_team_code?: string
+          away_team_code?: string
+          home_score?: number | null
+          away_score?: number | null
+          kickoff?: string
+        }
+        Relationships: []
+      }
       match_lineups: {
         Row: {
           match_id: string

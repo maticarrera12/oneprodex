@@ -1,5 +1,5 @@
-import { fetchLineups, fetchPredictions } from '@/lib/api-football/client'
-import { mapLineup, mapPrediction } from '@/lib/api-football/mappers'
+import { fetchH2H, fetchLineups, fetchPredictions } from '@/lib/api-football/client'
+import { mapH2H, mapLineup, mapPrediction } from '@/lib/api-football/mappers'
 import { APIFootballError } from '@/lib/api-football/types'
 import { createServiceClient } from '@/lib/supabase/service'
 import { applyWorldCupSeasonKickoffFilter } from '@/lib/world-cup/season'
@@ -49,29 +49,72 @@ export async function POST(request: Request) {
     const missingMatches = allMatches.filter((m) => !storedIds.has(m.id))
 
     let predictions = 0
+    let h2h = 0
     let failed = 0
 
+    // Build a teamCodeMap from teams table — used for both H2H api_id lookups and lineup mapping.
+    const teamsResult = await supabase.from('teams').select('api_id,code')
+    const teamsData = (teamsResult as { data: Array<{ api_id: number | null; code: string }> | null }).data ?? []
+    const teamCodeMap = new Map<number, string>(
+      teamsData
+        .filter((t): t is { api_id: number; code: string } => typeof t.api_id === 'number')
+        .map((t) => [t.api_id, t.code]),
+    )
+    // Reverse map: team_code → api_id (for H2H fetch)
+    const codeToApiId = new Map<string, number>(
+      teamsData
+        .filter((t): t is { api_id: number; code: string } => typeof t.api_id === 'number')
+        .map((t) => [t.code, t.api_id]),
+    )
+
     for (const match of missingMatches) {
+      // Predictions fetch — independent from H2H
       try {
         const { data: predData } = await fetchPredictions(match.id)
         const item = predData.response[0] ?? null
         const row = mapPrediction(match.id, item)
 
-        if (!row) continue
+        if (row) {
+          // ignoreDuplicates compiles to ON CONFLICT DO NOTHING: the pre-kickoff
+          // snapshot can never be overwritten, even by concurrent runs.
+          const { error: writeError } = await supabase
+            .from('match_predictions')
+            .upsert([row], { onConflict: 'match_id', ignoreDuplicates: true })
 
-        // ignoreDuplicates compiles to ON CONFLICT DO NOTHING: the pre-kickoff
-        // snapshot can never be overwritten, even by concurrent runs.
-        const { error: writeError } = await supabase
-          .from('match_predictions')
-          .upsert([row], { onConflict: 'match_id', ignoreDuplicates: true })
-
-        if (writeError) {
-          failed++
-          continue
+          if (writeError) {
+            failed++
+          } else {
+            predictions++
+          }
         }
-        predictions++
       } catch {
         failed++
+      }
+
+      // H2H fetch: requires both teams to have api_ids in the teams table.
+      // H2H param uses API TEAM IDs (not codes). Runs independently from prediction.
+      const homeApiId = codeToApiId.get(match.home_team_code)
+      const awayApiId = codeToApiId.get(match.away_team_code)
+
+      if (homeApiId !== undefined && awayApiId !== undefined) {
+        try {
+          const { data: h2hData } = await fetchH2H(homeApiId, awayApiId)
+          const h2hRows = h2hData.response.map((m) => mapH2H(match.id, m))
+
+          if (h2hRows.length > 0) {
+            const { error: h2hWriteError } = await supabase
+              .from('match_h2h')
+              .upsert(h2hRows, { onConflict: 'for_match_id,id', ignoreDuplicates: true })
+
+            if (!h2hWriteError) {
+              h2h += h2hRows.length
+            } else {
+              failed++
+            }
+          }
+        } catch {
+          failed++
+        }
       }
     }
 
@@ -90,15 +133,6 @@ export async function POST(request: Request) {
     const lineupMatches = (lineupMatchesResult as { data: Array<{ id: string }> | null }).data ?? []
 
     let lineups = 0
-
-    // Build a teamCodeMap from teams table for mapLineup (empty fallback — team_code falls back to String(apiId))
-    const teamsResult = await supabase.from('teams').select('api_id,code')
-    const teamsData = (teamsResult as { data: Array<{ api_id: number | null; code: string }> | null }).data ?? []
-    const teamCodeMap = new Map<number, string>(
-      teamsData
-        .filter((t): t is { api_id: number; code: string } => typeof t.api_id === 'number')
-        .map((t) => [t.api_id, t.code]),
-    )
 
     for (const match of lineupMatches) {
       try {
@@ -121,7 +155,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ predictions, lineups, failed }, { status: 200 })
+    return NextResponse.json({ predictions, h2h, lineups, failed }, { status: 200 })
   } catch (error) {
     if (error instanceof APIFootballError) {
       return NextResponse.json({ error: error.detail }, { status: error.status })

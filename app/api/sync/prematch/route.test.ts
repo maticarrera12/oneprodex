@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   createServiceClient: vi.fn(),
   fetchPredictions: vi.fn(),
   fetchLineups: vi.fn(),
+  fetchH2H: vi.fn(),
 }))
 
 // applyWorldCupSeasonKickoffFilter chains .gte/.lt — pass through in tests;
@@ -20,6 +21,7 @@ vi.mock("@/lib/supabase/service", () => ({
 vi.mock("@/lib/api-football/client", () => ({
   fetchPredictions: mocks.fetchPredictions,
   fetchLineups: mocks.fetchLineups,
+  fetchH2H: mocks.fetchH2H,
 }))
 
 import { POST } from "@/app/api/sync/prematch/route"
@@ -50,6 +52,7 @@ function buildService({
   storedPredictionIds = [] as string[],
   insertError = null as { message: string } | null,
   lineupUpsertError = null as { message: string } | null,
+  h2hUpsertError = null as { message: string } | null,
   teamsData = [] as Array<{ api_id: number | null; code: string }>,
 } = {}) {
   // Phase 1 uses the 48h window (upcomingMatches)
@@ -62,6 +65,7 @@ function buildService({
   const storedIdsChain = chainResolving({ data: storedPredictionIds.map((id) => ({ match_id: id })), error: null })
   const insertChain = chainResolving({ data: null, error: insertError })
   const lineupUpsertChain = chainResolving({ data: null, error: lineupUpsertError })
+  const h2hUpsertChain = chainResolving({ data: null, error: h2hUpsertError })
   const teamsChain = chainResolving({ data: teamsData, error: null })
 
   const matchPredictionsFrom = {
@@ -73,6 +77,10 @@ function buildService({
     upsert: vi.fn(() => lineupUpsertChain),
   }
 
+  const matchH2HFrom = {
+    upsert: vi.fn(() => h2hUpsertChain),
+  }
+
   const service = {
     from: vi.fn((table: string) => {
       if (table === "matches") {
@@ -82,13 +90,14 @@ function buildService({
       }
       if (table === "match_predictions") return matchPredictionsFrom
       if (table === "match_lineups") return matchLineupsFrom
+      if (table === "match_h2h") return matchH2HFrom
       if (table === "teams") return { select: vi.fn(() => teamsChain) }
       throw new Error(`Unexpected table: ${table}`)
     }),
   }
 
   mocks.createServiceClient.mockReturnValue(service)
-  return { service, matchPredictionsFrom, matchLineupsFrom }
+  return { service, matchPredictionsFrom, matchLineupsFrom, matchH2HFrom }
 }
 
 function syncRequest() {
@@ -104,6 +113,7 @@ describe("POST /api/sync/prematch", () => {
     process.env.SYNC_SECRET = "test-secret"
     mocks.fetchPredictions.mockResolvedValue({ data: { response: [{ predictions: { percent: { home: "45%", draw: "25%", away: "30%" }, advice: "Home win" } }] } })
     mocks.fetchLineups.mockResolvedValue({ data: { response: [] } })
+    mocks.fetchH2H.mockResolvedValue({ data: { response: [] } })
   })
 
   it("rejects requests without Authorization header and returns 401", async () => {
@@ -194,6 +204,7 @@ describe("POST /api/sync/prematch — write semantics", () => {
       data: { response: [{ predictions: { percent: { home: "45%", draw: "25%", away: "30%" }, advice: "x" } }] },
     })
     mocks.fetchLineups.mockResolvedValue({ data: { response: [] } })
+    mocks.fetchH2H.mockResolvedValue({ data: { response: [] } })
   })
 
   it("writes with ignoreDuplicates so the snapshot is never overwritten (ON CONFLICT DO NOTHING)", async () => {
@@ -231,11 +242,108 @@ const LIVE_MATCH_OUTSIDE_UPCOMING = {
   kickoff: new Date(Date.now() - 20 * 60_000).toISOString(), // 20 min ago, LIVE
 }
 
+describe("POST /api/sync/prematch — phase 1 H2H sync", () => {
+  const UPCOMING_WITH_TEAMS = {
+    ...UPCOMING_MATCH,
+    home_team_code: "ARG",
+    away_team_code: "FRA",
+  }
+  const TEAMS_WITH_API_IDS = [
+    { api_id: 26, code: "ARG" },
+    { api_id: 2, code: "FRA" },
+  ]
+  const H2H_RESPONSE = {
+    data: {
+      response: [
+        {
+          fixture: { id: 999, date: "2022-11-22T16:00:00Z" },
+          teams: { home: { id: 26, name: "Argentina", code: "ARG" }, away: { id: 2, name: "France", code: "FRA" } },
+          goals: { home: 3, away: 3 },
+        },
+      ],
+    },
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.SYNC_SECRET = "test-secret"
+    mocks.fetchPredictions.mockResolvedValue({ data: { response: [] } })
+    mocks.fetchLineups.mockResolvedValue({ data: { response: [] } })
+    mocks.fetchH2H.mockResolvedValue(H2H_RESPONSE)
+  })
+
+  it("calls fetchH2H with home and away api_ids when teams have api_ids", async () => {
+    buildService({
+      upcomingMatches: [UPCOMING_WITH_TEAMS],
+      storedPredictionIds: [],
+      teamsData: TEAMS_WITH_API_IDS,
+    })
+
+    await POST(syncRequest())
+
+    expect(mocks.fetchH2H).toHaveBeenCalledWith(26, 2)
+  })
+
+  it("skips H2H fetch when either team lacks api_id in teams table", async () => {
+    buildService({
+      upcomingMatches: [UPCOMING_WITH_TEAMS],
+      storedPredictionIds: [],
+      teamsData: [{ api_id: null, code: "ARG" }, { api_id: 2, code: "FRA" }],
+    })
+
+    await POST(syncRequest())
+
+    expect(mocks.fetchH2H).not.toHaveBeenCalled()
+  })
+
+  it("inserts H2H rows with ignoreDuplicates (ON CONFLICT DO NOTHING)", async () => {
+    const { matchH2HFrom } = buildService({
+      upcomingMatches: [UPCOMING_WITH_TEAMS],
+      storedPredictionIds: [],
+      teamsData: TEAMS_WITH_API_IDS,
+    })
+
+    await POST(syncRequest())
+
+    expect(matchH2HFrom.upsert).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ id: "999", for_match_id: "WC001" })]),
+      { onConflict: "for_match_id,id", ignoreDuplicates: true },
+    )
+  })
+
+  it("response body includes h2h count", async () => {
+    buildService({
+      upcomingMatches: [UPCOMING_WITH_TEAMS],
+      storedPredictionIds: [],
+      teamsData: TEAMS_WITH_API_IDS,
+    })
+
+    const response = await POST(syncRequest())
+    const body = (await response.json()) as { predictions: number; h2h: number; lineups: number; failed: number }
+
+    expect(typeof body.h2h).toBe("number")
+    expect(body.h2h).toBe(1)
+  })
+
+  it("does not call fetchH2H for matches that already have predictions stored", async () => {
+    buildService({
+      upcomingMatches: [UPCOMING_WITH_TEAMS],
+      storedPredictionIds: ["WC001"],
+      teamsData: TEAMS_WITH_API_IDS,
+    })
+
+    await POST(syncRequest())
+
+    expect(mocks.fetchH2H).not.toHaveBeenCalled()
+  })
+})
+
 describe("POST /api/sync/prematch — phase 2 lineup sync", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.SYNC_SECRET = "test-secret"
     mocks.fetchPredictions.mockResolvedValue({ data: { response: [] } })
+    mocks.fetchH2H.mockResolvedValue({ data: { response: [] } })
     mocks.fetchLineups.mockResolvedValue({
       data: {
         response: [
