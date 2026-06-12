@@ -592,3 +592,102 @@ describe("evalFuaElDiego", () => {
     expect((result?.progress_json as { accuracy: number })?.accuracy).toBeCloseTo(0.7)
   })
 })
+
+// ─── evalEsElNine ─────────────────────────────────────────────────────────────
+
+import { evalEsElNine } from "@/lib/achievements/evaluate"
+
+function buildNineSupabase({
+  pick,
+  finalFinished,
+  events,
+}: {
+  pick: number | null
+  finalFinished: boolean
+  events: Array<{ player_api_id: number }>
+}) {
+  return {
+    from: vi.fn().mockImplementation((table: string) => {
+      if (table === "tournament_predictions") {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: pick ? { top_scorer_api_id: pick } : null,
+              }),
+            }),
+          }),
+        }
+      }
+      if (table === "matches") {
+        return {
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: finalFinished ? { id: "final-match" } : null,
+                }),
+              }),
+            }),
+          }),
+        }
+      }
+      if (table === "match_events") {
+        return {
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              not: vi.fn().mockResolvedValue({ data: events, error: null }),
+            }),
+          }),
+        }
+      }
+      throw new Error(`Unexpected table: ${table}`)
+    }),
+  } as unknown as Parameters<typeof evalEsElNine>[1]
+}
+
+describe("evalEsElNine", () => {
+  it("never awards while the final has not been played, even if the pick currently leads", async () => {
+    const supabase = buildNineSupabase({
+      pick: 9,
+      finalFinished: false,
+      events: [{ player_api_id: 9 }, { player_api_id: 9 }],
+    })
+    expect(await evalEsElNine("user-1", supabase)).toBeNull()
+  })
+
+  it("awards after the final when the pick is the outright top scorer", async () => {
+    const supabase = buildNineSupabase({
+      pick: 9,
+      finalFinished: true,
+      events: [{ player_api_id: 7 }, { player_api_id: 9 }, { player_api_id: 9 }],
+    })
+    const result = await evalEsElNine("user-1", supabase)
+    expect(result?.achievement_id).toBe("es_el_nine")
+  })
+
+  it("awards when the pick is among tied top scorers", async () => {
+    // Player 7's goals come FIRST so a naive sort[0] would pick 7, not 9
+    const supabase = buildNineSupabase({
+      pick: 9,
+      finalFinished: true,
+      events: [
+        { player_api_id: 7 },
+        { player_api_id: 7 },
+        { player_api_id: 9 },
+        { player_api_id: 9 },
+      ],
+    })
+    const result = await evalEsElNine("user-1", supabase)
+    expect(result?.achievement_id).toBe("es_el_nine")
+  })
+
+  it("does not award when another player is the top scorer", async () => {
+    const supabase = buildNineSupabase({
+      pick: 9,
+      finalFinished: true,
+      events: [{ player_api_id: 7 }, { player_api_id: 7 }, { player_api_id: 9 }],
+    })
+    expect(await evalEsElNine("user-1", supabase)).toBeNull()
+  })
+})

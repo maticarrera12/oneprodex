@@ -546,6 +546,17 @@ export async function evalEsElNine(
 
   if (!tournamentPred?.top_scorer_api_id) return null
 
+  // The Golden Boot is only decided when the tournament is over: the final
+  // must be played. Before that, any leader is provisional — never award.
+  const { data: finalMatch } = await supabase
+    .from('matches')
+    .select('id')
+    .in('stage', ['Final', 'FINAL'])
+    .eq('status', 'FINISHED')
+    .maybeSingle()
+
+  if (!finalMatch) return null
+
   const { data: events } = await supabase
     .from('match_events')
     .select('player_api_id')
@@ -562,10 +573,14 @@ export async function evalEsElNine(
 
   if (scoreCounts.size === 0) return null
 
-  const topScorer = [...scoreCounts.entries()].sort((a, b) => b[1] - a[1])[0]
-  if (!topScorer) return null
+  // Real Golden Boot tiebreakers (assists, minutes) are not modeled:
+  // award if the pick is among the players tied for most goals.
+  const maxGoals = Math.max(...scoreCounts.values())
+  const leaders = [...scoreCounts.entries()]
+    .filter(([, goals]) => goals === maxGoals)
+    .map(([playerId]) => playerId)
 
-  if (tournamentPred.top_scorer_api_id !== topScorer[0]) return null
+  if (!leaders.includes(tournamentPred.top_scorer_api_id)) return null
 
   return { achievement_id: 'es_el_nine', tier: 'bronze', progress_json: null }
 }
