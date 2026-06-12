@@ -15,6 +15,19 @@ import { MAX_RED_CARDS, MAX_SCORERS, MAX_YELLOW_CARDS } from "@/features/predict
 import type { Match } from "@/features/matches/types"
 import { canPickScorerForTeam, derivePredictionFlow } from "@/features/matches/utils/prediction-flow"
 import { formatKickoffParts } from "@/features/matches/utils/kickoff"
+import { LineupsPanel } from "@/features/matches/components/lineups-panel"
+import type { MatchLineupRow } from "@/lib/api-football/types"
+
+const TAB = {
+  PREDECIR: "Predecir",
+  ALINEACIONES: "Alineaciones",
+  H2H: "H2H",
+  GRUPO: "Grupo",
+} as const
+
+type ActiveTab = (typeof TAB)[keyof typeof TAB]
+
+const EMPTY_LINEUPS: { home: MatchLineupRow[]; away: MatchLineupRow[] } = { home: [], away: [] }
 
 type MatchDetailScreenProps = {
   match: Match
@@ -22,9 +35,10 @@ type MatchDetailScreenProps = {
   players: { home: PlayerDetail[]; away: PlayerDetail[] }
   events: MatchEvent[]
   consensusGroups: MatchConsensusGroup[]
+  lineups?: { home: MatchLineupRow[]; away: MatchLineupRow[] }
 }
 
-export function MatchDetailScreen({ match, predictionState, players, events, consensusGroups }: MatchDetailScreenProps) {
+export function MatchDetailScreen({ match, predictionState, players, events, consensusGroups, lineups = EMPTY_LINEUPS }: MatchDetailScreenProps) {
   const router = useRouter()
   const isLive = match.status === "LIVE"
   const isFinished = match.status === "FINISHED"
@@ -35,6 +49,7 @@ export function MatchDetailScreen({ match, predictionState, players, events, con
     editLocked,
   })
   const kickoff = formatKickoffParts(match.kickoff)
+  const [activeTab, setActiveTab] = useState<ActiveTab>(TAB.PREDECIR)
   const [selectedSquad, setSelectedSquad] = useState<"home" | "away">("home")
 
   const { optimistic, toggleScorer, toggleYellowCard, toggleRedCard, toggleCleanSheet, handleScoreSubmit, handleExtrasSubmit } = usePrediction(
@@ -180,20 +195,34 @@ export function MatchDetailScreen({ match, predictionState, players, events, con
       </section>
 
       <div className="flex gap-2 overflow-x-auto scrollbar-none">
-        {["Predecir", "Alineaciones", "H2H", "Grupo"].map((tab, index) => (
-          <span
+        {([TAB.PREDECIR, TAB.ALINEACIONES, TAB.H2H, TAB.GRUPO] as ActiveTab[]).map((tab) => (
+          <button
             key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
             className={`rounded-full border px-3 py-1.5 text-xs whitespace-nowrap ${
-              index === 0
+              activeTab === tab
                 ? "border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-primary)"
                 : "border-(--color-border-hi) bg-(--color-card-hi) text-(--color-text3)"
             }`}
           >
             {tab}
-          </span>
+          </button>
         ))}
       </div>
 
+      {activeTab === TAB.ALINEACIONES && (
+        <LineupsPanel lineups={lineups} playersMap={new Map()} />
+      )}
+
+      {activeTab === TAB.H2H && (
+        <div className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) p-6 text-center">
+          <p className="text-sm text-(--color-text3)">Sin historial disponible</p>
+        </div>
+      )}
+
+      {(activeTab === TAB.PREDECIR || activeTab === TAB.GRUPO) && (
+      <>
       <section className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi)">
         <ScorePrediction
           matchId={match.id}
@@ -409,6 +438,9 @@ export function MatchDetailScreen({ match, predictionState, players, events, con
       )}
 
       <ConsensusSection groups={consensusGroups} home={match.home} away={match.away} />
+
+      </>
+      )}
 
     </div>
   )

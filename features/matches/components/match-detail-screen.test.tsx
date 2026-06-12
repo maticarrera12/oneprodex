@@ -221,3 +221,32 @@ describe("MatchDetailScreen prediction extras", () => {
     expect(screen.getByText("BLOQUEADA")).toBeInTheDocument()
   })
 })
+
+describe("MatchDetailScreen tab switching", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.commitScorerEdits.mockResolvedValue({})
+  })
+
+  it("default active tab on mount is Predecir — lineups and H2H panels are absent", () => {
+    renderDetail()
+    // Alineaciones panel empty state is not in the DOM when Predecir is active
+    expect(screen.queryByText("Alineaciones todavía no disponibles")).not.toBeInTheDocument()
+    // Predecir content (ScorePrediction area) is visible
+    expect(screen.getByText(/VS/i)).toBeInTheDocument()
+  })
+
+  it("clicking Alineaciones tab shows the lineups panel and hides extras section", () => {
+    renderDetail()
+    fireEvent.click(screen.getByRole("button", { name: "Alineaciones" }))
+    // Empty lineups → empty state message visible
+    expect(screen.getByText("Alineaciones todavía no disponibles")).toBeInTheDocument()
+  })
+
+  it("clicking H2H tab shows the H2H panel", () => {
+    renderDetail()
+    fireEvent.click(screen.getByRole("button", { name: "H2H" }))
+    // H2H panel empty state
+    expect(screen.getByText("Sin historial disponible")).toBeInTheDocument()
+  })
+})
