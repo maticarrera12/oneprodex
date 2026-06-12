@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Match } from "@/features/matches/types"
 import type { Database } from "@/lib/supabase/database.types"
 import { applyWorldCupSeasonKickoffFilter } from "@/lib/world-cup/season"
+import type { MatchLineupRow } from "@/lib/api-football/types"
 
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"]
 type PredictionRow = Database["public"]["Tables"]["predictions"]["Row"]
@@ -201,4 +202,44 @@ export async function getMatchesWithPredictions(
   )
 
   return matchesResult.data.map((row) => mapMatchRow(row, predictionsByMatchId.get(row.id) ?? null, now, lookup))
+}
+
+export async function getMatchLineups(
+  supabase: SupabaseClient<Database>,
+  matchId: string,
+  homeCode?: string,
+  awayCode?: string,
+): Promise<{ home: MatchLineupRow[]; away: MatchLineupRow[] }> {
+  const { data, error } = await supabase
+    .from("match_lineups")
+    .select("*")
+    .eq("match_id", matchId)
+    .order("is_substitute", { ascending: true })
+
+  if (error || !data) {
+    return { home: [], away: [] }
+  }
+
+  const rows = data as unknown as MatchLineupRow[]
+
+  if (homeCode && awayCode) {
+    return {
+      home: rows.filter((r) => r.team_code === homeCode),
+      away: rows.filter((r) => r.team_code === awayCode),
+    }
+  }
+
+  // Fallback: first distinct team_code is home, second is away
+  const teamCodes: string[] = []
+  for (const row of rows) {
+    if (!teamCodes.includes(row.team_code)) {
+      teamCodes.push(row.team_code)
+    }
+  }
+
+  const [firstCode, secondCode] = teamCodes
+  return {
+    home: firstCode ? rows.filter((r) => r.team_code === firstCode) : [],
+    away: secondCode ? rows.filter((r) => r.team_code === secondCode) : [],
+  }
 }
