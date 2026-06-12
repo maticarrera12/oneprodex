@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Match } from "@/features/matches/types"
 import type { Database } from "@/lib/supabase/database.types"
 import { applyWorldCupSeasonKickoffFilter } from "@/lib/world-cup/season"
-import type { MatchLineupRow } from "@/lib/api-football/types"
+import type { MatchLineupRow, MatchH2HRow } from "@/lib/api-football/types"
 
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"]
 type PredictionRow = Database["public"]["Tables"]["predictions"]["Row"]
@@ -242,4 +242,19 @@ export async function getMatchLineups(
     home: firstCode ? rows.filter((r) => r.team_code === firstCode) : [],
     away: secondCode ? rows.filter((r) => r.team_code === secondCode) : [],
   }
+}
+
+export async function getMatchH2H(
+  supabase: SupabaseClient<Database>,
+  matchId: string,
+): Promise<MatchH2HRow[]> {
+  const { data, error } = await supabase
+    .from("match_h2h")
+    .select("*")
+    .eq("for_match_id", matchId)
+    .order("kickoff", { ascending: false })
+
+  if (error || !data) return []
+
+  return data as unknown as MatchH2HRow[]
 }
