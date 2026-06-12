@@ -737,6 +737,13 @@ export type Database = {
           user_id: string
         }[]
       }
+      replace_group_picks: {
+        Args: {
+          p_user_id: string
+          p_rows: Json
+        }
+        Returns: undefined
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       user_is_group_member: { Args: { gid: string }; Returns: boolean }

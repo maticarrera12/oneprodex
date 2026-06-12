@@ -605,16 +605,17 @@ describe("onboarding actions", () => {
           if (table === "matches") return matchSelectChain
           if (table === "standings") return { select: vi.fn().mockResolvedValue({ data: GROUP_A_STANDINGS, error: null }) }
           if (table === "teams") return { select: vi.fn().mockResolvedValue({ data: GROUP_A_TEAMS, error: null }) }
-          if (table === "group_picks") return { upsert: insertFn }
+          if (table === "group_picks") return {}
           return {}
         }),
+        rpc: insertFn,
       })
 
       await deriveAndPersistGroupRankings("user-1")
 
       // upsert must have been called — late joiner gets group_picks from real results
       expect(insertFn).toHaveBeenCalledTimes(1)
-      const upsertedRows = insertFn.mock.calls[0]?.[0] as Array<{ group_code: string; position: number; team_code: string }>
+      const upsertedRows = (insertFn.mock.calls[0]?.[1] as { p_rows: unknown }).p_rows as Array<{ group_code: string; position: number; team_code: string }>
       const groupARows = upsertedRows.filter((r) => r.group_code === "A")
       // All 3 teams seen: A1 (6pts), A2 (1pt), A3 (1pt)
       expect(groupARows.length).toBeGreaterThanOrEqual(2)
@@ -652,9 +653,10 @@ describe("onboarding actions", () => {
           if (table === "matches") return matchSelectChain
           if (table === "standings") return { select: vi.fn().mockResolvedValue({ data: standings, error: null }) }
           if (table === "teams") return { select: vi.fn().mockResolvedValue({ data: teams, error: null }) }
-          if (table === "group_picks") return { upsert: insertFn }
+          if (table === "group_picks") return {}
           return {}
         }),
+        rpc: insertFn,
       }
     }
 
@@ -692,9 +694,10 @@ describe("onboarding actions", () => {
       await deriveAndPersistGroupRankings("user-1")
 
       expect(insertFn).toHaveBeenCalledTimes(1)
-      // Upsert (not delete+insert) so concurrent autosaves can't hit duplicate-key
-      expect(insertFn.mock.calls[0]?.[1]).toEqual({ onConflict: "user_id,group_code,position" })
-      const upsertedRows = insertFn.mock.calls[0]?.[0] as Array<{ group_code: string; position: number; team_code: string }>
+      // Atomic RPC replace: survives reorders (second unique constraint) and races
+      expect(insertFn.mock.calls[0]?.[0]).toBe("replace_group_picks")
+      expect(insertFn.mock.calls[0]?.[1]).toMatchObject({ p_user_id: "user-1" })
+      const upsertedRows = (insertFn.mock.calls[0]?.[1] as { p_rows: unknown }).p_rows as Array<{ group_code: string; position: number; team_code: string }>
       const groupARows = upsertedRows.filter((r) => r.group_code === "A")
       // Only 3 teams have predictions (A1, A2, A3) — A4 not seen so 3 rows
       expect(groupARows).toHaveLength(3)
@@ -717,7 +720,7 @@ describe("onboarding actions", () => {
 
       await deriveAndPersistGroupRankings("user-1")
 
-      const upsertedRows = insertFn.mock.calls[0]?.[0] as Array<{ group_code: string; team_code: string }>
+      const upsertedRows = (insertFn.mock.calls[0]?.[1] as { p_rows: unknown }).p_rows as Array<{ group_code: string; team_code: string }>
       expect(upsertedRows.every((r) => r.group_code === "A")).toBe(true)
       expect(upsertedRows.some((r) => r.group_code === "C")).toBe(false)
     })
@@ -736,7 +739,7 @@ describe("onboarding actions", () => {
 
       await deriveAndPersistGroupRankings("user-1")
 
-      const upsertedRows = insertFn.mock.calls[0]?.[0] as Array<{ group_code: string; position: number; team_code: string }>
+      const upsertedRows = (insertFn.mock.calls[0]?.[1] as { p_rows: unknown }).p_rows as Array<{ group_code: string; position: number; team_code: string }>
       const groupARows = upsertedRows.filter((r) => r.group_code === "A")
       // Alphabetical: A1 first (position 1), A2 second (position 2)
       expect(groupARows.find((r) => r.position === 1)?.team_code).toBe("A1")
@@ -784,15 +787,16 @@ describe("onboarding actions", () => {
           if (table === "matches") return matchSelectChain
           if (table === "standings") return { select: vi.fn().mockResolvedValue({ data: GROUP_A_STANDINGS, error: null }) }
           if (table === "teams") return { select: vi.fn().mockResolvedValue({ data: GROUP_A_TEAMS, error: null }) }
-          if (table === "group_picks") return { upsert: insertFn }
+          if (table === "group_picks") return {}
           return {}
         }),
+        rpc: insertFn,
       })
 
       await deriveAndPersistGroupRankings("user-1")
 
       expect(insertFn).toHaveBeenCalledTimes(1)
-      const upsertedRows = insertFn.mock.calls[0]?.[0] as Array<{ group_code: string; position: number; team_code: string }>
+      const upsertedRows = (insertFn.mock.calls[0]?.[1] as { p_rows: unknown }).p_rows as Array<{ group_code: string; position: number; team_code: string }>
       const groupARows = upsertedRows.filter((r) => r.group_code === "A")
       // A3 won m6 (3-1) via gap-fill → A3 should earn points; A4 should be last
       const a3Row = groupARows.find((r) => r.team_code === "A3")

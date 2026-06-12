@@ -506,14 +506,17 @@ export async function deriveAndPersistGroupRankings(userId: string): Promise<voi
     }
   }
 
-  // Upsert (not delete+insert): concurrent autosaves would interleave the
-  // delete/insert pair and crash on duplicate key. Rows per group never
-  // shrink (predictions are never deleted), so no stale rows are left behind.
-  const { error: upsertError } = await service
-    .from("group_picks")
-    .upsert(groupPicksPayload, { onConflict: "user_id,group_code,position" })
+  // Atomic replace via RPC: a plain upsert by (user_id, group_code, position)
+  // cannot REORDER teams — the second unique constraint
+  // (user_id, group_code, team_code) rejects the transient duplicate — and
+  // delete+insert as two calls races with concurrent autosaves. The Postgres
+  // function does delete+insert in one transaction, killing both.
+  const { error: replaceError } = await service.rpc("replace_group_picks", {
+    p_user_id: userId,
+    p_rows: groupPicksPayload,
+  })
 
-  if (upsertError) throw new Error(upsertError.message)
+  if (replaceError) throw new Error(replaceError.message)
 }
 
 type PredictionRow = { match_id: string; home_score: number; away_score: number }
