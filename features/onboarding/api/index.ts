@@ -11,8 +11,6 @@ type TournamentPredictionRow = Pick<
   "top_scorer_api_id" | "best_player_api_id" | "best_young_player_api_id"
 >
 
-const GROUP_STAGE_MATCH_COUNT = 72
-
 export type DeriveStepInput = {
   awardsAt: string | null
   prodePicksSubmittedAt?: string | null
@@ -22,8 +20,10 @@ export type DeriveStepInput = {
   bracketPickCount: number
   hasTournamentPrediction: boolean
   hasAllAwards: boolean
-  prodePickCount: number
-  groupStageMatchCount: number
+  // Both counts are scoped to OPEN matches (kickoff in the future) — never
+  // mix them with totals that include closed matches.
+  openPredictedCount: number
+  openUnpredictedCount: number
 }
 
 export function deriveOnboardingStep(input: DeriveStepInput): OnboardingStep {
@@ -31,9 +31,10 @@ export function deriveOnboardingStep(input: DeriveStepInput): OnboardingStep {
   if (!input.onboardingMode) return { status: 'mode_select' }
 
   if (input.onboardingMode === 'prode') {
-    if (input.prodePickCount < input.groupStageMatchCount) {
+    if (input.openUnpredictedCount > 0) {
       if (input.prodePicksSubmittedAt) return { status: 'awards' }
-      return { status: 'prode_picks', filled: input.prodePickCount, total: input.groupStageMatchCount }
+      const totalOpen = input.openUnpredictedCount + input.openPredictedCount
+      return { status: 'prode_picks', filled: input.openPredictedCount, total: totalOpen }
     }
     if (input.bracketPickCount < 32) return { status: 'bracket' }
     return { status: 'awards' }
@@ -99,7 +100,7 @@ export async function getGroupStageMatchesWithPredictions(
     supabase.from("teams").select("api_id,code"),
     supabase
       .from("matches")
-      .select("id,home_team_code,away_team_code,kickoff,stage")
+      .select("id,home_team_code,away_team_code,kickoff,stage,status,home_score,away_score")
       .ilike("stage", "Group Stage%")
       .order("kickoff", { ascending: true }),
     supabase
@@ -128,6 +129,9 @@ export async function getGroupStageMatchesWithPredictions(
         away_team_code: awayCode,
         group_code: group,
         kickoff: match.kickoff,
+        status: match.status ?? "UPCOMING",
+        home_score: match.home_score ?? null,
+        away_score: match.away_score ?? null,
       },
       prediction: pred ? { home_score: pred.home_score, away_score: pred.away_score } : null,
     })
@@ -140,7 +144,9 @@ export async function getOnboardingState(
   supabase: SupabaseClient<Database>,
   userId: string
 ): Promise<OnboardingState> {
-  const [userResult, groupCountResult, bestThirdCountResult, bracketCountResult, tournamentResult, prodePickCountResult] = await Promise.all([
+  const now = new Date().toISOString()
+
+  const [userResult, groupCountResult, bestThirdCountResult, bracketCountResult, tournamentResult, openMatchesResult] = await Promise.all([
     supabase.from("users").select("awards_at,prode_picks_submitted_at,onboarding_mode").eq("id", userId).maybeSingle(),
     supabase.from("group_picks").select("user_id", { count: "exact", head: true }).eq("user_id", userId),
     supabase
@@ -155,16 +161,30 @@ export async function getOnboardingState(
       .select("top_scorer_api_id,best_player_api_id,best_young_player_api_id")
       .eq("user_id", userId)
       .maybeSingle(),
+    // Step 1 of two-step openUnpredictedCount: fetch all open group-stage match IDs (kickoff > now)
     supabase
-      .from("predictions")
-      .select("match_id, matches!inner(stage)", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .ilike("matches.stage", "Group Stage%"),
-
+      .from("matches")
+      .select("id")
+      .ilike("stage", "Group Stage%")
+      .gt("kickoff", now),
   ])
 
   const tournamentPrediction = tournamentResult.error ? null : tournamentResult.data
   const userData = userResult.error ? null : userResult.data
+
+  // Step 2 of two-step openUnpredictedCount: how many of those open matches has this user predicted?
+  const openMatchIds = (openMatchesResult.data ?? []).map((m) => m.id)
+  let userOpenPredCount = 0
+  if (openMatchIds.length > 0) {
+    const userOpenPredsResult = await supabase
+      .from("predictions")
+      .select("match_id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .in("match_id", openMatchIds)
+    userOpenPredCount = userOpenPredsResult.count ?? 0
+  }
+  const openUnpredictedCount = openMatchIds.length - userOpenPredCount
+
   const step = deriveOnboardingStep({
     awardsAt: userData?.awards_at ?? null,
     prodePicksSubmittedAt: userData?.prode_picks_submitted_at ?? null,
@@ -178,8 +198,8 @@ export async function getOnboardingState(
         tournamentPrediction?.best_player_api_id &&
         tournamentPrediction?.best_young_player_api_id
     ),
-    prodePickCount: prodePickCountResult.count ?? 0,
-    groupStageMatchCount: GROUP_STAGE_MATCH_COUNT,
+    openPredictedCount: userOpenPredCount,
+    openUnpredictedCount,
   })
 
   const [groupRowsResult, bestThirdRowsResult, bracketRowsResult] = await Promise.all([

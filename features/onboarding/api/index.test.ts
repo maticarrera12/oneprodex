@@ -13,8 +13,8 @@ describe("deriveOnboardingStep", () => {
       bracketPickCount: 32,
       hasTournamentPrediction: true,
       hasAllAwards: true,
-      prodePickCount: 0,
-      groupStageMatchCount: 72,
+      openPredictedCount: 0,
+      openUnpredictedCount: 0,
     })
     expect(step).toEqual({ status: "complete" })
   })
@@ -28,8 +28,8 @@ describe("deriveOnboardingStep", () => {
       bracketPickCount: 0,
       hasTournamentPrediction: false,
       hasAllAwards: false,
-      prodePickCount: 0,
-      groupStageMatchCount: 72,
+      openPredictedCount: 0,
+      openUnpredictedCount: 0,
     })
     expect(step).toEqual({ status: "mode_select" })
   })
@@ -45,8 +45,8 @@ describe("deriveOnboardingStep", () => {
       bracketPickCount: 0,
       hasTournamentPrediction: false,
       hasAllAwards: false,
-      prodePickCount: 0,
-      groupStageMatchCount: 72,
+      openPredictedCount: 0,
+      openUnpredictedCount: 0,
     })
     expect(step).toEqual({ status: "quick_step", step: 1 })
   })
@@ -60,8 +60,8 @@ describe("deriveOnboardingStep", () => {
       bracketPickCount: 0,
       hasTournamentPrediction: false,
       hasAllAwards: false,
-      prodePickCount: 0,
-      groupStageMatchCount: 72,
+      openPredictedCount: 0,
+      openUnpredictedCount: 0,
     })
     expect(step).toEqual({ status: "quick_step", step: 2 })
   })
@@ -75,8 +75,8 @@ describe("deriveOnboardingStep", () => {
       bracketPickCount: 31,
       hasTournamentPrediction: false,
       hasAllAwards: false,
-      prodePickCount: 0,
-      groupStageMatchCount: 72,
+      openPredictedCount: 0,
+      openUnpredictedCount: 0,
     })
     expect(step).toEqual({ status: "quick_step", step: 3 })
   })
@@ -90,8 +90,8 @@ describe("deriveOnboardingStep", () => {
       bracketPickCount: 32,
       hasTournamentPrediction: false,
       hasAllAwards: false,
-      prodePickCount: 0,
-      groupStageMatchCount: 72,
+      openPredictedCount: 0,
+      openUnpredictedCount: 0,
     })
     expect(step).toEqual({ status: "quick_step", step: 4 })
   })
@@ -107,8 +107,8 @@ describe("deriveOnboardingStep", () => {
       bracketPickCount: 0,
       hasTournamentPrediction: false,
       hasAllAwards: false,
-      prodePickCount: 20,
-      groupStageMatchCount: 72,
+      openPredictedCount: 20,
+      openUnpredictedCount: 52,
     })
     expect(step).toEqual({ status: "prode_picks", filled: 20, total: 72 })
   })
@@ -122,8 +122,8 @@ describe("deriveOnboardingStep", () => {
       bracketPickCount: 0,
       hasTournamentPrediction: false,
       hasAllAwards: false,
-      prodePickCount: 0,
-      groupStageMatchCount: 72,
+      openPredictedCount: 0,
+      openUnpredictedCount: 72,
     })
     expect(step).toEqual({ status: "prode_picks", filled: 0, total: 72 })
   })
@@ -138,8 +138,8 @@ describe("deriveOnboardingStep", () => {
       bracketPickCount: 10,
       hasTournamentPrediction: false,
       hasAllAwards: false,
-      prodePickCount: 72,
-      groupStageMatchCount: 72,
+      openPredictedCount: 72,
+      openUnpredictedCount: 0,
     })
     expect(step).toEqual({ status: "bracket" })
   })
@@ -154,8 +154,8 @@ describe("deriveOnboardingStep", () => {
       bracketPickCount: 0,
       hasTournamentPrediction: false,
       hasAllAwards: false,
-      prodePickCount: 12,
-      groupStageMatchCount: 72,
+      openPredictedCount: 12,
+      openUnpredictedCount: 60,
     })
     expect(step).toEqual({ status: "awards" })
   })
@@ -169,8 +169,8 @@ describe("deriveOnboardingStep", () => {
       bracketPickCount: 32,
       hasTournamentPrediction: false,
       hasAllAwards: false,
-      prodePickCount: 72,
-      groupStageMatchCount: 72,
+      openPredictedCount: 72,
+      openUnpredictedCount: 0,
     })
     expect(step).toEqual({ status: "awards" })
   })
@@ -184,8 +184,8 @@ describe("deriveOnboardingStep", () => {
       bracketPickCount: 32,
       hasTournamentPrediction: true,
       hasAllAwards: true,
-      prodePickCount: 72,
-      groupStageMatchCount: 72,
+      openPredictedCount: 72,
+      openUnpredictedCount: 0,
     })
     expect(step).toEqual({ status: "complete" })
   })
@@ -199,9 +199,93 @@ describe("deriveOnboardingStep", () => {
       bracketPickCount: 32,
       hasTournamentPrediction: true,
       hasAllAwards: true,
-      prodePickCount: 72,
-      groupStageMatchCount: 72,
+      openPredictedCount: 72,
+      openUnpredictedCount: 0,
     })
     expect(step).toEqual({ status: "awards" })
+  })
+
+  // --- openUnpredictedCount gate (new) ---
+
+  it("returns prode_picks with step filled/total from open counts when user has 0 predictions and 30 open matches", () => {
+    const step = deriveOnboardingStep({
+      awardsAt: null,
+      onboardingMode: "prode",
+      groupPickCount: 0,
+      bestThirdCount: 0,
+      bracketPickCount: 0,
+      hasTournamentPrediction: false,
+      hasAllAwards: false,
+      openPredictedCount: 0,
+      openUnpredictedCount: 30,
+    })
+    expect(step).toEqual({ status: "prode_picks", filled: 0, total: 30 })
+  })
+
+  it("returns prode_picks with filled=10 when user predicted 10 of 30 open matches", () => {
+    const step = deriveOnboardingStep({
+      awardsAt: null,
+      onboardingMode: "prode",
+      groupPickCount: 0,
+      bestThirdCount: 0,
+      bracketPickCount: 0,
+      hasTournamentPrediction: false,
+      hasAllAwards: false,
+      openPredictedCount: 10,
+      openUnpredictedCount: 20,
+    })
+    // totalOpen = 20 + 10 = 30, filled = 10
+    expect(step).toEqual({ status: "prode_picks", filled: 10, total: 30 })
+  })
+
+  it("returns bracket when openUnpredictedCount is 0", () => {
+    const step = deriveOnboardingStep({
+      awardsAt: null,
+      prodePicksSubmittedAt: null,
+      onboardingMode: "prode",
+      groupPickCount: 0,
+      bestThirdCount: 0,
+      bracketPickCount: 0,
+      hasTournamentPrediction: false,
+      hasAllAwards: false,
+      openPredictedCount: 10,
+      openUnpredictedCount: 0,
+    })
+    expect(step).toEqual({ status: "bracket" })
+  })
+
+  it("returns awards via submitted-at early-exit even when openUnpredictedCount > 0", () => {
+    const step = deriveOnboardingStep({
+      awardsAt: null,
+      prodePicksSubmittedAt: "2026-06-10T16:00:00.000Z",
+      onboardingMode: "prode",
+      groupPickCount: 0,
+      bestThirdCount: 0,
+      bracketPickCount: 0,
+      hasTournamentPrediction: false,
+      hasAllAwards: false,
+      openPredictedCount: 5,
+      openUnpredictedCount: 25,
+    })
+    expect(step).toEqual({ status: "awards" })
+  })
+})
+
+describe("deriveOnboardingStep — progress over open matches only", () => {
+  it("ignores predictions on closed matches in filled/total", () => {
+    // User made 30 predictions but 10 of those matches already closed.
+    // 42 matches remain open, 20 predicted → progress must read 20/42.
+    const step = deriveOnboardingStep({
+      awardsAt: null,
+      onboardingMode: "prode",
+      groupPickCount: 0,
+      bestThirdCount: 0,
+      bracketPickCount: 0,
+      hasTournamentPrediction: false,
+      hasAllAwards: false,
+      openPredictedCount: 20,
+      openUnpredictedCount: 22,
+    })
+    expect(step).toEqual({ status: "prode_picks", filled: 20, total: 42 })
   })
 })
