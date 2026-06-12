@@ -227,3 +227,106 @@ export interface MatchEventRow {
   type: 'GOAL' | 'OWN_GOAL' | 'PENALTY' | 'YELLOW_CARD' | 'RED_CARD'
   minute: number | null
 }
+
+// ─── Predictions ─────────────────────────────────────────────────────────────
+
+export interface AFPredictionPercent {
+  home: string
+  draw: string
+  away: string
+}
+
+export interface AFPredictionItem {
+  predictions: {
+    percent: AFPredictionPercent
+    advice: string
+  }
+}
+
+export interface AFPredictionsResponse {
+  response: AFPredictionItem[]
+}
+
+export interface MatchPredictionRow {
+  match_id: string
+  home_pct: number
+  draw_pct: number
+  away_pct: number
+  advice: string | null
+  synced_at: string
+}
+
+// ─── Lineups ──────────────────────────────────────────────────────────────────
+
+export interface AFLineupPlayer {
+  id: number
+  name: string
+  number: number
+  pos: string
+  grid: string | null
+}
+
+export interface AFLineupTeam {
+  team: {
+    id: number
+    name: string
+  }
+  formation: string
+  startXI: Array<{ player: AFLineupPlayer }>
+  substitutes: Array<{ player: AFLineupPlayer }>
+}
+
+export interface AFLineupsResponse {
+  response: AFLineupTeam[]
+}
+
+export interface MatchLineupRow {
+  match_id: string
+  team_code: string
+  player_api_id: number
+  name: string
+  number: number | null
+  position: string | null
+  grid: string | null
+  is_substitute: boolean
+  synced_at: string
+}
+
+// ─── H2H ─────────────────────────────────────────────────────────────────────
+
+export interface AFH2HFixture {
+  id: number
+  date: string
+}
+
+export interface AFH2HTeam {
+  id: number
+  name: string
+  code: string | null
+}
+
+export interface AFH2HMatch {
+  fixture: AFH2HFixture
+  teams: {
+    home: AFH2HTeam
+    away: AFH2HTeam
+  }
+  goals: {
+    home: number | null
+    away: number | null
+  }
+}
+
+export interface AFH2HResponse {
+  response: AFH2HMatch[]
+}
+
+export interface MatchH2HRow {
+  id: string
+  for_match_id: string
+  home_team_code: string
+  away_team_code: string
+  home_score: number | null
+  away_score: number | null
+  kickoff: string
+}

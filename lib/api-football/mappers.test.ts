@@ -1,5 +1,5 @@
-import { mapFixtureStatus, mapMatchEvent, mapPlayer, mapTeam } from '@/lib/api-football/mappers'
-import type { AFMatchEvent, AFSquadPlayer, AFTeam } from '@/lib/api-football/types'
+import { mapFixtureStatus, mapH2H, mapLineup, mapMatchEvent, mapPlayer, mapPrediction, mapTeam } from '@/lib/api-football/mappers'
+import type { AFH2HMatch, AFLineupTeam, AFMatchEvent, AFPredictionItem, AFSquadPlayer, AFTeam } from '@/lib/api-football/types'
 
 describe('mapFixtureStatus', () => {
   it('maps known upcoming codes', () => {
@@ -187,5 +187,162 @@ describe('mapMatchEvent', () => {
     const result = mapMatchEvent(event, 'match-1', teamCodeMap)
     expect(result).not.toBeNull()
     expect(result!.id).toBe('match-1-55-unknown-GOAL')
+  })
+})
+
+describe('mapPrediction', () => {
+  function makePredictionItem(overrides: Partial<AFPredictionItem['predictions']> = {}): AFPredictionItem {
+    return {
+      predictions: {
+        percent: { home: '45%', draw: '25%', away: '30%' },
+        advice: 'Home win recommended',
+        ...overrides,
+      },
+    }
+  }
+
+  it('parses percentage strings to integers (strips % suffix)', () => {
+    const result = mapPrediction('WC001', makePredictionItem())
+    expect(result).not.toBeNull()
+    expect(result!.home_pct).toBe(45)
+    expect(result!.draw_pct).toBe(25)
+    expect(result!.away_pct).toBe(30)
+  })
+
+  it('sets match_id from the fixtureId argument', () => {
+    const result = mapPrediction('WC001', makePredictionItem())
+    expect(result).not.toBeNull()
+    expect(result!.match_id).toBe('WC001')
+  })
+
+  it('includes advice in the row', () => {
+    const result = mapPrediction('WC001', makePredictionItem({ advice: 'Away will win' }))
+    expect(result).not.toBeNull()
+    expect(result!.advice).toBe('Away will win')
+  })
+
+  it('returns null when the response item is missing (null input)', () => {
+    const result = mapPrediction('WC002', null)
+    expect(result).toBeNull()
+  })
+
+  it('triangulate — different pct values are all parsed correctly', () => {
+    const result = mapPrediction('WC003', makePredictionItem({
+      percent: { home: '60%', draw: '10%', away: '30%' },
+    }))
+    expect(result).not.toBeNull()
+    expect(result!.home_pct).toBe(60)
+    expect(result!.draw_pct).toBe(10)
+    expect(result!.away_pct).toBe(30)
+  })
+})
+
+describe('mapLineup', () => {
+  const teamCodeMap = new Map<number, string>([[10, 'ARG']])
+
+  function makeLineupTeam(overrides: Partial<AFLineupTeam> = {}): AFLineupTeam {
+    return {
+      team: { id: 10, name: 'Argentina' },
+      formation: '4-3-3',
+      startXI: [
+        { player: { id: 1, name: 'Keeper', number: 1, pos: 'G', grid: '1:1' } },
+      ],
+      substitutes: [
+        { player: { id: 99, name: 'Sub One', number: 20, pos: 'F', grid: null } },
+      ],
+      ...overrides,
+    }
+  }
+
+  it('marks startXI players as is_substitute=false', () => {
+    const rows = mapLineup('WC001', makeLineupTeam(), teamCodeMap)
+    const starter = rows.find((r) => r.player_api_id === 1)
+    expect(starter).toBeDefined()
+    expect(starter!.is_substitute).toBe(false)
+  })
+
+  it('marks substitute players as is_substitute=true', () => {
+    const rows = mapLineup('WC001', makeLineupTeam(), teamCodeMap)
+    const sub = rows.find((r) => r.player_api_id === 99)
+    expect(sub).toBeDefined()
+    expect(sub!.is_substitute).toBe(true)
+  })
+
+  it('returns combined startXI + substitutes rows', () => {
+    const rows = mapLineup('WC001', makeLineupTeam(), teamCodeMap)
+    expect(rows).toHaveLength(2)
+  })
+
+  it('uses teamCodeMap to resolve team_code', () => {
+    const rows = mapLineup('WC001', makeLineupTeam(), teamCodeMap)
+    expect(rows[0].team_code).toBe('ARG')
+  })
+
+  it('falls back to String(apiId) when teamCodeMap has no entry', () => {
+    const emptyMap = new Map<number, string>()
+    const rows = mapLineup('WC001', makeLineupTeam(), emptyMap)
+    expect(rows[0].team_code).toBe('10')
+  })
+
+  it('triangulate — sets match_id and player fields correctly', () => {
+    const rows = mapLineup('WC002', makeLineupTeam(), teamCodeMap)
+    expect(rows[0].match_id).toBe('WC002')
+    expect(rows[0].name).toBe('Keeper')
+    expect(rows[0].number).toBe(1)
+    expect(rows[0].position).toBe('G')
+    expect(rows[0].grid).toBe('1:1')
+  })
+})
+
+describe('mapH2H', () => {
+  function makeH2HMatch(overrides: Partial<AFH2HMatch> = {}): AFH2HMatch {
+    return {
+      fixture: { id: 555, date: '2025-06-10T18:00:00Z' },
+      teams: {
+        home: { id: 10, name: 'Argentina', code: 'ARG' },
+        away: { id: 20, name: 'France', code: 'FRA' },
+      },
+      goals: { home: 3, away: 1 },
+      ...overrides,
+    }
+  }
+
+  it('sets id from fixture.id as string', () => {
+    const row = mapH2H('WC001', makeH2HMatch())
+    expect(row.id).toBe('555')
+  })
+
+  it('sets for_match_id from the forMatchId argument', () => {
+    const row = mapH2H('WC001', makeH2HMatch())
+    expect(row.for_match_id).toBe('WC001')
+  })
+
+  it('maps scores from goals', () => {
+    const row = mapH2H('WC001', makeH2HMatch())
+    expect(row.home_score).toBe(3)
+    expect(row.away_score).toBe(1)
+  })
+
+  it('sets kickoff from fixture.date', () => {
+    const row = mapH2H('WC001', makeH2HMatch())
+    expect(row.kickoff).toBe('2025-06-10T18:00:00Z')
+  })
+
+  it('handles null scores', () => {
+    const row = mapH2H('WC001', makeH2HMatch({ goals: { home: null, away: null } }))
+    expect(row.home_score).toBeNull()
+    expect(row.away_score).toBeNull()
+  })
+
+  it('triangulate — falls back to String(id) when team code is null', () => {
+    const match = makeH2HMatch({
+      teams: {
+        home: { id: 10, name: 'Argentina', code: null },
+        away: { id: 20, name: 'France', code: null },
+      },
+    })
+    const row = mapH2H('WC001', match)
+    expect(row.home_team_code).toBe('10')
+    expect(row.away_team_code).toBe('20')
   })
 })

@@ -1,11 +1,17 @@
 import type {
   AFFixture,
+  AFH2HMatch,
+  AFLineupTeam,
   AFMatchEvent,
+  AFPredictionItem,
   AFSquadPlayer,
   AFStanding,
   AFTeam,
   MatchEventRow,
+  MatchH2HRow,
+  MatchLineupRow,
   MatchLiveUpdateRow,
+  MatchPredictionRow,
   MatchRow,
   PlayerRow,
   StandingRow,
@@ -143,5 +149,74 @@ export function mapMatchEvent(
     team_code: teamCodeMap.get(event.team.id) ?? null,
     type,
     minute: event.time.elapsed,
+  }
+}
+
+function parsePct(raw: string): number {
+  return parseInt(raw, 10)
+}
+
+export function mapPrediction(
+  fixtureId: string,
+  item: AFPredictionItem | null,
+): MatchPredictionRow | null {
+  if (!item) return null
+
+  const { percent, advice } = item.predictions
+
+  return {
+    match_id: fixtureId,
+    home_pct: parsePct(percent.home),
+    draw_pct: parsePct(percent.draw),
+    away_pct: parsePct(percent.away),
+    advice: advice ?? null,
+    synced_at: new Date().toISOString(),
+  }
+}
+
+export function mapLineup(
+  fixtureId: string,
+  lineup: AFLineupTeam,
+  teamCodeMap: Map<number, string>,
+): MatchLineupRow[] {
+  const teamCode = teamCodeMap.get(lineup.team.id) ?? String(lineup.team.id)
+  const synced_at = new Date().toISOString()
+
+  const startRows: MatchLineupRow[] = lineup.startXI.map(({ player }) => ({
+    match_id: fixtureId,
+    team_code: teamCode,
+    player_api_id: player.id,
+    name: player.name,
+    number: player.number ?? null,
+    position: player.pos ?? null,
+    grid: player.grid ?? null,
+    is_substitute: false,
+    synced_at,
+  }))
+
+  const subRows: MatchLineupRow[] = lineup.substitutes.map(({ player }) => ({
+    match_id: fixtureId,
+    team_code: teamCode,
+    player_api_id: player.id,
+    name: player.name,
+    number: player.number ?? null,
+    position: player.pos ?? null,
+    grid: player.grid ?? null,
+    is_substitute: true,
+    synced_at,
+  }))
+
+  return [...startRows, ...subRows]
+}
+
+export function mapH2H(forMatchId: string, match: AFH2HMatch): MatchH2HRow {
+  return {
+    id: String(match.fixture.id),
+    for_match_id: forMatchId,
+    home_team_code: match.teams.home.code ?? String(match.teams.home.id),
+    away_team_code: match.teams.away.code ?? String(match.teams.away.id),
+    home_score: match.goals.home,
+    away_score: match.goals.away,
+    kickoff: match.fixture.date,
   }
 }

@@ -2,7 +2,10 @@ import type {
   APIFootballEnvelope,
   APIFootballErrorPayload,
   AFFixturesResponse,
+  AFH2HResponse,
+  AFLineupsResponse,
   AFMatchEventsResponse,
+  AFPredictionsResponse,
   AFSquadResponse,
   AFStandingsResponse,
   AFTeamsResponse,
@@ -115,4 +118,16 @@ export function fetchFixtureById(fixtureId: string): Promise<APIFootballEnvelope
 
 export function fetchMatchEvents(fixtureId: string): Promise<APIFootballEnvelope<AFMatchEventsResponse>> {
   return apiFetch<AFMatchEventsResponse>('/fixtures/events', { fixture: fixtureId })
+}
+
+export function fetchPredictions(fixtureId: string): Promise<APIFootballEnvelope<AFPredictionsResponse>> {
+  return apiFetch<AFPredictionsResponse>('/predictions', { fixture: fixtureId })
+}
+
+export function fetchLineups(fixtureId: string): Promise<APIFootballEnvelope<AFLineupsResponse>> {
+  return apiFetch<AFLineupsResponse>('/fixtures/lineups', { fixture: fixtureId })
+}
+
+export function fetchH2H(homeApiId: number, awayApiId: number): Promise<APIFootballEnvelope<AFH2HResponse>> {
+  return apiFetch<AFH2HResponse>('/fixtures/headtohead', { h2h: `${homeApiId}-${awayApiId}` })
 }
