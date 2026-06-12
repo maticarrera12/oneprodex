@@ -2,6 +2,8 @@ import { redirect } from "next/navigation"
 import { getOnboardingState, getGroupStageMatchesWithPredictions } from "@/features/onboarding/api"
 import { OnboardingScreen } from "@/features/onboarding/components/onboarding-screen"
 import { getStandingsByGroup } from "@/features/standings/api"
+import { deriveAndPersistGroupRankings } from "@/features/onboarding/actions"
+import { shouldReDeriveGroupRankings } from "@/features/onboarding/utils/onboarding-mode-gate"
 import type { GroupCode, OnboardingTeam } from "@/features/onboarding/types"
 import { createServiceClient } from "@/lib/supabase/service"
 import { createClient } from "@/lib/supabase/server"
@@ -55,6 +57,18 @@ export default async function OnboardingPage() {
   }
 
   const serviceClient = createServiceClient()
+
+  // Check onboarding_mode before deriving so quick-mode group_picks are never overwritten
+  const { data: userModeRow } = await serviceClient
+    .from("users")
+    .select("onboarding_mode")
+    .eq("id", user.id)
+    .maybeSingle()
+
+  if (shouldReDeriveGroupRankings({ onboarding_mode: userModeRow?.onboarding_mode ?? null })) {
+    await deriveAndPersistGroupRankings(user.id)
+  }
+
   const state = await getOnboardingState(serviceClient, user.id)
   if (state.step.status === "complete") {
     redirect("/")
