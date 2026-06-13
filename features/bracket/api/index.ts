@@ -239,7 +239,13 @@ export async function getBracketData(
     ).order("kickoff", { ascending: true }),
   ])
 
-  if (picksResult.error) return null
+  if (picksResult.error) {
+    // Distinguish a transient read failure from a genuinely empty bracket: both return
+    // null (callers render the "no bracket yet" state), but only the error is unexpected.
+    console.error("getBracketData: failed to read bracket_picks", picksResult.error)
+    return null
+  }
+  if (picksResult.data.length === 0) return null
 
   const winnersByStage = new Map<string, Set<string>>()
   for (const match of knockoutResult.data ?? []) {

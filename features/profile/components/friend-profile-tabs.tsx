@@ -1,9 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { getBracketData } from "@/features/bracket/api"
-import { BracketScreen } from "@/features/bracket/components/bracket-screen"
-import { EmptyState } from "@/features/shared/components/empty-state"
+import type { getBracketData } from "@/features/bracket/api"
+import { FriendBracketTab } from "@/features/bracket/components/friend-bracket-tab"
 import type { FriendPredictionsTabData, ProfileData } from "@/features/profile/api"
 import { FriendPredictionsTab } from "@/features/profile/components/friend-predictions-tab"
 import ProfileScreen from "@/features/profile/components/profile-screen"
@@ -50,19 +49,7 @@ export function FriendProfileTabs({
 
       {activeTab === "Perfil" && <ProfileScreen data={profileData} />}
 
-      {activeTab === "Bracket" && (
-        bracketData ? (
-          <BracketScreen
-            rounds={bracketData.rounds}
-            actualRounds={bracketData.actualRounds}
-            scoreStats={bracketData.scoreStats}
-            champion={bracketData.champion}
-            readOnly={true}
-          />
-        ) : (
-          <EmptyState message="Aún no completó su bracket" />
-        )
-      )}
+      {activeTab === "Bracket" && <FriendBracketTab data={bracketData} />}
 
       {activeTab === "Predicciones" && (
         <FriendPredictionsTab data={predictionsData} />
