@@ -240,6 +240,7 @@ export async function getBracketData(
   ])
 
   if (picksResult.error) return null
+  if (picksResult.data.length === 0) return null
 
   const winnersByStage = new Map<string, Set<string>>()
   for (const match of knockoutResult.data ?? []) {
