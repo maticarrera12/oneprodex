@@ -30,7 +30,8 @@ import {
 } from "@/features/predictions/utils/consensus"
 import { MATCH_SCORING, MATCH_SCORING_LABELS } from "@/features/scoring/constants"
 import { userAccentColor } from "@/features/shared/utils/user-accent-color"
-import type { MatchLineupRow, MatchH2HRow } from "@/lib/api-football/types"
+import type { MatchLineupRow, MatchH2HRow, MatchPredictionRow } from "@/lib/api-football/types"
+import { PredictionBar } from "@/features/matches/components/prediction-bar"
 
 const EMPTY_LINEUPS: { home: MatchLineupRow[]; away: MatchLineupRow[] } = { home: [], away: [] }
 
@@ -43,6 +44,7 @@ type MatchDetailScreenProps = {
   lineups?: { home: MatchLineupRow[]; away: MatchLineupRow[] }
   playersMap?: Map<number, string>
   h2h?: MatchH2HRow[]
+  matchPrediction?: MatchPredictionRow | null
 }
 
 export function MatchDetailScreen({
@@ -54,6 +56,7 @@ export function MatchDetailScreen({
   lineups = EMPTY_LINEUPS,
   playersMap = new Map(),
   h2h = [],
+  matchPrediction = null,
 }: MatchDetailScreenProps) {
   const router = useRouter()
   const isLive = match.status === "LIVE"
@@ -143,6 +146,26 @@ export function MatchDetailScreen({
             : null
         }
       />
+
+      {matchPrediction && (
+        <div className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.2)]">
+          <p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-(--color-text3)">Probabilidades</p>
+          <PredictionBar
+            homePct={matchPrediction.home_pct}
+            drawPct={matchPrediction.draw_pct}
+            awayPct={matchPrediction.away_pct}
+            homeColor={match.homeC1}
+            awayColor={match.awayC1}
+            advice={
+              matchPrediction.home_pct > matchPrediction.away_pct
+                ? `Favorito: ${match.home}`
+                : matchPrediction.away_pct > matchPrediction.home_pct
+                  ? `Favorito: ${match.away}`
+                  : null
+            }
+          />
+        </div>
+      )}
 
       <div className="space-y-3 lg:space-y-0">
         <div className="flex gap-2 lg:hidden">

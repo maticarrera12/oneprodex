@@ -4,6 +4,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react"
 import { MatchDetailScreen } from "@/features/matches/components/match-detail-screen"
 import type { Match } from "@/features/matches/types"
 import type { MatchPredictionState, PlayerDetail } from "@/features/predictions/types"
+import type { MatchPredictionRow } from "@/lib/api-football/types"
 
 const mocks = vi.hoisted(() => ({
   savePrediction: vi.fn(),
@@ -237,5 +238,102 @@ describe("MatchDetailScreen layout", () => {
   it("does not render H2H tab", () => {
     renderDetail()
     expect(screen.queryByRole("button", { name: "H2H" })).not.toBeInTheDocument()
+  })
+})
+
+describe("MatchDetailScreen — PredictionBar", () => {
+  const mockPrediction: MatchPredictionRow = {
+    match_id: "m1",
+    home_pct: 55,
+    draw_pct: 20,
+    away_pct: 25,
+    advice: null,
+    synced_at: "2026-06-13T00:00:00Z",
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.commitScorerEdits.mockResolvedValue({})
+  })
+
+  it("renders PredictionBar when matchPrediction is provided", () => {
+    render(
+      <MatchDetailScreen
+        match={buildMatch({ homeC1: "#FF0000", awayC1: "#0000FF" })}
+        predictionState={buildPredictionState()}
+        players={{ home: HOME_PLAYERS, away: AWAY_PLAYERS }}
+        events={[]}
+        consensusGroups={[]}
+        matchPrediction={mockPrediction}
+      />
+    )
+
+    expect(screen.getByLabelText("Home team: 55% win probability")).toBeInTheDocument()
+    expect(screen.getByLabelText("Away team: 25% win probability")).toBeInTheDocument()
+  })
+
+  it("renders the advice line as 'Favorito: {home}' when home_pct > away_pct", () => {
+    render(
+      <MatchDetailScreen
+        match={buildMatch({ home: "HOM", away: "AWY" })}
+        predictionState={buildPredictionState()}
+        players={{ home: HOME_PLAYERS, away: AWAY_PLAYERS }}
+        events={[]}
+        consensusGroups={[]}
+        matchPrediction={mockPrediction}
+      />
+    )
+
+    expect(screen.getByTestId("prediction-advice")).toHaveTextContent("Favorito: HOM")
+  })
+
+  it("renders 'Favorito: {away}' when away_pct > home_pct", () => {
+    render(
+      <MatchDetailScreen
+        match={buildMatch({ home: "HOM", away: "AWY" })}
+        predictionState={buildPredictionState()}
+        players={{ home: HOME_PLAYERS, away: AWAY_PLAYERS }}
+        events={[]}
+        consensusGroups={[]}
+        matchPrediction={{ ...mockPrediction, home_pct: 25, away_pct: 55 }}
+      />
+    )
+
+    expect(screen.getByTestId("prediction-advice")).toHaveTextContent("Favorito: AWY")
+  })
+
+  it("renders no advice when home_pct === away_pct", () => {
+    render(
+      <MatchDetailScreen
+        match={buildMatch()}
+        predictionState={buildPredictionState()}
+        players={{ home: HOME_PLAYERS, away: AWAY_PLAYERS }}
+        events={[]}
+        consensusGroups={[]}
+        matchPrediction={{ ...mockPrediction, home_pct: 40, draw_pct: 20, away_pct: 40 }}
+      />
+    )
+
+    expect(screen.queryByTestId("prediction-advice")).not.toBeInTheDocument()
+  })
+
+  it("does not render PredictionBar when matchPrediction is null", () => {
+    render(
+      <MatchDetailScreen
+        match={buildMatch()}
+        predictionState={buildPredictionState()}
+        players={{ home: HOME_PLAYERS, away: AWAY_PLAYERS }}
+        events={[]}
+        consensusGroups={[]}
+        matchPrediction={null}
+      />
+    )
+
+    expect(screen.queryByLabelText(/win probability/i)).not.toBeInTheDocument()
+  })
+
+  it("does not render PredictionBar when matchPrediction is undefined (default)", () => {
+    renderDetail()
+    expect(screen.queryByLabelText(/win probability/i)).not.toBeInTheDocument()
   })
 })
