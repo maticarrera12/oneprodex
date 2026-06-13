@@ -1,4 +1,4 @@
-import { MATCH_SCORING } from "@/features/scoring/constants"
+import { MATCH_SCORING, UPSET_BONUS } from "@/features/scoring/constants"
 
 export function calcScorePts(
   pred: { home_score: number; away_score: number },
@@ -34,6 +34,18 @@ export function calcCardPts(
   const correctYellow = predictedYellowIds.filter((id) => yellowSet.has(id)).length
   const correctRed = predictedRedIds.filter((id) => redSet.has(id)).length
   return correctYellow * MATCH_SCORING.yellowCard + correctRed * MATCH_SCORING.redCard
+}
+
+/**
+ * Compute the upset bonus points for a winning underdog.
+ * Pure function — no eligibility logic. Eligibility (gap >= 15, underdog won,
+ * user predicted winner, not a draw, snapshot exists) lives in scoreMatch().
+ *
+ * Formula: clamp(round(25 * (1 - winnerImpliedPct / 100)), UPSET_BONUS.min, UPSET_BONUS.max)
+ */
+export function calcUpsetBonus(winnerImpliedPct: number): number {
+  const raw = Math.round(UPSET_BONUS.max * (1 - winnerImpliedPct / 100))
+  return Math.max(UPSET_BONUS.min, Math.min(UPSET_BONUS.max, raw))
 }
 
 /**
