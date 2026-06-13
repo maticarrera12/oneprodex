@@ -489,6 +489,36 @@ describe('mapOddsToPrediction — empty / invalid input', () => {
   })
 })
 
+describe('mapOddsToPrediction — malformed odds guard', () => {
+  it('skips a bookmaker with a non-numeric odd and averages only valid ones', () => {
+    const bad: AFOddsBookmaker = {
+      id: 2,
+      name: 'Broken',
+      bets: [{ name: 'Match Winner', values: [
+        { value: 'Home', odd: 'N/A' },
+        { value: 'Draw', odd: '-' },
+        { value: 'Away', odd: '' },
+      ] }],
+    }
+    const good = makeBookmaker(2.0, 3.5, 4.0)
+    const result = mapOddsToPrediction('WC001', [bad, good])
+    // Must equal the single-good-bookmaker result, not NaN
+    const expected = mapOddsToPrediction('WC001', [good])
+    expect(result).toEqual(expected)
+    expect(result!.home_pct + result!.draw_pct + result!.away_pct).toBe(100)
+  })
+
+  it('returns null when every bookmaker has malformed odds', () => {
+    const bad: AFOddsBookmaker = {
+      id: 1, name: 'Broken',
+      bets: [{ name: 'Match Winner', values: [
+        { value: 'Home', odd: 'x' }, { value: 'Draw', odd: 'y' }, { value: 'Away', odd: 'z' },
+      ] }],
+    }
+    expect(mapOddsToPrediction('WC001', [bad])).toBeNull()
+  })
+})
+
 describe('mapOddsToPrediction — single bookmaker', () => {
   it('converts odds to implied probs, normalizes, and returns integers summing to 100', () => {
     // odds: Home=2.0, Draw=3.5, Away=4.0

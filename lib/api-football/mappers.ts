@@ -223,7 +223,7 @@ export function mapOddsToPrediction(
     const pA = 1 / parseFloat(awayVal.odd)
     const sum = pH + pD + pA
 
-    if (sum <= 0) continue
+    if (!Number.isFinite(sum) || sum <= 0) continue
 
     accumulated.home += pH / sum
     accumulated.draw += pD / sum
