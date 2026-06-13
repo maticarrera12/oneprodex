@@ -7,6 +7,8 @@ import type { ProfileHistoryEntry, ProfileHistoryPhase } from "@/features/profil
 
 type ProfileHistoryListProps = {
   entries: ProfileHistoryEntry[]
+  /** "Ver todas mis predicciones" → /partidos only makes sense on your own profile. */
+  showSeeAll?: boolean
 }
 
 type TabId = "todas" | ProfileHistoryPhase
@@ -20,7 +22,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "final", label: "Final" },
 ]
 
-export function ProfileHistoryList({ entries }: ProfileHistoryListProps) {
+export function ProfileHistoryList({ entries, showSeeAll = true }: ProfileHistoryListProps) {
   const [activeTab, setActiveTab] = useState<TabId>("todas")
 
   const exact = entries.filter((e) => e.kind === "exact").length
@@ -87,14 +89,16 @@ export function ProfileHistoryList({ entries }: ProfileHistoryListProps) {
         )}
       </div>
 
-      <div className="mt-3 flex justify-center">
-        <Link
-          href="/partidos"
-          className="rounded-xl border border-(--color-border-hi) bg-(--color-card-hi) px-4 py-2.5 font-mono text-xs font-semibold text-(--color-text2) tracking-wide"
-        >
-          Ver todas mis predicciones →
-        </Link>
-      </div>
+      {showSeeAll && (
+        <div className="mt-3 flex justify-center">
+          <Link
+            href="/partidos"
+            className="rounded-xl border border-(--color-border-hi) bg-(--color-card-hi) px-4 py-2.5 font-mono text-xs font-semibold text-(--color-text2) tracking-wide"
+          >
+            Ver todas mis predicciones →
+          </Link>
+        </div>
+      )}
     </section>
   )
 }

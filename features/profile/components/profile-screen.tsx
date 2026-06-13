@@ -9,9 +9,11 @@ import { ProfileLevelProgress } from "@/features/profile/components/profile-leve
 
 type ProfileScreenProps = {
   data: ProfileData
+  /** Hide the "Ver todas mis predicciones" CTA (it links to your own /partidos). */
+  showSeeAllPredictions?: boolean
 }
 
-export default function ProfileScreen({ data }: ProfileScreenProps) {
+export default function ProfileScreen({ data, showSeeAllPredictions = true }: ProfileScreenProps) {
   const userColor = "hsl(83 81% 62%)"
 
   return (
@@ -24,7 +26,7 @@ export default function ProfileScreen({ data }: ProfileScreenProps) {
         <ProfileFormBreakdown values={data.formLast7} />
       </div>
       <ProfileAchievementsGrid achievements={data.achievements} />
-      <ProfileHistoryList entries={data.history} />
+      <ProfileHistoryList entries={data.history} showSeeAll={showSeeAllPredictions} />
     </div>
   )
 }

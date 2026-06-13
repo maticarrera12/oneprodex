@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { GroupSwitcher } from '@/features/groups/components/group-switcher'
+import { ShareBrandIcon } from '@/features/shared/components/share-brand-icon'
 import type { GroupInfo } from '@/features/groups/types'
 
 type GroupHeaderProps = {
@@ -93,8 +94,10 @@ export function GroupHeader({ name, members, inviteCode, onAdd, groups = [], act
   }, [toastMessage])
 
   return (
-    <header className="relative grid grid-cols-[40px_1fr_auto] items-center gap-3">
-      {shareOpen ? <button type="button" aria-label="Cerrar compartir" className="fixed inset-0 z-10" onClick={closeShare} /> : null}
+    <header className={`relative grid grid-cols-[40px_1fr_auto] items-center gap-3 ${shareOpen ? 'z-50' : 'z-40'}`}>
+      {shareOpen ? (
+        <button type="button" aria-label="Cerrar compartir" className="fixed inset-0 z-40 bg-black/20" onClick={closeShare} />
+      ) : null}
       <Link
         href="/"
         className="inline-flex size-10 items-center justify-center rounded-xl border border-(--color-border-hi) bg-(--color-card-hi)"
@@ -136,7 +139,7 @@ export function GroupHeader({ name, members, inviteCode, onAdd, groups = [], act
         />
       </div>
 
-      <div className="relative z-20 flex items-center gap-2">
+      <div className="relative z-50 flex items-center gap-2">
         <button
           type="button"
           onClick={() => setShareOpen((prev) => !prev)}
@@ -171,7 +174,7 @@ export function GroupHeader({ name, members, inviteCode, onAdd, groups = [], act
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.97 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
-              className="absolute right-0 top-12 w-[320px] rounded-2xl border border-(--color-border-hi) bg-background p-3 shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
+              className="absolute right-0 top-12 z-50 w-[320px] rounded-2xl border border-(--color-border-hi) bg-background p-3 shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
             >
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-sm font-semibold text-foreground">Compartir invitación</p>
@@ -192,7 +195,9 @@ export function GroupHeader({ name, members, inviteCode, onAdd, groups = [], act
                   className="flex items-center gap-2 rounded-lg border border-(--color-border-hi) bg-(--color-card-hi) px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-black/20"
                   onClick={() => { triggerShareAchievement(); closeShare() }}
                 >
-                  <span className="inline-flex size-5 items-center justify-center rounded-full bg-[#25D366] text-[10px] font-bold text-black">W</span>
+                  <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white">
+                    <ShareBrandIcon brand="whatsapp" className="size-3" />
+                  </span>
                   WhatsApp
                 </a>
                 <a
@@ -202,7 +207,9 @@ export function GroupHeader({ name, members, inviteCode, onAdd, groups = [], act
                   className="flex items-center gap-2 rounded-lg border border-(--color-border-hi) bg-(--color-card-hi) px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-black/20"
                   onClick={() => { triggerShareAchievement(); closeShare() }}
                 >
-                  <span className="inline-flex size-5 items-center justify-center rounded-full bg-[#1877F2] text-[10px] font-bold text-white">f</span>
+                  <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[#1877F2] text-white">
+                    <ShareBrandIcon brand="facebook" className="size-3" />
+                  </span>
                   Facebook
                 </a>
                 <a
@@ -212,7 +219,9 @@ export function GroupHeader({ name, members, inviteCode, onAdd, groups = [], act
                   className="flex items-center gap-2 rounded-lg border border-(--color-border-hi) bg-(--color-card-hi) px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-black/20"
                   onClick={() => { triggerShareAchievement(); closeShare() }}
                 >
-                  <span className="inline-flex size-5 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white">X</span>
+                  <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-black text-white">
+                    <ShareBrandIcon brand="x" className="size-2.5" />
+                  </span>
                   X
                 </a>
                 <button
@@ -220,7 +229,9 @@ export function GroupHeader({ name, members, inviteCode, onAdd, groups = [], act
                   className="flex items-center gap-2 rounded-lg border border-(--color-border-hi) bg-(--color-card-hi) px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-black/20"
                   onClick={shareToInstagram}
                 >
-                  <span className="inline-flex size-5 items-center justify-center rounded-full bg-[#E4405F] text-[10px] font-bold text-white">I</span>
+                  <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[#E4405F] text-white">
+                    <ShareBrandIcon brand="instagram" className="size-3" />
+                  </span>
                   Instagram
                 </button>
               </div>

@@ -15,11 +15,13 @@ export const metadata: Metadata = {
     siteName: "OneProdex",
     locale: "es_AR",
     type: "website",
+    images: [{ url: "/oneprodex.png", width: 512, height: 512, alt: "OneProdex" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "OneProdex",
     description: "Predicciones, grupos y puntos del Mundial 2026 — en vivo.",
+    images: ["/oneprodex.png"],
   },
 }
 
