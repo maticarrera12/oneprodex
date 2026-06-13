@@ -408,6 +408,193 @@ async function getProfileHistory(
   })
 }
 
+// --- friend-profiles: getUserByHandle + getFriendPredictionsTab ---
+
+export async function getUserByHandle(
+  supabase: SupabaseClient<Database>,
+  handle: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("id")
+    .eq("handle", handle)
+    .maybeSingle()
+
+  if (error || !data) return null
+  return data.id
+}
+
+/** Embedded prediction object in the inverted matches→predictions join */
+interface FriendPredictionEmbedRow {
+  home_score: number | null
+  away_score: number | null
+  points: number | null
+}
+
+/**
+ * Raw row shape returned by the inverted finished+live query:
+ * FROM matches WITH predictions!inner(...) filtered by user_id and status IN [FINISHED,LIVE]
+ */
+type FriendPredictionsMatchRow = {
+  id: string
+  home_team_code: string
+  away_team_code: string
+  home_score: number | null
+  away_score: number | null
+  kickoff: string
+  stage: string
+  status: string
+  predictions: FriendPredictionEmbedRow[]
+}
+
+/** Embedded upcoming prediction (left join — may be empty) */
+interface FriendUpcomingPredictionEmbedRow {
+  home_score: number
+  away_score: number
+}
+
+/** Raw upcoming row (match left-joined with the friend's prediction if any) */
+type FriendUpcomingMatchRow = {
+  id: string
+  home_team_code: string
+  away_team_code: string
+  kickoff: string
+  predictions: FriendUpcomingPredictionEmbedRow[]
+}
+
+export interface FriendPredictionEntry {
+  matchId: string
+  homeTeam: string
+  awayTeam: string
+  homeLogo: string | null
+  awayLogo: string | null
+  kickoff: string
+  status: "FINISHED" | "LIVE"
+  predictedHome: number | null
+  predictedAway: number | null
+  actualHome: number | null
+  actualAway: number | null
+  pts: number | null
+  kind: ProfileHistoryKind | null
+}
+
+export interface FriendUpcomingEntry {
+  matchId: string
+  homeTeam: string
+  awayTeam: string
+  homeLogo: string | null
+  awayLogo: string | null
+  kickoff: string
+  predictedHome: number | null
+  predictedAway: number | null
+}
+
+export interface FriendPredictionsTabData {
+  finished: FriendPredictionEntry[]
+  live: FriendPredictionEntry[]
+  upcomingNext5: FriendUpcomingEntry[]
+}
+
+export function mapFriendPredictionEntry(
+  row: FriendPredictionsMatchRow,
+  teamLookup: ReturnType<typeof buildTeamsLookup>,
+): FriendPredictionEntry | null {
+  // Row is now match-centric (FROM matches WITH predictions!inner).
+  // The embedded predictions array always has exactly one element (inner join by user_id).
+  const pick = row.predictions[0] ?? null
+
+  const homeTeamRecord = resolveTeam(row.home_team_code, teamLookup)
+  const awayTeamRecord = resolveTeam(row.away_team_code, teamLookup)
+
+  const predictedHome = pick?.home_score ?? null
+  const predictedAway = pick?.away_score ?? null
+
+  let kind: ProfileHistoryKind | null = null
+  if (
+    row.status === "FINISHED" &&
+    predictedHome !== null &&
+    predictedAway !== null &&
+    row.home_score !== null &&
+    row.away_score !== null
+  ) {
+    kind = computePredictionKind(predictedHome, predictedAway, row.home_score, row.away_score)
+  }
+
+  return {
+    matchId: row.id,
+    homeTeam: homeTeamRecord?.name ?? row.home_team_code,
+    awayTeam: awayTeamRecord?.name ?? row.away_team_code,
+    homeLogo: normalizeLogoUrl(homeTeamRecord?.logo ?? null),
+    awayLogo: normalizeLogoUrl(awayTeamRecord?.logo ?? null),
+    kickoff: row.kickoff,
+    status: row.status as "FINISHED" | "LIVE",
+    predictedHome,
+    predictedAway,
+    actualHome: row.home_score,
+    actualAway: row.away_score,
+    pts: pick?.points ?? null,
+    kind,
+  }
+}
+
+export async function getFriendPredictionsTab(
+  supabase: SupabaseClient<Database>,
+  friendUserId: string,
+): Promise<FriendPredictionsTabData> {
+  const [finishedLiveResult, upcomingResult, teamsResult] = await Promise.all([
+    // Inverted query: FROM matches with predictions!inner so PostgREST filters parent rows server-side.
+    // Only matches that have a prediction from this user AND are FINISHED/LIVE are returned.
+    supabase
+      .from("matches")
+      .select(
+        "id, home_team_code, away_team_code, home_score, away_score, kickoff, stage, status, predictions!inner(home_score, away_score, points)",
+      )
+      .in("status", ["FINISHED", "LIVE"])
+      .eq("predictions.user_id", friendUserId)
+      .order("kickoff", { ascending: false })
+      .limit(30),
+    // Upcoming: LEFT join so matches with no friend pick still appear ("Sin predicción").
+    // Embedded filter attaches only the friend's pick (or nothing) — does not exclude the parent row.
+    supabase
+      .from("matches")
+      .select("id, home_team_code, away_team_code, kickoff, predictions!left(home_score, away_score)")
+      .eq("status", "UPCOMING")
+      .eq("predictions.user_id", friendUserId)
+      .order("kickoff", { ascending: true })
+      .limit(5),
+    supabase.from("teams").select("api_id, code, name, logo"),
+  ])
+
+  const teamLookup = buildTeamsLookup(teamsResult.data ?? [])
+
+  const finishedLiveRows = (finishedLiveResult.data ?? []) as FriendPredictionsMatchRow[]
+  const finishedLiveEntries = finishedLiveRows
+    .map((row) => mapFriendPredictionEntry(row, teamLookup))
+    .filter((e): e is FriendPredictionEntry => e !== null)
+
+  const finished = finishedLiveEntries.filter((e) => e.status === "FINISHED")
+  const live = finishedLiveEntries.filter((e) => e.status === "LIVE")
+
+  const upcomingRows = (upcomingResult.data ?? []) as FriendUpcomingMatchRow[]
+  const upcomingNext5: FriendUpcomingEntry[] = upcomingRows.map((row) => {
+    const homeTeamRecord = resolveTeam(row.home_team_code, teamLookup)
+    const awayTeamRecord = resolveTeam(row.away_team_code, teamLookup)
+    const pick = row.predictions?.[0] ?? null
+    return {
+      matchId: row.id,
+      homeTeam: homeTeamRecord?.name ?? row.home_team_code,
+      awayTeam: awayTeamRecord?.name ?? row.away_team_code,
+      homeLogo: normalizeLogoUrl(homeTeamRecord?.logo ?? null),
+      awayLogo: normalizeLogoUrl(awayTeamRecord?.logo ?? null),
+      kickoff: row.kickoff,
+      predictedHome: pick?.home_score ?? null,
+      predictedAway: pick?.away_score ?? null,
+    }
+  })
+
+  return { finished, live, upcomingNext5 }
+}
+
 export async function getProfileData(supabase: SupabaseClient<Database>, userId: string): Promise<ProfileData | null> {
   const [user, stats, achievements, formLast7, history, championPick] = await Promise.all([
     getUserProfile(supabase, userId),
