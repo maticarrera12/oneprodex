@@ -256,7 +256,7 @@ describe("MatchDetailScreen — PredictionBar", () => {
     mocks.commitScorerEdits.mockResolvedValue({})
   })
 
-  it("renders PredictionBar when matchPrediction is provided", () => {
+  it("renders PredictionBar inside the hero when matchPrediction is provided", () => {
     render(
       <MatchDetailScreen
         match={buildMatch({ homeC1: "#FF0000", awayC1: "#0000FF" })}
@@ -268,6 +268,7 @@ describe("MatchDetailScreen — PredictionBar", () => {
       />
     )
 
+    expect(screen.queryByText("Probabilidades")).not.toBeInTheDocument()
     expect(screen.getByLabelText("Home team: 55% win probability")).toBeInTheDocument()
     expect(screen.getByLabelText("Away team: 25% win probability")).toBeInTheDocument()
   })

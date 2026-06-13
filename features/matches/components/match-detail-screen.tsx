@@ -134,6 +134,7 @@ export function MatchDetailScreen({
         isLive={isLive}
         isFinished={isFinished}
         kickoff={kickoff}
+        matchPrediction={matchPrediction}
         groupStats={
           selectedGroup && selectedGroup.summary.count > 0
             ? {
@@ -146,26 +147,6 @@ export function MatchDetailScreen({
             : null
         }
       />
-
-      {matchPrediction && (
-        <div className="rounded-2xl border border-(--color-border-hi) bg-(--color-card-hi) px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.2)]">
-          <p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-(--color-text3)">Probabilidades</p>
-          <PredictionBar
-            homePct={matchPrediction.home_pct}
-            drawPct={matchPrediction.draw_pct}
-            awayPct={matchPrediction.away_pct}
-            homeColor={match.homeC1}
-            awayColor={match.awayC1}
-            advice={
-              matchPrediction.home_pct > matchPrediction.away_pct
-                ? `Favorito: ${match.home}`
-                : matchPrediction.away_pct > matchPrediction.home_pct
-                  ? `Favorito: ${match.away}`
-                  : null
-            }
-          />
-        </div>
-      )}
 
       <div className="space-y-3 lg:space-y-0">
         <div className="flex gap-2 lg:hidden">
@@ -316,12 +297,14 @@ function MatchHero({
   isLive,
   isFinished,
   kickoff,
+  matchPrediction,
   groupStats,
 }: {
   match: Match
   isLive: boolean
   isFinished: boolean
   kickoff: string
+  matchPrediction?: MatchPredictionRow | null
   groupStats: {
     count: number
     topScore: string | null
@@ -425,10 +408,30 @@ function MatchHero({
               </p>
             ) : null}
           </div>
+
+          {matchPrediction ? (
+            <div className="mt-3 w-full max-w-xs px-1">
+              <PredictionBar
+                variant="inline"
+                homePct={matchPrediction.home_pct}
+                drawPct={matchPrediction.draw_pct}
+                awayPct={matchPrediction.away_pct}
+                homeColor={match.homeC1}
+                awayColor={match.awayC1}
+                advice={
+                  matchPrediction.home_pct > matchPrediction.away_pct
+                    ? `Favorito: ${match.home}`
+                    : matchPrediction.away_pct > matchPrediction.home_pct
+                      ? `Favorito: ${match.away}`
+                      : null
+                }
+              />
+            </div>
+          ) : null}
+
+          {groupStats ? <HeroStatsBar {...groupStats} /> : null}
         </div>
       </div>
-
-      {groupStats ? <HeroStatsBar {...groupStats} /> : null}
     </section>
   )
 }
@@ -494,15 +497,10 @@ function HeroStatsBar({
   const leaderLabel = leaderCode ? `Elige ${leaderCode} para ganar` : "Elige empate para ganar"
 
   return (
-    <div className="relative grid grid-cols-3 divide-x divide-(--color-border-hi) border-t border-(--color-border-hi) bg-black/25 backdrop-blur-sm">
-      <HeroStatColumn
-        icon="users"
-        value={`${count}`}
-        label="realizando predicción"
-        shortLabel="predicciones"
-      />
-      <HeroStatColumn icon="chart" value={`${leaderPct}%`} label={leaderLabel} shortLabel="favorito" />
-      <HeroStatColumn icon="flame" value={topScore ?? "–"} label="Marcador más elegido" shortLabel="top score" />
+    <div className="mt-4 grid w-full grid-cols-3 divide-x divide-(--color-border-hi) border-t border-(--color-border-hi) pt-3">
+      <HeroStatColumn icon="users" value={`${count}`} label="realizando predicción" />
+      <HeroStatColumn icon="chart" value={`${leaderPct}%`} label={leaderLabel} />
+      <HeroStatColumn icon="flame" value={topScore ?? "–"} label="Marcador más elegido" />
     </div>
   )
 }
@@ -511,21 +509,18 @@ function HeroStatColumn({
   icon,
   value,
   label,
-  shortLabel,
 }: {
   icon: "users" | "chart" | "flame"
   value: string
   label: string
-  shortLabel: string
 }) {
   return (
-    <div className="flex min-w-0 flex-col items-center gap-0.5 px-1 py-3 text-center sm:gap-1 sm:px-2 sm:py-3.5 md:px-3 md:py-4">
-      <div className="flex items-center justify-center gap-1 sm:gap-1.5">
+    <div className="flex min-w-0 flex-col items-center gap-1 px-2 py-1 text-center">
+      <div className="flex items-center justify-center gap-1.5">
         <HeroStatIcon type={icon} />
-        <p className="font-mono text-lg font-semibold leading-none text-foreground sm:text-xl md:text-2xl">{value}</p>
+        <p className="font-mono text-xl font-semibold leading-none text-foreground sm:text-2xl">{value}</p>
       </div>
-      <p className="max-w-full truncate text-[9px] leading-snug text-(--color-text3) sm:hidden">{shortLabel}</p>
-      <p className="hidden max-w-full text-[10px] leading-snug text-(--color-text3) sm:block md:text-[11px]">{label}</p>
+      <p className="max-w-full text-[10px] leading-snug text-(--color-text3) sm:text-[11px]">{label}</p>
     </div>
   )
 }

@@ -83,3 +83,13 @@ describe("PredictionBar — advice", () => {
     expect(screen.queryByTestId("prediction-advice")).not.toBeInTheDocument()
   })
 })
+
+describe("PredictionBar — inline variant", () => {
+  it("hides visible percentages in inline mode", () => {
+    render(<PredictionBar variant="inline" homePct={55} drawPct={20} awayPct={25} />)
+
+    expect(screen.getByLabelText("Home team: 55% win probability")).toBeInTheDocument()
+    expect(screen.getByLabelText("Draw: 20% probability")).toBeInTheDocument()
+    expect(screen.getByLabelText("Away team: 25% win probability")).toBeInTheDocument()
+  })
+})
