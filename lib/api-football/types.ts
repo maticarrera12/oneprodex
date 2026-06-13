@@ -228,6 +228,33 @@ export interface MatchEventRow {
   minute: number | null
 }
 
+// ─── Odds ────────────────────────────────────────────────────────────────────
+
+export interface AFOddsValue {
+  value: 'Home' | 'Draw' | 'Away'
+  odd: string
+}
+
+export interface AFOddsBet {
+  name: string
+  values: AFOddsValue[]
+}
+
+export interface AFOddsBookmaker {
+  id: number
+  name: string
+  bets: AFOddsBet[]
+}
+
+export interface AFOddsResponseItem {
+  fixture: { id: number }
+  bookmakers: AFOddsBookmaker[]
+}
+
+export interface AFOddsResponse {
+  response: AFOddsResponseItem[]
+}
+
 // ─── Predictions ─────────────────────────────────────────────────────────────
 
 export interface AFPredictionPercent {

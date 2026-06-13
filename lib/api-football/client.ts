@@ -5,6 +5,7 @@ import type {
   AFH2HResponse,
   AFLineupsResponse,
   AFMatchEventsResponse,
+  AFOddsResponse,
   AFPredictionsResponse,
   AFSquadResponse,
   AFStandingsResponse,
@@ -122,6 +123,10 @@ export function fetchMatchEvents(fixtureId: string): Promise<APIFootballEnvelope
 
 export function fetchPredictions(fixtureId: string): Promise<APIFootballEnvelope<AFPredictionsResponse>> {
   return apiFetch<AFPredictionsResponse>('/predictions', { fixture: fixtureId })
+}
+
+export function fetchOdds(fixtureId: string): Promise<APIFootballEnvelope<AFOddsResponse>> {
+  return apiFetch<AFOddsResponse>('/odds', { fixture: fixtureId, bet: 1 })
 }
 
 export function fetchLineups(fixtureId: string): Promise<APIFootballEnvelope<AFLineupsResponse>> {

@@ -1,5 +1,5 @@
-import { fetchH2H, fetchLineups, fetchPredictions } from '@/lib/api-football/client'
-import { mapH2H, mapLineup, mapPrediction } from '@/lib/api-football/mappers'
+import { fetchH2H, fetchLineups, fetchOdds } from '@/lib/api-football/client'
+import { mapH2H, mapLineup, mapOddsToPrediction } from '@/lib/api-football/mappers'
 import { APIFootballError } from '@/lib/api-football/types'
 import { createServiceClient } from '@/lib/supabase/service'
 import { applyWorldCupSeasonKickoffFilter } from '@/lib/world-cup/season'
@@ -68,11 +68,11 @@ export async function POST(request: Request) {
     )
 
     for (const match of missingMatches) {
-      // Predictions fetch — independent from H2H
+      // Odds fetch → implied-probability predictions — independent from H2H
       try {
-        const { data: predData } = await fetchPredictions(match.id)
-        const item = predData.response[0] ?? null
-        const row = mapPrediction(match.id, item)
+        const { data: oddsData } = await fetchOdds(match.id)
+        const bookmakers = oddsData.response[0]?.bookmakers ?? []
+        const row = mapOddsToPrediction(match.id, bookmakers)
 
         if (row) {
           // ignoreDuplicates compiles to ON CONFLICT DO NOTHING: the pre-kickoff

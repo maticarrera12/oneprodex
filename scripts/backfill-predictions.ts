@@ -1,10 +1,11 @@
-// Backfill match_predictions for FINISHED matches missing a prediction row.
-// Future fixtures get their snapshot from the prematch cron when they enter
-// the 48h window. Tolerant: skips matches where the API returns no real
-// prediction (mapPrediction's quality gate returns null on placeholders).
+// Backfill match_predictions for matches missing an odds-derived prediction row.
+// Targets FINISHED matches by default. The script is idempotent: it skips any
+// match already present in match_predictions (ON CONFLICT DO NOTHING).
+// Also works for UPCOMING matches — the prematch cron only covers the 48h window,
+// so this script is the only way to populate predictions for matches outside that window.
 // Usage: pnpm dlx tsx scripts/backfill-predictions.ts
-import { fetchPredictions } from '@/lib/api-football/client'
-import { mapPrediction } from '@/lib/api-football/mappers'
+import { fetchOdds } from '@/lib/api-football/client'
+import { mapOddsToPrediction } from '@/lib/api-football/mappers'
 import { createServiceClient } from '@/lib/supabase/service'
 
 async function main() {
@@ -13,7 +14,7 @@ async function main() {
   const { data: allMatches, error: matchesError } = await supabase
     .from('matches')
     .select('id,status')
-    .eq('status', 'FINISHED')
+    .in('status', ['FINISHED', 'UPCOMING'])
     .order('kickoff', { ascending: true })
 
   if (matchesError) {
@@ -44,12 +45,12 @@ async function main() {
 
   for (const match of missing) {
     try {
-      const { data: predData } = await fetchPredictions(match.id)
-      const item = predData.response[0] ?? null
-      const row = mapPrediction(match.id, item)
+      const { data: oddsData } = await fetchOdds(match.id)
+      const bookmakers = oddsData.response[0]?.bookmakers ?? []
+      const row = mapOddsToPrediction(match.id, bookmakers)
 
       if (!row) {
-        console.log(`  skip ${match.id} — no prediction from API`)
+        console.log(`  skip ${match.id} — no valid Match Winner odds from API`)
         skipped++
         continue
       }
