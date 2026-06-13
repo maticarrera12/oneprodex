@@ -22,17 +22,21 @@ function makeEntry(): ProfileHistoryEntry {
 }
 
 describe("ProfileHistoryList", () => {
-  it("shows the 'Ver todas mis predicciones' link to /partidos by default (own profile)", () => {
+  it("on the own profile: shows the CTA to /partidos and the 'Tu pred.' header", () => {
     render(<ProfileHistoryList entries={[makeEntry()]} />)
     expect(
       screen.getByRole("link", { name: /ver todas mis predicciones/i }),
     ).toHaveAttribute("href", "/partidos")
+    expect(screen.getByText("Tu pred.")).toBeTruthy()
+    expect(screen.queryByText("Su pred.")).toBeNull()
   })
 
-  it("hides the link when showSeeAll is false (friend profile)", () => {
-    render(<ProfileHistoryList entries={[makeEntry()]} showSeeAll={false} />)
+  it("on a friend's profile (isOwnProfile=false): hides the CTA and shows 'Su pred.'", () => {
+    render(<ProfileHistoryList entries={[makeEntry()]} isOwnProfile={false} />)
     expect(
       screen.queryByRole("link", { name: /ver todas mis predicciones/i }),
     ).toBeNull()
+    expect(screen.getByText("Su pred.")).toBeTruthy()
+    expect(screen.queryByText("Tu pred.")).toBeNull()
   })
 })

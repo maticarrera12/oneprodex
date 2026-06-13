@@ -9,11 +9,11 @@ import { ProfileLevelProgress } from "@/features/profile/components/profile-leve
 
 type ProfileScreenProps = {
   data: ProfileData
-  /** Hide the "Ver todas mis predicciones" CTA (it links to your own /partidos). */
-  showSeeAllPredictions?: boolean
+  /** False when viewing a friend's profile — adjusts self-referential copy and hides the own-only CTA. */
+  isOwnProfile?: boolean
 }
 
-export default function ProfileScreen({ data, showSeeAllPredictions = true }: ProfileScreenProps) {
+export default function ProfileScreen({ data, isOwnProfile = true }: ProfileScreenProps) {
   const userColor = "hsl(83 81% 62%)"
 
   return (
@@ -26,7 +26,7 @@ export default function ProfileScreen({ data, showSeeAllPredictions = true }: Pr
         <ProfileFormBreakdown values={data.formLast7} />
       </div>
       <ProfileAchievementsGrid achievements={data.achievements} />
-      <ProfileHistoryList entries={data.history} showSeeAll={showSeeAllPredictions} />
+      <ProfileHistoryList entries={data.history} isOwnProfile={isOwnProfile} />
     </div>
   )
 }

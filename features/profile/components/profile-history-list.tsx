@@ -7,8 +7,12 @@ import type { ProfileHistoryEntry, ProfileHistoryPhase } from "@/features/profil
 
 type ProfileHistoryListProps = {
   entries: ProfileHistoryEntry[]
-  /** "Ver todas mis predicciones" → /partidos only makes sense on your own profile. */
-  showSeeAll?: boolean
+  /**
+   * Whether this is the viewer's own profile. On a friend's profile the
+   * self-referential bits change: the column header reads "Su pred." and the
+   * "Ver todas mis predicciones" CTA (which links to your own /partidos) is hidden.
+   */
+  isOwnProfile?: boolean
 }
 
 type TabId = "todas" | ProfileHistoryPhase
@@ -22,7 +26,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "final", label: "Final" },
 ]
 
-export function ProfileHistoryList({ entries, showSeeAll = true }: ProfileHistoryListProps) {
+export function ProfileHistoryList({ entries, isOwnProfile = true }: ProfileHistoryListProps) {
   const [activeTab, setActiveTab] = useState<TabId>("todas")
 
   const exact = entries.filter((e) => e.kind === "exact").length
@@ -74,7 +78,7 @@ export function ProfileHistoryList({ entries, showSeeAll = true }: ProfileHistor
         <div className="grid grid-cols-[1fr_72px_36px_32px] items-center gap-2 border-b border-(--color-border-hi) px-3 py-2 md:grid-cols-[40px_1fr_72px_52px_36px_32px]">
           <span className="hidden font-mono text-[9px] tracking-wider text-(--color-text4) uppercase md:block">Fecha</span>
           <span className="font-mono text-[9px] tracking-wider text-(--color-text4) uppercase">Partido</span>
-          <span className="font-mono text-[9px] tracking-wider text-(--color-text4) uppercase text-center">Tu pred.</span>
+          <span className="font-mono text-[9px] tracking-wider text-(--color-text4) uppercase text-center">{isOwnProfile ? "Tu pred." : "Su pred."}</span>
           <span className="hidden font-mono text-[9px] tracking-wider text-(--color-text4) uppercase text-center md:block">Result.</span>
           <span className="font-mono text-[9px] tracking-wider text-(--color-text4) uppercase text-center">Pts</span>
           <span />
@@ -89,7 +93,7 @@ export function ProfileHistoryList({ entries, showSeeAll = true }: ProfileHistor
         )}
       </div>
 
-      {showSeeAll && (
+      {isOwnProfile && (
         <div className="mt-3 flex justify-center">
           <Link
             href="/partidos"
