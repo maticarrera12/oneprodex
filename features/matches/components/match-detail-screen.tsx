@@ -17,6 +17,10 @@ import { ScorePrediction } from "@/features/predictions/components/score-predict
 import type { MatchConsensusGroup } from "@/features/predictions/api"
 import { usePrediction } from "@/features/predictions/hooks/usePrediction"
 import type { MatchEvent, MatchPredictionState, PlayerDetail } from "@/features/predictions/types"
+
+// The optimistic value from usePrediction lacks editLocked; the extras UI
+// only reads the scorer/card selections, so accept that subset structurally.
+type ScorerSelectionState = Pick<MatchPredictionState, "scorerIds" | "yellowCardIds" | "redCardIds">
 import { MAX_RED_CARDS, MAX_SCORERS, MAX_YELLOW_CARDS } from "@/features/predictions/types"
 import {
   computeOutcomeSplit,
@@ -918,7 +922,7 @@ function PlayerExtrasSection({
   match: Match
   players: { home: PlayerDetail[]; away: PlayerDetail[] }
   draftScore: { home: number; away: number }
-  optimistic: MatchPredictionState
+  optimistic: ScorerSelectionState
   extrasLocked: boolean
   extrasSaving: boolean
   extrasError: string | null
@@ -1023,7 +1027,7 @@ function TeamExtrasPanel({
   teamSide: "home" | "away"
   players: PlayerDetail[]
   draftScore: { home: number; away: number }
-  optimistic: MatchPredictionState
+  optimistic: ScorerSelectionState
   extrasLocked: boolean
   onScorer: (id: number) => void
   onYellow: (id: number) => void
