@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { motion } from "framer-motion"
 
 import { GroupAvatar } from "@/features/groups/components/group-avatar"
@@ -47,8 +48,10 @@ function rankRowClass(rank: number) {
 
 export function GroupRankRow({ entry, pulse, showBorder }: GroupRankRowProps) {
   const hits = entry.hits
+  const href = entry.isYou ? "/perfil" : `/perfil/${entry.handle}`
 
   return (
+    <Link href={href} className="block">
     <motion.article
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
@@ -99,5 +102,6 @@ export function GroupRankRow({ entry, pulse, showBorder }: GroupRankRowProps) {
         <p className="font-mono text-[9px] uppercase tracking-wider text-(--color-text3)">pts</p>
       </div>
     </motion.article>
+    </Link>
   )
 }
