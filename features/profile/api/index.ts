@@ -408,6 +408,179 @@ async function getProfileHistory(
   })
 }
 
+// --- friend-profiles: getUserByHandle + getFriendPredictionsTab ---
+
+export async function getUserByHandle(
+  supabase: SupabaseClient<Database>,
+  handle: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("id")
+    .eq("handle", handle)
+    .maybeSingle()
+
+  if (error || !data) return null
+  return data.id
+}
+
+/** Raw row shape returned by the predictions+matches join for the friend tab */
+type FriendPredictionsMatchRow = {
+  home_score: number | null
+  away_score: number | null
+  points: number | null
+  matches: {
+    id: string
+    home_team_code: string
+    away_team_code: string
+    home_score: number | null
+    away_score: number | null
+    kickoff: string
+    stage: string
+    status: string
+  } | null
+}
+
+/** Raw upcoming row (match left-joined with the friend's prediction if any) */
+type FriendUpcomingMatchRow = {
+  id: string
+  home_team_code: string
+  away_team_code: string
+  kickoff: string
+  predictions: Array<{
+    home_score: number
+    away_score: number
+  }>
+}
+
+export interface FriendPredictionEntry {
+  matchId: string
+  homeTeam: string
+  awayTeam: string
+  homeLogo: string | null
+  awayLogo: string | null
+  kickoff: string
+  status: "FINISHED" | "LIVE"
+  predictedHome: number | null
+  predictedAway: number | null
+  actualHome: number | null
+  actualAway: number | null
+  pts: number | null
+  kind: ProfileHistoryKind | null
+}
+
+export interface FriendUpcomingEntry {
+  matchId: string
+  homeTeam: string
+  awayTeam: string
+  homeLogo: string | null
+  awayLogo: string | null
+  kickoff: string
+  predictedHome: number | null
+  predictedAway: number | null
+}
+
+export interface FriendPredictionsTabData {
+  finished: FriendPredictionEntry[]
+  live: FriendPredictionEntry[]
+  upcomingNext5: FriendUpcomingEntry[]
+}
+
+export function mapFriendPredictionEntry(
+  row: FriendPredictionsMatchRow,
+  teamLookup: ReturnType<typeof buildTeamsLookup>,
+): FriendPredictionEntry | null {
+  const m = row.matches
+  if (!m) return null
+
+  const homeTeamRecord = resolveTeam(m.home_team_code, teamLookup)
+  const awayTeamRecord = resolveTeam(m.away_team_code, teamLookup)
+
+  const predictedHome = row.home_score
+  const predictedAway = row.away_score
+
+  let kind: ProfileHistoryKind | null = null
+  if (
+    m.status === "FINISHED" &&
+    predictedHome !== null &&
+    predictedAway !== null &&
+    m.home_score !== null &&
+    m.away_score !== null
+  ) {
+    kind = computePredictionKind(predictedHome, predictedAway, m.home_score, m.away_score)
+  }
+
+  return {
+    matchId: m.id,
+    homeTeam: homeTeamRecord?.name ?? m.home_team_code,
+    awayTeam: awayTeamRecord?.name ?? m.away_team_code,
+    homeLogo: normalizeLogoUrl(homeTeamRecord?.logo ?? null),
+    awayLogo: normalizeLogoUrl(awayTeamRecord?.logo ?? null),
+    kickoff: m.kickoff,
+    status: m.status as "FINISHED" | "LIVE",
+    predictedHome,
+    predictedAway,
+    actualHome: m.home_score,
+    actualAway: m.away_score,
+    pts: row.points,
+    kind,
+  }
+}
+
+export async function getFriendPredictionsTab(
+  supabase: SupabaseClient<Database>,
+  friendUserId: string,
+): Promise<FriendPredictionsTabData> {
+  const [finishedLiveResult, upcomingResult, teamsResult] = await Promise.all([
+    supabase
+      .from("predictions")
+      .select(
+        "home_score, away_score, points, matches(id, home_team_code, away_team_code, home_score, away_score, kickoff, stage, status)",
+      )
+      .eq("user_id", friendUserId)
+      .in("matches.status", ["FINISHED", "LIVE"])
+      .not("matches", "is", null)
+      .order("kickoff", { referencedTable: "matches", ascending: false }),
+    supabase
+      .from("matches")
+      .select("id, home_team_code, away_team_code, kickoff, predictions!left(home_score, away_score)")
+      .eq("status", "UPCOMING")
+      .eq("predictions.user_id", friendUserId)
+      .order("kickoff", { ascending: true })
+      .limit(5),
+    supabase.from("teams").select("api_id, code, name, logo"),
+  ])
+
+  const teamLookup = buildTeamsLookup(teamsResult.data ?? [])
+
+  const finishedLiveRows = (finishedLiveResult.data ?? []) as FriendPredictionsMatchRow[]
+  const finishedLiveEntries = finishedLiveRows
+    .map((row) => mapFriendPredictionEntry(row, teamLookup))
+    .filter((e): e is FriendPredictionEntry => e !== null && ["FINISHED", "LIVE"].includes(e.status))
+
+  const finished = finishedLiveEntries.filter((e) => e.status === "FINISHED")
+  const live = finishedLiveEntries.filter((e) => e.status === "LIVE")
+
+  const upcomingRows = (upcomingResult.data ?? []) as FriendUpcomingMatchRow[]
+  const upcomingNext5: FriendUpcomingEntry[] = upcomingRows.map((row) => {
+    const homeTeamRecord = resolveTeam(row.home_team_code, teamLookup)
+    const awayTeamRecord = resolveTeam(row.away_team_code, teamLookup)
+    const pick = row.predictions?.[0] ?? null
+    return {
+      matchId: row.id,
+      homeTeam: homeTeamRecord?.name ?? row.home_team_code,
+      awayTeam: awayTeamRecord?.name ?? row.away_team_code,
+      homeLogo: normalizeLogoUrl(homeTeamRecord?.logo ?? null),
+      awayLogo: normalizeLogoUrl(awayTeamRecord?.logo ?? null),
+      kickoff: row.kickoff,
+      predictedHome: pick?.home_score ?? null,
+      predictedAway: pick?.away_score ?? null,
+    }
+  })
+
+  return { finished, live, upcomingNext5 }
+}
+
 export async function getProfileData(supabase: SupabaseClient<Database>, userId: string): Promise<ProfileData | null> {
   const [user, stats, achievements, formLast7, history, championPick] = await Promise.all([
     getUserProfile(supabase, userId),

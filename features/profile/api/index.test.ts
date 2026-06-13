@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest"
-import { getUserStats, mapToProfileAchievement, mapUserProfile } from "@/features/profile/api"
+import {
+  getFriendPredictionsTab,
+  getUserByHandle,
+  getUserStats,
+  mapFriendPredictionEntry,
+  mapToProfileAchievement,
+  mapUserProfile,
+} from "@/features/profile/api"
 
 type AchievementRow = Parameters<typeof mapToProfileAchievement>[0]
 
@@ -259,5 +266,199 @@ describe("mapUserProfile", () => {
     expect(profile.championPickLogo).toBe("https://example.com/bra.png")
     expect(profile.points).toBe(22)
     expect(profile.streak).toBe(2)
+  })
+})
+
+// --- Task 1.1: RED tests for getUserByHandle ---
+describe("getUserByHandle", () => {
+  function makeHandleSupabase(row: { id: string; handle: string } | null) {
+    return {
+      from: (_table: string) => ({
+        select: (_cols: string) => ({
+          eq: (_col: string, _val: string) => ({
+            maybeSingle: () => Promise.resolve({ data: row, error: null }),
+          }),
+        }),
+      }),
+    }
+  }
+
+  it("returns the userId string when exactly one row matches the handle", async () => {
+    const supabase = makeHandleSupabase({ id: "user-abc", handle: "maticarrera" })
+    const result = await getUserByHandle(supabase as never, "maticarrera")
+    expect(result).toBe("user-abc")
+  })
+
+  it("returns null when no row matches the handle", async () => {
+    const supabase = makeHandleSupabase(null)
+    const result = await getUserByHandle(supabase as never, "ghost99")
+    expect(result).toBeNull()
+  })
+})
+
+// --- Task 1.4: RED tests for mapFriendPredictionEntry ---
+describe("mapFriendPredictionEntry", () => {
+  const noopLookup = { byCode: new Map(), byApiId: new Map() }
+
+  const baseMatchRow = {
+    home_score: 1,
+    away_score: 0,
+    points: 3,
+    matches: {
+      id: "match-1",
+      home_team_code: "ARG",
+      away_team_code: "BRA",
+      home_score: 1,
+      away_score: 0,
+      kickoff: "2026-06-14T18:00:00Z",
+      stage: "GROUP",
+      status: "FINISHED",
+    },
+  }
+
+  it("maps a row with a pick to FriendPredictionEntry with kind=exact", () => {
+    const entry = mapFriendPredictionEntry(baseMatchRow, noopLookup as never)
+    expect(entry).not.toBeNull()
+    expect(entry!.matchId).toBe("match-1")
+    expect(entry!.homeTeam).toBe("ARG")
+    expect(entry!.awayTeam).toBe("BRA")
+    expect(entry!.predictedHome).toBe(1)
+    expect(entry!.predictedAway).toBe(0)
+    expect(entry!.actualHome).toBe(1)
+    expect(entry!.actualAway).toBe(0)
+    expect(entry!.pts).toBe(3)
+    expect(entry!.kind).toBe("exact")
+    expect(entry!.status).toBe("FINISHED")
+  })
+
+  it("maps a row with no prediction scores → predictedHome/Away null, kind null", () => {
+    const rowWithNoPick = {
+      ...baseMatchRow,
+      home_score: null,
+      away_score: null,
+      points: null,
+    }
+    const entry = mapFriendPredictionEntry(rowWithNoPick, noopLookup as never)
+    expect(entry).not.toBeNull()
+    expect(entry!.predictedHome).toBeNull()
+    expect(entry!.predictedAway).toBeNull()
+    expect(entry!.pts).toBeNull()
+    expect(entry!.kind).toBeNull()
+  })
+
+  it("returns null when matches is null", () => {
+    const rowNoMatch = { home_score: 1, away_score: 0, points: 3, matches: null }
+    const entry = mapFriendPredictionEntry(rowNoMatch, noopLookup as never)
+    expect(entry).toBeNull()
+  })
+})
+
+// --- Task 1.7: RED tests for getFriendPredictionsTab ---
+describe("getFriendPredictionsTab", () => {
+  function makeFinishedLiveRow(status: "FINISHED" | "LIVE", matchId: string, kickoff: string) {
+    return {
+      home_score: 2,
+      away_score: 1,
+      points: status === "FINISHED" ? 3 : null,
+      matches: {
+        id: matchId,
+        home_team_code: "ARG",
+        away_team_code: "BRA",
+        home_score: 2,
+        away_score: 1,
+        kickoff,
+        stage: "GROUP",
+        status,
+      },
+    }
+  }
+
+  function makeUpcomingRow(matchId: string, kickoff: string, hasPick: boolean) {
+    return {
+      id: matchId,
+      home_team_code: "FRA",
+      away_team_code: "GER",
+      kickoff,
+      predictions: hasPick ? [{ home_score: 1, away_score: 0 }] : [],
+    }
+  }
+
+  function makeSupabase(finishedLiveRows: unknown[], upcomingRows: unknown[]) {
+    return {
+      from: (table: string) => {
+        if (table === "predictions") {
+          return {
+            select: () => ({
+              eq: () => ({
+                in: () => ({
+                  not: () => ({
+                    order: () => Promise.resolve({ data: finishedLiveRows, error: null }),
+                  }),
+                }),
+              }),
+            }),
+          }
+        }
+        if (table === "matches") {
+          return {
+            select: () => ({
+              eq: (_col: string, _val: string) => ({
+                eq: (_col2: string, _val2: string) => ({
+                  order: () => ({
+                    limit: () => Promise.resolve({ data: upcomingRows, error: null }),
+                  }),
+                }),
+              }),
+            }),
+          }
+        }
+        if (table === "teams") {
+          return {
+            select: () => Promise.resolve({ data: [], error: null }),
+          }
+        }
+        throw new Error(`Unexpected table: ${table}`)
+      },
+    }
+  }
+
+  it("returns finished and live arrays from finished+live query rows", async () => {
+    const rows = [
+      makeFinishedLiveRow("FINISHED", "m1", "2026-06-10T18:00:00Z"),
+      makeFinishedLiveRow("FINISHED", "m2", "2026-06-09T18:00:00Z"),
+      makeFinishedLiveRow("FINISHED", "m3", "2026-06-08T18:00:00Z"),
+      makeFinishedLiveRow("LIVE", "m4", "2026-06-14T18:00:00Z"),
+    ]
+    const upcoming = [
+      makeUpcomingRow("u1", "2026-06-20T18:00:00Z", true),
+      makeUpcomingRow("u2", "2026-06-21T18:00:00Z", false),
+    ]
+    const supabase = makeSupabase(rows, upcoming)
+    const result = await getFriendPredictionsTab(supabase as never, "friend-123")
+
+    expect(result.finished).toHaveLength(3)
+    expect(result.live).toHaveLength(1)
+    expect(result.upcomingNext5).toHaveLength(2)
+  })
+
+  it("returns all-empty arrays when no data", async () => {
+    const supabase = makeSupabase([], [])
+    const result = await getFriendPredictionsTab(supabase as never, "friend-123")
+    expect(result.finished).toHaveLength(0)
+    expect(result.live).toHaveLength(0)
+    expect(result.upcomingNext5).toHaveLength(0)
+  })
+
+  it("upcoming entry has pick when prediction exists, null when absent", async () => {
+    const upcoming = [
+      makeUpcomingRow("u1", "2026-06-20T18:00:00Z", true),
+      makeUpcomingRow("u2", "2026-06-21T18:00:00Z", false),
+    ]
+    const supabase = makeSupabase([], upcoming)
+    const result = await getFriendPredictionsTab(supabase as never, "friend-123")
+    expect(result.upcomingNext5[0].predictedHome).toBe(1)
+    expect(result.upcomingNext5[0].predictedAway).toBe(0)
+    expect(result.upcomingNext5[1].predictedHome).toBeNull()
+    expect(result.upcomingNext5[1].predictedAway).toBeNull()
   })
 })
