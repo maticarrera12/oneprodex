@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 
 import MatchDetailScreen from "@/features/matches/components/match-detail-screen"
-import { getMatchById, getMatchLineups, getMatchH2H } from "@/features/matches/api"
+import { getMatchById, getMatchLineups, getMatchH2H, getMatchPredictions } from "@/features/matches/api"
 import { getPredictionsForMatch, getPlayersForMatch, getMatchConsensusGroups } from "@/features/predictions/api"
 import { createClient } from "@/lib/supabase/server"
 import type { MatchEvent, MatchPredictionState } from "@/features/predictions/types"
@@ -31,11 +31,12 @@ export default async function MatchDetailPage({ params }: Props) {
 
   if (!match) notFound()
 
-  const [players, consensusGroups, lineups, h2h] = await Promise.all([
+  const [players, consensusGroups, lineups, h2h, matchPrediction] = await Promise.all([
     getPlayersForMatch(supabase, match.home, match.away),
     user ? getMatchConsensusGroups(supabase, match.id, user.id) : Promise.resolve([]),
     getMatchLineups(supabase, match.id, match.home, match.away),
     getMatchH2H(supabase, match.id),
+    getMatchPredictions(supabase, match.id),
   ])
 
   // Build players map (api_id → photo_url) from the already-fetched players data
@@ -58,6 +59,7 @@ export default async function MatchDetailPage({ params }: Props) {
       lineups={lineups}
       playersMap={playersMap}
       h2h={h2h}
+      matchPrediction={matchPrediction}
     />
   )
 }

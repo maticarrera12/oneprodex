@@ -140,18 +140,21 @@ function buildJuegaDavidSupabase(
 }
 
 describe("evalJuegaDavid", () => {
-  it("is disabled while match_predictions snapshots are unreliable", async () => {
+  it("is enabled and awards bronze when user called an upset (away favorite, home wins)", async () => {
+    // home_pct=35, away_pct=65 → away is API favorite; user predicts home win; home wins → upset
     const preds: PredRow[] = [{ id: "p1", home_score: 2, away_score: 0, match_id: "m1" }]
     const matches: MatchRow[] = [
       { id: "m1", home_team_code: "ARG", away_team_code: "BRA", home_score: 2, away_score: 0 },
     ]
     const mp: MpRow[] = [{ match_id: "m1", home_pct: 35, away_pct: 65 }]
     const sb = buildJuegaDavidSupabase(preds, matches, mp)
-    expect(await evalJuegaDavid("u1", sb, CATALOG)).toBeNull()
+    const result = await evalJuegaDavid("u1", sb, CATALOG)
+    expect(result?.tier).toBe("bronze")
+    expect((result?.progress_json as { current: number })?.current).toBe(1)
   })
 })
 
-describe.skip("evalJuegaDavid — new API-predictions mechanic", () => {
+describe("evalJuegaDavid — new API-predictions mechanic", () => {
   it("returns null when achievement not in catalog", async () => {
     const sb = buildJuegaDavidSupabase([], [], [])
     const result = await evalJuegaDavid("u1", sb, [])
