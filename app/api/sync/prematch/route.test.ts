@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mocks = vi.hoisted(() => ({
   createServiceClient: vi.fn(),
-  fetchPredictions: vi.fn(),
+  fetchOdds: vi.fn(),
   fetchLineups: vi.fn(),
   fetchH2H: vi.fn(),
 }))
@@ -19,7 +19,7 @@ vi.mock("@/lib/supabase/service", () => ({
 }))
 
 vi.mock("@/lib/api-football/client", () => ({
-  fetchPredictions: mocks.fetchPredictions,
+  fetchOdds: mocks.fetchOdds,
   fetchLineups: mocks.fetchLineups,
   fetchH2H: mocks.fetchH2H,
 }))
@@ -108,10 +108,27 @@ function syncRequest() {
 }
 
 describe("POST /api/sync/prematch", () => {
+  const ODDS_RESPONSE = {
+    data: {
+      response: [{
+        fixture: { id: 1 },
+        bookmakers: [{
+          id: 1,
+          name: "Bet365",
+          bets: [{ name: "Match Winner", values: [
+            { value: "Home", odd: "2.0" },
+            { value: "Draw", odd: "3.5" },
+            { value: "Away", odd: "4.0" },
+          ]}],
+        }],
+      }],
+    },
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.SYNC_SECRET = "test-secret"
-    mocks.fetchPredictions.mockResolvedValue({ data: { response: [{ predictions: { percent: { home: "45%", draw: "25%", away: "30%" }, advice: "Home win" } }] } })
+    mocks.fetchOdds.mockResolvedValue(ODDS_RESPONSE)
     mocks.fetchLineups.mockResolvedValue({ data: { response: [] } })
     mocks.fetchH2H.mockResolvedValue({ data: { response: [] } })
   })
@@ -148,8 +165,8 @@ describe("POST /api/sync/prematch", () => {
 
     await POST(syncRequest())
 
-    // WC001 is already stored — fetchPredictions MUST NOT be called
-    expect(mocks.fetchPredictions).not.toHaveBeenCalled()
+    // WC001 is already stored — fetchOdds MUST NOT be called
+    expect(mocks.fetchOdds).not.toHaveBeenCalled()
     expect(matchPredictionsFrom.upsert).not.toHaveBeenCalled()
   })
 
@@ -162,7 +179,7 @@ describe("POST /api/sync/prematch", () => {
     const response = await POST(syncRequest())
     const body = (await response.json()) as { predictions: number; failed: number }
 
-    expect(mocks.fetchPredictions).toHaveBeenCalledWith("WC001")
+    expect(mocks.fetchOdds).toHaveBeenCalledWith("WC001")
     expect(matchPredictionsFrom.upsert).toHaveBeenCalledTimes(1)
     expect(body.predictions).toBe(1)
     expect(body.failed).toBe(0)
@@ -181,12 +198,12 @@ describe("POST /api/sync/prematch", () => {
     expect(Object.keys(body)).toContain("failed")
   })
 
-  it("counts failed when fetchPredictions throws", async () => {
+  it("counts failed when fetchOdds throws", async () => {
     buildService({
       upcomingMatches: [UPCOMING_MATCH],
       storedPredictionIds: [],
     })
-    mocks.fetchPredictions.mockRejectedValue(new Error("API error"))
+    mocks.fetchOdds.mockRejectedValue(new Error("API error"))
 
     const response = await POST(syncRequest())
     const body = (await response.json()) as { predictions: number; failed: number }
@@ -197,12 +214,27 @@ describe("POST /api/sync/prematch", () => {
 })
 
 describe("POST /api/sync/prematch — write semantics", () => {
+  const ODDS_RESPONSE_WRITE = {
+    data: {
+      response: [{
+        fixture: { id: 1 },
+        bookmakers: [{
+          id: 1,
+          name: "Bet365",
+          bets: [{ name: "Match Winner", values: [
+            { value: "Home", odd: "2.0" },
+            { value: "Draw", odd: "3.5" },
+            { value: "Away", odd: "4.0" },
+          ]}],
+        }],
+      }],
+    },
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.SYNC_SECRET = "test-secret"
-    mocks.fetchPredictions.mockResolvedValue({
-      data: { response: [{ predictions: { percent: { home: "45%", draw: "25%", away: "30%" }, advice: "x" } }] },
-    })
+    mocks.fetchOdds.mockResolvedValue(ODDS_RESPONSE_WRITE)
     mocks.fetchLineups.mockResolvedValue({ data: { response: [] } })
     mocks.fetchH2H.mockResolvedValue({ data: { response: [] } })
   })
@@ -268,7 +300,7 @@ describe("POST /api/sync/prematch — phase 1 H2H sync", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.SYNC_SECRET = "test-secret"
-    mocks.fetchPredictions.mockResolvedValue({ data: { response: [] } })
+    mocks.fetchOdds.mockResolvedValue({ data: { response: [] } })
     mocks.fetchLineups.mockResolvedValue({ data: { response: [] } })
     mocks.fetchH2H.mockResolvedValue(H2H_RESPONSE)
   })
@@ -343,7 +375,7 @@ describe("POST /api/sync/prematch — phase 2 lineup sync", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.SYNC_SECRET = "test-secret"
-    mocks.fetchPredictions.mockResolvedValue({ data: { response: [] } })
+    mocks.fetchOdds.mockResolvedValue({ data: { response: [] } })
     mocks.fetchH2H.mockResolvedValue({ data: { response: [] } })
     mocks.fetchLineups.mockResolvedValue({
       data: {
