@@ -1,3 +1,5 @@
+import Link from "next/link"
+
 import type { RankingEntry } from "@/features/rankings/types"
 import { GroupAvatar } from "@/features/groups/components/group-avatar"
 
@@ -41,9 +43,10 @@ export function GroupPodiumItem({ entry, position, isLeader = false }: GroupPodi
   const size = isLeader ? 72 : 54
   const outer = size + (isLeader ? 16 : 14)
   const displayName = `${entry.name.split(" ")[0]} ${entry.name.split(" ")[1]?.slice(0, 1) ?? ""}.`.trim()
+  const href = entry.isYou ? "/perfil" : `/perfil/${entry.handle}`
 
   return (
-    <div className="pointer-events-auto flex flex-col items-center gap-1.5">
+    <Link href={href} className="pointer-events-auto flex flex-col items-center gap-1.5">
       <div className="relative flex items-center justify-center" style={{ width: outer, height: outer }}>
         <span
           aria-hidden="true"
@@ -86,6 +89,6 @@ export function GroupPodiumItem({ entry, position, isLeader = false }: GroupPodi
           {entry.pts.toLocaleString("es-AR")} pts
         </p>
       </div>
-    </div>
+    </Link>
   )
 }
