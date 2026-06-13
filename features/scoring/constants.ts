@@ -16,6 +16,13 @@ export const BRACKET_SCORING = {
   FINAL: 160,
 } as const
 
+export const UPSET_BONUS = {
+  min: 8,
+  max: 25,
+} as const
+
+export const UPSET_ELIGIBILITY_GAP = 15
+
 export const MATCH_SCORING_LABELS = {
   exactScore: `Resultado exacto · ${MATCH_SCORING.exactScore} pts`,
   correctResult: `Solo resultado · ${MATCH_SCORING.correctResult} pts`,

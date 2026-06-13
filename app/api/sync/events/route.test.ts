@@ -37,6 +37,7 @@ type QueryResult = { data: unknown; error: { message: string } | null }
 function chainResolving(result: QueryResult) {
   const chain: Record<string, unknown> = {
     then: (resolve: (value: QueryResult) => unknown) => Promise.resolve(result).then(resolve),
+    maybeSingle: vi.fn(() => Promise.resolve(result)),
   }
   for (const method of ["select", "eq", "or", "not", "in", "order"]) {
     chain[method] = vi.fn(() => chain)
@@ -62,6 +63,7 @@ function buildService({
   matchEvents = [],
   playerPreds = [],
   cleanSheets = [],
+  matchPrediction = null,
   predictionsUpdateError = null,
 }: {
   finishedMatches?: unknown[]
@@ -69,6 +71,7 @@ function buildService({
   matchEvents?: unknown[]
   playerPreds?: unknown[]
   cleanSheets?: unknown[]
+  matchPrediction?: { home_pct: number; away_pct: number } | null
   predictionsUpdateError?: { message: string } | null
 } = {}) {
   const matchesSelectChain = chainResolving({ data: finishedMatches, error: null })
@@ -93,6 +96,8 @@ function buildService({
         return { select: vi.fn(() => chainResolving({ data: playerPreds, error: null })) }
       if (table === "prediction_clean_sheets")
         return { select: vi.fn(() => chainResolving({ data: cleanSheets, error: null })) }
+      if (table === "match_predictions")
+        return { select: vi.fn(() => chainResolving({ data: matchPrediction, error: null })) }
       throw new Error(`Unexpected table: ${table}`)
     }),
   }
@@ -196,5 +201,115 @@ describe("POST /api/sync/events", () => {
     // u1: exact (50) + scorer (16) = 66 · u2: nothing = 0
     expect(predictionsUpdate).toHaveBeenCalledWith({ points: 66 })
     expect(predictionsUpdate).toHaveBeenCalledWith({ points: 0 })
+  })
+
+  // USA-PAR shaped: home=46, draw=29, away=25 — gap=21 >= 15 → eligible
+  // Away wins, user predicted away (0-1) → upset bonus applies
+  it("USA-PAR regression: away underdog wins with gap>=15, user called it → upset bonus added", async () => {
+    const usaParMatch = {
+      ...FINISHED_MATCH,
+      home_score: 0,
+      away_score: 1,
+      home_team_code: "USA",
+      away_team_code: "PAR",
+    }
+    const { predictionsUpdate } = buildService({
+      finishedMatches: [usaParMatch],
+      predictions: [{ id: "p1", user_id: "u1", home_score: 0, away_score: 1 }],
+      matchPrediction: { home_pct: 46, away_pct: 25 },
+    })
+
+    await POST(syncRequest())
+
+    // base: exact score (user predicted 0-1, match ended 0-1) = 50
+    // upsetBonus = calcUpsetBonus(25) = round(25 * 0.75) = 19
+    // total = 50 + 19 = 69
+    const calls = predictionsUpdate.mock.calls.map((c) => c[0] as { points: number })
+    expect(calls).toHaveLength(1)
+    expect(calls[0].points).toBe(69)
+  })
+
+  // Coin-flip: gap < 15 → no bonus
+  it("coin-flip match (gap=7 < 15) → no upset bonus regardless of who wins", async () => {
+    const coinFlipMatch = {
+      ...FINISHED_MATCH,
+      home_score: 0,
+      away_score: 1,
+      home_team_code: "EQA",
+      away_team_code: "SEN",
+    }
+    const { predictionsUpdate } = buildService({
+      finishedMatches: [coinFlipMatch],
+      predictions: [{ id: "p1", user_id: "u1", home_score: 0, away_score: 1 }],
+      // home_pct=40, away_pct=33 → gap=7 < 15 → NOT eligible
+      matchPrediction: { home_pct: 40, away_pct: 33 },
+    })
+
+    await POST(syncRequest())
+
+    // exact score (pred 0-1 = match 0-1) = 50, no bonus (gap too small)
+    const calls = predictionsUpdate.mock.calls.map((c) => c[0] as { points: number })
+    expect(calls[0].points).toBe(50)
+  })
+
+  // Favorite wins → no bonus (away_pct=25 < home_pct=46 → home is favorite, home wins)
+  it("favorite wins (gap>=15 but winner is favorite) → no upset bonus", async () => {
+    const favoriteWinsMatch = {
+      ...FINISHED_MATCH,
+      home_score: 2,
+      away_score: 0,
+      home_team_code: "BRA",
+      away_team_code: "BOL",
+    }
+    const { predictionsUpdate } = buildService({
+      finishedMatches: [favoriteWinsMatch],
+      predictions: [{ id: "p1", user_id: "u1", home_score: 2, away_score: 0 }],
+      // home=65 is favorite; home wins → NOT an upset
+      matchPrediction: { home_pct: 65, away_pct: 18 },
+    })
+
+    await POST(syncRequest())
+
+    // exact score = 50, no bonus
+    const calls = predictionsUpdate.mock.calls.map((c) => c[0] as { points: number })
+    expect(calls[0].points).toBe(50)
+  })
+
+  // Draw → no bonus
+  it("draw result → no upset bonus even when gap>=15", async () => {
+    const drawMatch = {
+      ...FINISHED_MATCH,
+      home_score: 1,
+      away_score: 1,
+      home_team_code: "GER",
+      away_team_code: "CRC",
+    }
+    const { predictionsUpdate } = buildService({
+      finishedMatches: [drawMatch],
+      predictions: [{ id: "p1", user_id: "u1", home_score: 1, away_score: 1 }],
+      matchPrediction: { home_pct: 70, away_pct: 12 },
+    })
+
+    await POST(syncRequest())
+
+    // exact score (pred 1-1 = match 1-1) = 50, no bonus (draw result never qualifies)
+    const calls = predictionsUpdate.mock.calls.map((c) => c[0] as { points: number })
+    expect(calls[0].points).toBe(50)
+  })
+
+  // No snapshot → no bonus (FINISHED_MATCH: home=2, away=1, home wins)
+  it("no match_predictions snapshot → no upset bonus", async () => {
+    const { predictionsUpdate } = buildService({
+      finishedMatches: [FINISHED_MATCH],
+      // user predicts correct result (home win, 1-0) → 24 pts base
+      predictions: [{ id: "p1", user_id: "u1", home_score: 1, away_score: 0 }],
+      matchPrediction: null, // no snapshot
+    })
+
+    await POST(syncRequest())
+
+    // correct result only = 24, no upset bonus (no snapshot)
+    const calls = predictionsUpdate.mock.calls.map((c) => c[0] as { points: number })
+    expect(calls[0].points).toBe(24)
   })
 })

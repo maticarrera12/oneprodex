@@ -2,7 +2,8 @@ import { fetchMatchEvents } from '@/lib/api-football/client'
 import { mapMatchEvent } from '@/lib/api-football/mappers'
 import { APIFootballError } from '@/lib/api-football/types'
 import { createServiceClient } from '@/lib/supabase/service'
-import { calcCardPts, calcCleanSheetPts, calcPlayerScorerPts, calcScorePts } from '@/features/predictions/utils/scoring'
+import { calcCardPts, calcCleanSheetPts, calcPlayerScorerPts, calcScorePts, calcUpsetBonus } from '@/features/predictions/utils/scoring'
+import { UPSET_ELIGIBILITY_GAP } from '@/features/scoring/constants'
 import { scoreBracketForMatch } from '@/features/scoring/sync-bracket'
 import { evaluateAllUsers } from '@/lib/achievements/evaluate'
 import { applyWorldCupSeasonKickoffFilter } from '@/lib/world-cup/season'
@@ -155,6 +156,13 @@ async function scoreMatch(
     return false
   }
 
+  // Read the pre-match odds snapshot for upset bonus eligibility (gap-based)
+  const { data: matchPrediction } = await supabase
+    .from('match_predictions')
+    .select('home_pct,away_pct')
+    .eq('match_id', match.id)
+    .maybeSingle()
+
   const predictions = predsResult.data ?? []
   const events = eventsResult.data ?? []
   const playerPredsByUser = groupByUser((playerPredsResult.data ?? []) as PlayerPredRow[])
@@ -212,7 +220,28 @@ async function scoreMatch(
       match.home_score,
     )
 
-    const totalPts = scorePts + scorerPts + cardPts + cleanSheetPts
+    const upsetBonus = (() => {
+      if (!matchPrediction) return 0
+      const { home_pct, away_pct } = matchPrediction
+      // Gap-based eligibility (AUTHORITATIVE — decision #498): abs(home_pct - away_pct) >= 15
+      if (Math.abs(home_pct - away_pct) < UPSET_ELIGIBILITY_GAP) return 0
+      // Draw result never qualifies
+      if (match.home_score === match.away_score) return 0
+      // Identify which side is the underdog (lower implied %)
+      const actualWinner = match.home_score! > match.away_score! ? 'home' : 'away'
+      const underdogSide = home_pct < away_pct ? 'home' : 'away'
+      // Only an upset when the underdog (lower-pct side) won
+      if (actualWinner !== underdogSide) return 0
+      // User must have predicted the upset winner (not a draw prediction)
+      const userPredWinner =
+        pred.home_score > pred.away_score ? 'home' : pred.home_score < pred.away_score ? 'away' : 'draw'
+      if (userPredWinner !== actualWinner) return 0
+      // Compute bonus from the winner's implied probability
+      const winnerPct = actualWinner === 'home' ? home_pct : away_pct
+      return calcUpsetBonus(winnerPct)
+    })()
+
+    const totalPts = scorePts + scorerPts + cardPts + cleanSheetPts + upsetBonus
 
     const { error: updateError } = await supabase
       .from('predictions')
