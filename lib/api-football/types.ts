@@ -300,16 +300,26 @@ export interface MatchLineupRow {
 export interface AFH2HFixture {
   id: number
   date: string
+  status?: { short: string }
+  venue?: { name?: string | null; city?: string | null }
+}
+
+export interface AFH2HLeague {
+  name?: string
+  season?: number
+  round?: string
 }
 
 export interface AFH2HTeam {
   id: number
   name: string
   code: string | null
+  logo?: string | null
 }
 
 export interface AFH2HMatch {
   fixture: AFH2HFixture
+  league?: AFH2HLeague
   teams: {
     home: AFH2HTeam
     away: AFH2HTeam
@@ -329,7 +339,16 @@ export interface MatchH2HRow {
   for_match_id: string
   home_team_code: string
   away_team_code: string
+  home_team_name?: string | null
+  away_team_name?: string | null
   home_score: number | null
   away_score: number | null
   kickoff: string
+  league_name?: string | null
+  season?: number | null
+  round?: string | null
+  venue?: string | null
+  /** Enriched on read — not persisted */
+  homeLogo?: string | null
+  awayLogo?: string | null
 }

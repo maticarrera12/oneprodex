@@ -7,6 +7,7 @@ export type MatchConsensusPrediction = {
   userId: string
   displayName: string
   handle: string
+  avatarUrl: string | null
   homeScore: number
   awayScore: number
   isYou: boolean
@@ -113,7 +114,7 @@ export async function getMatchConsensusGroups(
       .select('user_id,home_score,away_score')
       .eq('match_id', matchId)
       .in('user_id', memberIds),
-    supabase.from('users').select('id,display_name,handle').in('id', memberIds),
+    supabase.from('users').select('id,display_name,handle,avatar_url').in('id', memberIds),
   ])
 
   const userById = new Map((users ?? []).map((user) => [user.id, user] as const))
@@ -135,6 +136,7 @@ export async function getMatchConsensusGroups(
           userId: member.user_id,
           displayName: member.user_id === userId ? 'Vos' : user.display_name,
           handle: user.handle,
+          avatarUrl: user.avatar_url ?? null,
           homeScore: prediction.home_score,
           awayScore: prediction.away_score,
           isYou: member.user_id === userId,

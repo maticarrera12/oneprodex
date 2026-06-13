@@ -71,7 +71,7 @@ export function GroupRankRow({ entry, pulse, showBorder }: GroupRankRowProps) {
       </span>
 
       <div className="relative flex min-w-0 items-center gap-2.5">
-        <GroupAvatar name={entry.name} color={entry.color} size={36} ring={entry.isYou} />
+        <GroupAvatar name={entry.name} color={entry.color} size={36} ring={entry.isYou} imageUrl={entry.avatarUrl} />
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-foreground">{entry.name}</p>
           <p className="truncate font-mono text-[10px] text-(--color-text3)">@{entry.handle}</p>

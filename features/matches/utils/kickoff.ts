@@ -10,6 +10,27 @@ export function parseKickoff(kickoff: string): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
+export function formatKickoffHero(kickoff: string): string {
+  const parsed = parseKickoff(kickoff)
+  if (!parsed) return kickoff
+
+  const datePart = new Intl.DateTimeFormat("es-AR", {
+    timeZone: AR_TIME_ZONE,
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(parsed)
+  const timePart = new Intl.DateTimeFormat("es-AR", {
+    timeZone: AR_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(parsed)
+
+  const capitalizedDate = datePart.replace(/\b([a-záéíóú])/g, (m) => m.toUpperCase())
+  return `${capitalizedDate} • ${timePart}`
+}
+
 export function formatKickoffParts(kickoff: string): { date: string; time: string } {
   const parsed = parseKickoff(kickoff)
   if (!parsed) {

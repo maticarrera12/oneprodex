@@ -9,6 +9,7 @@ import type {
   ProfileUser,
 } from "@/features/profile/types"
 import { computePredictionKind } from "@/features/profile/utils/prediction-kind"
+import { isAchievementEnabled } from "@/lib/achievements/constants"
 import type { Database } from "@/lib/supabase/database.types"
 import { AR_TIME_ZONE } from "@/features/matches/utils/kickoff"
 
@@ -139,18 +140,20 @@ const earnedMap = new Map(
     (earnedResult.data ?? []).map((r) => [r.achievement_id, r])
   )
 
-  return catalog.map((a) => {
-    const userRow = earnedMap.get(a.id)
-    const joinRow: UserAchievementJoinRow = {
-      user_id: userId,
-      achievement_id: a.id,
-      tier: (userRow?.tier as UserAchievementJoinRow["tier"]) ?? null,
-      earned_at: userRow?.earned_at ?? "",
-      progress_json: (userRow?.progress_json as Record<string, unknown>) ?? { current: 0 },
-      achievements: a as UserAchievementJoinRow["achievements"],
-    }
-    return mapToProfileAchievement(joinRow)
-  })
+  return catalog
+    .filter((a) => isAchievementEnabled(a.id))
+    .map((a) => {
+      const userRow = earnedMap.get(a.id)
+      const joinRow: UserAchievementJoinRow = {
+        user_id: userId,
+        achievement_id: a.id,
+        tier: (userRow?.tier as UserAchievementJoinRow["tier"]) ?? null,
+        earned_at: userRow?.earned_at ?? "",
+        progress_json: (userRow?.progress_json as Record<string, unknown>) ?? { current: 0 },
+        achievements: a as UserAchievementJoinRow["achievements"],
+      }
+      return mapToProfileAchievement(joinRow)
+    })
 }
 
 export type UserStats = {
@@ -174,6 +177,7 @@ export function mapUserProfile(user: UserRow, stats: UserStats, championPick: Ch
   return {
     name: user.display_name,
     handle: user.handle,
+    avatarUrl: user.avatar_url,
     joinedAt: user.created_at
       ? `Joined ${new Date(user.created_at).toLocaleDateString("es-AR", { timeZone: AR_TIME_ZONE })}`
       : "Joined",

@@ -3,6 +3,7 @@ export interface RankingEntry {
   handle: string
   name: string
   color: string
+  avatarUrl?: string | null
   pts: number
   hits: number
   acc: number

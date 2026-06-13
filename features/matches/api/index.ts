@@ -250,15 +250,46 @@ export async function getMatchH2H(
   supabase: SupabaseClient<Database>,
   matchId: string,
 ): Promise<MatchH2HRow[]> {
-  const { data, error } = await supabase
-    .from("match_h2h")
-    .select("*")
-    .eq("for_match_id", matchId)
-    .order("kickoff", { ascending: false })
+  const [{ data, error }, teamsResult] = await Promise.all([
+    supabase
+      .from("match_h2h")
+      .select("*")
+      .eq("for_match_id", matchId)
+      .order("kickoff", { ascending: false }),
+    supabase.from("teams").select("api_id,code,logo"),
+  ])
 
   if (error || !data) return []
 
-  return data as unknown as MatchH2HRow[]
+  const teams = (teamsResult.data ?? []) as Array<{ api_id: number | null; code: string; logo: string | null }>
+  const codeByApiId = new Map<number, string>(
+    teams.filter((t): t is { api_id: number; code: string; logo: string | null } => typeof t.api_id === "number").map((t) => [t.api_id, t.code]),
+  )
+  const logoByCode = new Map(teams.map((t) => [t.code, t.logo]))
+
+  function resolveCode(code: string): string {
+    const asNum = Number(code)
+    if (!Number.isNaN(asNum) && codeByApiId.has(asNum)) {
+      return codeByApiId.get(asNum)!
+    }
+    return code
+  }
+
+  return (data as MatchH2HRow[])
+    .filter((row) => row.id !== matchId)
+    .filter((row) => row.home_score !== null && row.away_score !== null)
+    .slice(0, 10)
+    .map((row) => {
+      const homeCode = resolveCode(row.home_team_code)
+      const awayCode = resolveCode(row.away_team_code)
+      return {
+        ...row,
+        home_team_code: homeCode,
+        away_team_code: awayCode,
+        homeLogo: logoByCode.get(homeCode) ?? null,
+        awayLogo: logoByCode.get(awayCode) ?? null,
+      }
+    })
 }
 
 export async function getMatchPredictions(

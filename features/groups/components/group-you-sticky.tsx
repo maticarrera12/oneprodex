@@ -16,7 +16,7 @@ export function GroupYouSticky({ you }: GroupYouStickyProps) {
               ❧
             </span>
           </div>
-          <GroupAvatar name={you.name} color={you.color} size={36} ring />
+          <GroupAvatar name={you.name} color={you.color} size={36} ring imageUrl={you.avatarUrl} />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-foreground">{you.name}</p>
             <p className="font-mono text-[10px] text-(--color-text3)">

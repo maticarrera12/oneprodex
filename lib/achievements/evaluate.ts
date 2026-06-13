@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/service'
+import { isAchievementEnabled } from '@/lib/achievements/constants'
 import {
   sortTeamsByOlympicTiebreak,
   type GroupMatchResult,
@@ -231,6 +232,8 @@ export async function evalJuegaDavid(
   supabase: SupabaseClient,
   catalog: AchievementRow[],
 ): Promise<EvalResult | null> {
+  if (!isAchievementEnabled('juega_david')) return null
+
   const achievement = catalog.find((a) => a.id === 'juega_david')
   if (!achievement?.tiers) return null
 

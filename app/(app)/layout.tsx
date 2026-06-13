@@ -2,8 +2,19 @@ import type { ReactNode } from "react"
 
 import { BottomNav } from "@/components/nav/bottom-nav"
 import { TopNav } from "@/components/nav/top-nav"
+import { syncUserProfileFromAuth } from "@/lib/auth/sync-user-profile"
+import { createClient } from "@/lib/supabase/server"
 
-export default function AppLayout({ children }: { children: ReactNode }) {
+export default async function AppLayout({ children }: { children: ReactNode }) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (user) {
+    await syncUserProfileFromAuth(user)
+  }
+
   return (
     <div className="min-h-screen overflow-x-hidden">
       <TopNav />

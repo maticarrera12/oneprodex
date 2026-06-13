@@ -32,6 +32,7 @@ function mapLeaderboardRow(
     handle: row.handle,
     name: row.display_name,
     color: "hsl(83 81% 62%)",
+    avatarUrl: row.avatar_url || null,
     pts: row.total_pts,
     hits: row.correct_count,
     acc: stats.acc,

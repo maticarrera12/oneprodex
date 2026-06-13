@@ -91,7 +91,7 @@ const quickPick = (label: string) => screen.getByRole("button", { name: label })
 // The clean-sheet toggle also renders buttons named after the team codes,
 // so squad tabs must be queried inside the extras section only.
 function squadTab(code: string): HTMLElement {
-  const section = screen.getByText(/Jugadores · G/).closest("section")
+  const section = screen.getByText("Goles y tarjetas").closest("section")
   if (!section) throw new Error("Extras section not found")
   return within(section as HTMLElement).getByRole("button", { name: code })
 }
@@ -222,31 +222,20 @@ describe("MatchDetailScreen prediction extras", () => {
   })
 })
 
-describe("MatchDetailScreen tab switching", () => {
+describe("MatchDetailScreen layout", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.commitScorerEdits.mockResolvedValue({})
   })
 
-  it("default active tab on mount is Predecir — lineups and H2H panels are absent", () => {
+  it("shows lineups section and prediction area on the same page", () => {
     renderDetail()
-    // Alineaciones panel empty state is not in the DOM when Predecir is active
-    expect(screen.queryByText("Alineaciones todavía no disponibles")).not.toBeInTheDocument()
-    // Predecir content (ScorePrediction area) is visible
-    expect(screen.getByText(/VS/i)).toBeInTheDocument()
-  })
-
-  it("clicking Alineaciones tab shows the lineups panel and hides extras section", () => {
-    renderDetail()
-    fireEvent.click(screen.getByRole("button", { name: "Alineaciones" }))
-    // Empty lineups → empty state message visible
     expect(screen.getByText("Alineaciones todavía no disponibles")).toBeInTheDocument()
+    expect(screen.getByText(/Tu predicción/i)).toBeInTheDocument()
   })
 
-  it("clicking H2H tab shows the H2H panel", () => {
+  it("does not render H2H tab", () => {
     renderDetail()
-    fireEvent.click(screen.getByRole("button", { name: "H2H" }))
-    // H2H panel empty state
-    expect(screen.getByText("Sin historial disponible")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "H2H" })).not.toBeInTheDocument()
   })
 })

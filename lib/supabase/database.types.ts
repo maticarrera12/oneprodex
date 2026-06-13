@@ -256,27 +256,45 @@ export type Database = {
           for_match_id: string
           home_team_code: string
           away_team_code: string
+          home_team_name: string | null
+          away_team_name: string | null
           home_score: number | null
           away_score: number | null
           kickoff: string
+          league_name: string | null
+          season: number | null
+          round: string | null
+          venue: string | null
         }
         Insert: {
           id: string
           for_match_id: string
           home_team_code: string
           away_team_code: string
+          home_team_name?: string | null
+          away_team_name?: string | null
           home_score?: number | null
           away_score?: number | null
           kickoff: string
+          league_name?: string | null
+          season?: number | null
+          round?: string | null
+          venue?: string | null
         }
         Update: {
           id?: string
           for_match_id?: string
           home_team_code?: string
           away_team_code?: string
+          home_team_name?: string | null
+          away_team_name?: string | null
           home_score?: number | null
           away_score?: number | null
           kickoff?: string
+          league_name?: string | null
+          season?: number | null
+          round?: string | null
+          venue?: string | null
         }
         Relationships: []
       }

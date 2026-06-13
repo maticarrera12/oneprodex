@@ -367,6 +367,16 @@ function buildDavidSupabase(
 }
 
 describe("evalJuegaDavid", () => {
+  it("is disabled while match_predictions snapshots are unreliable", async () => {
+    const preds: DavidPredRow[] = [{ id: "p1", match_id: "m1", home_score: 1, away_score: 0 }]
+    const matches: DavidMatchRow[] = [{ id: "m1", home_team_code: "ARG", away_team_code: "BRZ", home_score: 1, away_score: 0 }]
+    const mp: DavidMpRow[] = [{ match_id: "m1", home_pct: 35, away_pct: 65 }]
+    const supabase = buildDavidSupabase(preds, matches, mp)
+    expect(await evalJuegaDavid("user-1", supabase, JUEGA_DAVID_CATALOG)).toBeNull()
+  })
+})
+
+describe.skip("evalJuegaDavid — mechanics", () => {
   it("returns null when achievement not in catalog", async () => {
     const supabase = { from: vi.fn() } as unknown as Parameters<typeof evalJuegaDavid>[1]
     expect(await evalJuegaDavid("user-1", supabase, [])).toBeNull()

@@ -128,6 +128,13 @@ export function fetchLineups(fixtureId: string): Promise<APIFootballEnvelope<AFL
   return apiFetch<AFLineupsResponse>('/fixtures/lineups', { fixture: fixtureId })
 }
 
-export function fetchH2H(homeApiId: number, awayApiId: number): Promise<APIFootballEnvelope<AFH2HResponse>> {
-  return apiFetch<AFH2HResponse>('/fixtures/headtohead', { h2h: `${homeApiId}-${awayApiId}` })
+export function fetchH2H(
+  homeApiId: number,
+  awayApiId: number,
+  last = 10,
+): Promise<APIFootballEnvelope<AFH2HResponse>> {
+  return apiFetch<AFH2HResponse>('/fixtures/headtohead', {
+    h2h: `${homeApiId}-${awayApiId}`,
+    last: String(last),
+  })
 }

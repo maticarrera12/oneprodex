@@ -71,7 +71,7 @@ export function GroupPodiumItem({ entry, position, isLeader = false }: GroupPodi
             boxShadow: theme.glow,
           }}
         >
-          <GroupAvatar name={entry.name} color={entry.color} size={size} />
+          <GroupAvatar name={entry.name} color={entry.color} size={size} imageUrl={entry.avatarUrl} />
         </span>
         <span
           className={`absolute -bottom-2.5 z-10 inline-flex min-w-8 items-center justify-center rounded-full px-1.5 py-0.5 font-mono text-lg font-bold leading-none ${theme.badge}`}

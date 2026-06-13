@@ -295,9 +295,15 @@ describe('mapLineup', () => {
 })
 
 describe('mapH2H', () => {
+  const teamCodeMap = new Map<number, string>([
+    [10, 'ARG'],
+    [20, 'FRA'],
+  ])
+
   function makeH2HMatch(overrides: Partial<AFH2HMatch> = {}): AFH2HMatch {
     return {
-      fixture: { id: 555, date: '2025-06-10T18:00:00Z' },
+      fixture: { id: 555, date: '2025-06-10T18:00:00Z', status: { short: 'FT' } },
+      league: { name: 'World Cup', season: 2022, round: 'Final' },
       teams: {
         home: { id: 10, name: 'Argentina', code: 'ARG' },
         away: { id: 20, name: 'France', code: 'FRA' },
@@ -308,42 +314,89 @@ describe('mapH2H', () => {
   }
 
   it('sets id from fixture.id as string', () => {
-    const row = mapH2H('WC001', makeH2HMatch())
-    expect(row.id).toBe('555')
+    const row = mapH2H('WC001', makeH2HMatch(), teamCodeMap)
+    expect(row?.id).toBe('555')
   })
 
   it('sets for_match_id from the forMatchId argument', () => {
-    const row = mapH2H('WC001', makeH2HMatch())
-    expect(row.for_match_id).toBe('WC001')
+    const row = mapH2H('WC001', makeH2HMatch(), teamCodeMap)
+    expect(row?.for_match_id).toBe('WC001')
   })
 
   it('maps scores from goals', () => {
-    const row = mapH2H('WC001', makeH2HMatch())
-    expect(row.home_score).toBe(3)
-    expect(row.away_score).toBe(1)
+    const row = mapH2H('WC001', makeH2HMatch(), teamCodeMap)
+    expect(row?.home_score).toBe(3)
+    expect(row?.away_score).toBe(1)
   })
 
   it('sets kickoff from fixture.date', () => {
-    const row = mapH2H('WC001', makeH2HMatch())
-    expect(row.kickoff).toBe('2025-06-10T18:00:00Z')
+    const row = mapH2H('WC001', makeH2HMatch(), teamCodeMap)
+    expect(row?.kickoff).toBe('2025-06-10T18:00:00Z')
   })
 
-  it('handles null scores', () => {
-    const row = mapH2H('WC001', makeH2HMatch({ goals: { home: null, away: null } }))
-    expect(row.home_score).toBeNull()
-    expect(row.away_score).toBeNull()
+  it('maps league and venue metadata', () => {
+    const row = mapH2H(
+      'WC001',
+      makeH2HMatch({
+        fixture: {
+          id: 555,
+          date: '2025-06-10T18:00:00Z',
+          status: { short: 'FT' },
+          venue: { name: 'Lusail Stadium', city: 'Lusail' },
+        },
+      }),
+      teamCodeMap,
+    )
+    expect(row?.league_name).toBe('World Cup')
+    expect(row?.season).toBe(2022)
+    expect(row?.round).toBe('Final')
+    expect(row?.venue).toBe('Lusail Stadium, Lusail')
+    expect(row?.home_team_name).toBe('Argentina')
+    expect(row?.away_team_name).toBe('France')
   })
 
-  it('triangulate — falls back to String(id) when team code is null', () => {
+  it('returns null for the upcoming fixture itself', () => {
+    const row = mapH2H('555', makeH2HMatch(), teamCodeMap)
+    expect(row).toBeNull()
+  })
+
+  it('returns null for unfinished fixtures', () => {
+    const row = mapH2H(
+      'WC001',
+      makeH2HMatch({ fixture: { id: 555, date: '2025-06-10T18:00:00Z', status: { short: 'NS' } } }),
+      teamCodeMap,
+    )
+    expect(row).toBeNull()
+  })
+
+  it('returns null when scores are missing', () => {
+    const row = mapH2H('WC001', makeH2HMatch({ goals: { home: null, away: null } }), teamCodeMap)
+    expect(row).toBeNull()
+  })
+
+  it('resolves team codes via teamCodeMap when API omits code', () => {
     const match = makeH2HMatch({
       teams: {
         home: { id: 10, name: 'Argentina', code: null },
         away: { id: 20, name: 'France', code: null },
       },
     })
-    const row = mapH2H('WC001', match)
-    expect(row.home_team_code).toBe('10')
-    expect(row.away_team_code).toBe('20')
+    const row = mapH2H('WC001', match, teamCodeMap)
+    expect(row?.home_team_code).toBe('ARG')
+    expect(row?.away_team_code).toBe('FRA')
+  })
+
+  it('falls back to String(id) when teamCodeMap has no entry', () => {
+    const emptyMap = new Map<number, string>()
+    const match = makeH2HMatch({
+      teams: {
+        home: { id: 10, name: 'Argentina', code: null },
+        away: { id: 20, name: 'France', code: null },
+      },
+    })
+    const row = mapH2H('WC001', match, emptyMap)
+    expect(row?.home_team_code).toBe('10')
+    expect(row?.away_team_code).toBe('20')
   })
 })
 

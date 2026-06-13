@@ -150,17 +150,21 @@ describe("features/matches/api", () => {
 })
 
 describe("getMatchH2H", () => {
-  function buildH2HSupabase(rows: unknown[], error: { message: string } | null = null) {
-    const chain = {
+  function buildH2HSupabase(rows: unknown[], teams: unknown[] = [], error: { message: string } | null = null) {
+    const h2hChain = {
       eq: vi.fn().mockReturnThis(),
       order: vi.fn().mockResolvedValue({ data: error ? null : rows, error }),
     }
+    const teamsChain = {
+      select: vi.fn().mockResolvedValue({ data: teams, error: null }),
+    }
     return {
       from: vi.fn((table: string) => {
-        if (table === "match_h2h") return { select: vi.fn(() => chain) }
+        if (table === "match_h2h") return { select: vi.fn(() => h2hChain) }
+        if (table === "teams") return teamsChain
         throw new Error(`Unexpected table: ${table}`)
       }),
-      __chain: chain,
+      __h2hChain: h2hChain,
     }
   }
 
@@ -185,16 +189,49 @@ describe("getMatchH2H", () => {
         kickoff: "2018-07-07T14:00:00Z",
       },
     ]
-    const supabase = buildH2HSupabase(rows)
+    const supabase = buildH2HSupabase(rows, [{ api_id: 10, code: "ARG", logo: null }])
 
     const result = await getMatchH2H(supabase as never, "m1")
 
     expect(result).toHaveLength(2)
-    expect(supabase.__chain.eq).toHaveBeenCalledWith("for_match_id", "m1")
-    expect(supabase.__chain.order).toHaveBeenCalledWith("kickoff", { ascending: false })
+    expect(supabase.__h2hChain.eq).toHaveBeenCalledWith("for_match_id", "m1")
+    expect(supabase.__h2hChain.order).toHaveBeenCalledWith("kickoff", { ascending: false })
     expect(result[0]?.id).toBe("f1")
     expect(result[0]?.home_team_code).toBe("ARG")
     expect(result[0]?.home_score).toBe(2)
+  })
+
+  it("filters self-referencing and incomplete rows", async () => {
+    const rows = [
+      {
+        id: "m1",
+        for_match_id: "m1",
+        home_team_code: "ARG",
+        away_team_code: "BRA",
+        home_score: null,
+        away_score: null,
+        kickoff: "2026-06-10T18:00:00Z",
+      },
+      {
+        id: "f1",
+        for_match_id: "m1",
+        home_team_code: "1531",
+        away_team_code: "16",
+        home_score: 1,
+        away_score: 1,
+        kickoff: "2010-06-22T18:00:00Z",
+      },
+    ]
+    const supabase = buildH2HSupabase(rows, [
+      { api_id: 1531, code: "MEX", logo: null },
+      { api_id: 16, code: "RSA", logo: null },
+    ])
+
+    const result = await getMatchH2H(supabase as never, "m1")
+
+    expect(result).toHaveLength(1)
+    expect(result[0]?.home_team_code).toBe("MEX")
+    expect(result[0]?.away_team_code).toBe("RSA")
   })
 
   it("returns empty array when no H2H rows exist for the match", async () => {
@@ -203,11 +240,11 @@ describe("getMatchH2H", () => {
     const result = await getMatchH2H(supabase as never, "m-unknown")
 
     expect(result).toHaveLength(0)
-    expect(supabase.__chain.eq).toHaveBeenCalledWith("for_match_id", "m-unknown")
+    expect(supabase.__h2hChain.eq).toHaveBeenCalledWith("for_match_id", "m-unknown")
   })
 
   it("returns empty array on DB error", async () => {
-    const supabase = buildH2HSupabase([], { message: "DB error" })
+    const supabase = buildH2HSupabase([], [], { message: "DB error" })
 
     const result = await getMatchH2H(supabase as never, "m1")
 

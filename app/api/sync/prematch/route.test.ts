@@ -256,7 +256,8 @@ describe("POST /api/sync/prematch — phase 1 H2H sync", () => {
     data: {
       response: [
         {
-          fixture: { id: 999, date: "2022-11-22T16:00:00Z" },
+          fixture: { id: 999, date: "2022-11-22T16:00:00Z", status: { short: "FT" } },
+          league: { name: "World Cup", season: 2022, round: "Final" },
           teams: { home: { id: 26, name: "Argentina", code: "ARG" }, away: { id: 2, name: "France", code: "FRA" } },
           goals: { home: 3, away: 3 },
         },

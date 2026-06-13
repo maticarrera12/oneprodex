@@ -99,7 +99,9 @@ export async function POST(request: Request) {
       if (homeApiId !== undefined && awayApiId !== undefined) {
         try {
           const { data: h2hData } = await fetchH2H(homeApiId, awayApiId)
-          const h2hRows = h2hData.response.map((m) => mapH2H(match.id, m))
+          const h2hRows = h2hData.response
+            .map((m) => mapH2H(match.id, m, teamCodeMap))
+            .filter((row): row is NonNullable<typeof row> => row !== null)
 
           if (h2hRows.length > 0) {
             const { error: h2hWriteError } = await supabase

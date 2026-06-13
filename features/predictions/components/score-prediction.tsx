@@ -42,13 +42,13 @@ export function ScorePrediction({
         </p>
       </div>
 
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 pb-4">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 px-3 pb-4 sm:gap-2 sm:px-4">
         <Stepper
           value={homeScore}
           disabled={isLocked}
           onChange={(nextHome) => onChange(nextHome, awayScore)}
         />
-        <span className="font-mono text-3xl text-(--color-text3)">·</span>
+        <span className="font-mono text-2xl text-(--color-text3) sm:text-3xl">·</span>
         <Stepper
           value={awayScore}
           disabled={isLocked}
@@ -129,7 +129,7 @@ function Stepper({
           />
         </svg>
       </button>
-      <p className="w-14 text-center font-mono text-5xl font-semibold leading-none tracking-tight">{value}</p>
+      <p className="w-11 text-center font-mono text-4xl font-semibold leading-none tracking-tight sm:w-14 sm:text-5xl">{value}</p>
       <button
         type="button"
         disabled={disabled}

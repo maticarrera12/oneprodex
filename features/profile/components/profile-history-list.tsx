@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import { TeamLogo } from "@/features/shared/components/team-logo"
 import type { ProfileHistoryEntry, ProfileHistoryPhase } from "@/features/profile/types"
@@ -87,12 +88,12 @@ export function ProfileHistoryList({ entries }: ProfileHistoryListProps) {
       </div>
 
       <div className="mt-3 flex justify-center">
-        <button
-          type="button"
+        <Link
+          href="/partidos"
           className="rounded-xl border border-(--color-border-hi) bg-(--color-card-hi) px-4 py-2.5 font-mono text-xs font-semibold text-(--color-text2) tracking-wide"
         >
           Ver todas mis predicciones →
-        </button>
+        </Link>
       </div>
     </section>
   )

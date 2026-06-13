@@ -7,6 +7,7 @@ export type ProfileHistoryPhase = "grupos" | "octavos" | "cuartos" | "semis" | "
 export interface ProfileUser {
   name: string
   handle: string
+  avatarUrl?: string | null
   joinedAt: string
   level: number
   levelTitle: string

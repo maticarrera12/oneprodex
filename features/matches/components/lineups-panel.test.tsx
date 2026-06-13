@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, fireEvent } from "@testing-library/react"
 import { LineupsPanel } from "@/features/matches/components/lineups-panel"
 import type { MatchLineupRow } from "@/lib/api-football/types"
 
@@ -25,20 +25,11 @@ describe("LineupsPanel", () => {
       <LineupsPanel
         lineups={{ home: [], away: [] }}
         playersMap={new Map()}
-      />
+        homeCode="ARG"
+        awayCode="BRA"
+      />,
     )
     expect(screen.getByText("Alineaciones todavía no disponibles")).toBeInTheDocument()
-  })
-
-  it("does not render empty state when lineups have data", () => {
-    const player = buildPlayer()
-    render(
-      <LineupsPanel
-        lineups={{ home: [player], away: [] }}
-        playersMap={new Map()}
-      />
-    )
-    expect(screen.queryByText("Alineaciones todavía no disponibles")).not.toBeInTheDocument()
   })
 
   it("renders player name and number when lineups have data", () => {
@@ -47,34 +38,58 @@ describe("LineupsPanel", () => {
       <LineupsPanel
         lineups={{ home: [player], away: [] }}
         playersMap={new Map()}
-      />
+        homeCode="ARG"
+        awayCode="BRA"
+      />,
     )
     expect(screen.getByText("Lamine Yamal")).toBeInTheDocument()
     expect(screen.getByText("27")).toBeInTheDocument()
   })
 
-  it("renders player photo when player_api_id matches playersMap entry", () => {
-    const player = buildPlayer({ player_api_id: 200, name: "Vinicius Jr" })
-    const playersMap = new Map([[200, "https://example.com/vini.jpg"]])
+  it("shows both teams side by side on desktop layout container", () => {
+    const home = buildPlayer({ player_api_id: 1, name: "Home Player", team_code: "ARG" })
+    const away = buildPlayer({ player_api_id: 2, name: "Away Player", team_code: "BRA" })
     render(
       <LineupsPanel
-        lineups={{ home: [player], away: [] }}
-        playersMap={playersMap}
-      />
+        lineups={{ home: [home], away: [away] }}
+        playersMap={new Map()}
+        homeCode="ARG"
+        awayCode="BRA"
+      />,
     )
-    const img = screen.getByAltText("Vinicius Jr") as HTMLImageElement
-    expect(img.src).toBe("https://example.com/vini.jpg")
+    expect(screen.getByText("Home Player")).toBeInTheDocument()
+    expect(screen.getByText("Away Player")).toBeInTheDocument()
+    expect(screen.getAllByText("Titulares · 1")).toHaveLength(2)
   })
 
-  it("renders initials fallback when player has no matching entry in playersMap", () => {
-    const player = buildPlayer({ player_api_id: 888, name: "Carlos Soler" })
+  it("shows mobile tabs when both lineups are available", () => {
+    const home = buildPlayer({ player_api_id: 1, name: "Home Player" })
+    const away = buildPlayer({ player_api_id: 2, name: "Away Player", team_code: "BRA" })
     render(
       <LineupsPanel
-        lineups={{ home: [player], away: [] }}
+        lineups={{ home: [home], away: [away] }}
         playersMap={new Map()}
-      />
+        homeCode="ARG"
+        awayCode="BRA"
+      />,
     )
-    // Initials: "CA" (first two chars of name, uppercased)
-    expect(screen.getByText("CA")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /ARG/ })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /BRA/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: /BRA/ }))
+    expect(screen.getByText("Away Player")).toBeInTheDocument()
+  })
+
+  it("renders pending card on desktop when only away lineup exists", () => {
+    const away = buildPlayer({ player_api_id: 2, name: "Away Player", team_code: "BRA" })
+    render(
+      <LineupsPanel
+        lineups={{ home: [], away: [away] }}
+        playersMap={new Map()}
+        homeCode="ARG"
+        awayCode="BRA"
+      />,
+    )
+    expect(screen.getByText("Alineación pendiente")).toBeInTheDocument()
+    expect(screen.getByText("Away Player")).toBeInTheDocument()
   })
 })

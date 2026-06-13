@@ -225,14 +225,37 @@ export function mapLineup(
   return [...startRows, ...subRows]
 }
 
-export function mapH2H(forMatchId: string, match: AFH2HMatch): MatchH2HRow {
+const H2H_FINISHED_STATUS = new Set(['FT', 'AET', 'PEN'])
+
+export function mapH2H(
+  forMatchId: string,
+  match: AFH2HMatch,
+  teamCodeMap: Map<number, string>,
+): MatchH2HRow | null {
+  const fixtureId = String(match.fixture.id)
+
+  if (fixtureId === forMatchId) return null
+
+  const status = match.fixture.status?.short
+  if (status && !H2H_FINISHED_STATUS.has(status)) return null
+
+  if (match.goals.home === null || match.goals.away === null) return null
+
+  const venueParts = [match.fixture.venue?.name, match.fixture.venue?.city].filter(Boolean)
+
   return {
-    id: String(match.fixture.id),
+    id: fixtureId,
     for_match_id: forMatchId,
-    home_team_code: match.teams.home.code ?? String(match.teams.home.id),
-    away_team_code: match.teams.away.code ?? String(match.teams.away.id),
+    home_team_code: teamCodeMap.get(match.teams.home.id) ?? match.teams.home.code ?? String(match.teams.home.id),
+    away_team_code: teamCodeMap.get(match.teams.away.id) ?? match.teams.away.code ?? String(match.teams.away.id),
+    home_team_name: match.teams.home.name,
+    away_team_name: match.teams.away.name,
     home_score: match.goals.home,
     away_score: match.goals.away,
     kickoff: match.fixture.date,
+    league_name: match.league?.name ?? null,
+    season: match.league?.season ?? null,
+    round: match.league?.round ?? null,
+    venue: venueParts.length > 0 ? venueParts.join(', ') : null,
   }
 }

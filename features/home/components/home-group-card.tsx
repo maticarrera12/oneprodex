@@ -33,6 +33,7 @@ export function HomeGroupCard({ group, allGroups, you }: HomeGroupCardProps) {
     handle: "—",
     name: "—",
     color: "#84cc16",
+    avatarUrl: null,
     pts: 0,
     acc: 0,
     streak: 0,
@@ -87,7 +88,7 @@ export function HomeGroupCard({ group, allGroups, you }: HomeGroupCardProps) {
 
       <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-(--color-border-hi) bg-(--color-bg2) px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <GroupAvatar name={member.name} color={member.color} size={36} />
+          <GroupAvatar name={member.name} color={member.color} size={36} imageUrl={member.avatarUrl} />
           <span className="truncate text-sm font-medium text-foreground">{member.handle}</span>
         </div>
         <span className="shrink-0 font-mono text-sm text-muted-foreground">{member.pts} pts</span>

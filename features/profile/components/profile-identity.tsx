@@ -23,7 +23,7 @@ export function ProfileIdentity({ user, accentColor }: ProfileIdentityProps) {
       </span>
       <div className="relative flex items-center gap-4">
         <div className="relative shrink-0">
-          <GroupAvatar name={user.name} color={accentColor} size={84} ring />
+          <GroupAvatar name={user.name} color={accentColor} size={84} ring imageUrl={user.avatarUrl} />
           <span className="absolute -right-1 -bottom-1 rounded-lg bg-(--color-primary) px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider text-black">
             LV {user.level}
           </span>
