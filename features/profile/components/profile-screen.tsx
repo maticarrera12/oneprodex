@@ -18,7 +18,11 @@ export default function ProfileScreen({ data, isOwnProfile = true }: ProfileScre
 
   return (
     <div className="space-y-5 pt-4 pb-8">
-      <ProfileHeader />
+      <ProfileHeader
+        title={isOwnProfile ? "Profile" : data.user.name}
+        backHref={isOwnProfile ? "/" : "/grupo"}
+        showSettings={isOwnProfile}
+      />
       <ProfileIdentity user={data.user} accentColor={userColor} />
       <ProfileHeroStats stats={data.heroStats} />
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
