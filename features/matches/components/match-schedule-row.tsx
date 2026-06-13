@@ -158,32 +158,47 @@ function MatchScheduleRowBody({ match, teams, layout }: MatchScheduleRowBodyProp
 
   if (layout === "inline") {
     const showPoints = hasPrediction && match.status === "FINISHED"
+    const teamsBlock = (
+      <div className="flex min-w-0 items-center gap-1.5">
+        <TeamBadge code={match.home} name={home?.name} logo={match.homeLogo} />
+        <span className="shrink-0 text-sm font-semibold">{home?.code ?? match.home}</span>
+        {showScore ? (
+          <span className="shrink-0 px-0.5 font-mono text-sm font-semibold text-foreground">
+            {match.hs ?? "-"}–{match.as ?? "-"}
+          </span>
+        ) : (
+          <span className="shrink-0 font-mono text-[11px] text-muted-foreground">vs</span>
+        )}
+        <TeamBadge code={match.away} name={away?.name} logo={match.awayLogo} />
+        <span className="truncate text-sm font-semibold">{away?.code ?? match.away}</span>
+      </div>
+    )
+    const actionsBlock = (
+      <div className="flex shrink-0 items-center gap-1">
+        <MatchStatusBadge isLive={isLive} minute={match.minute} kickoff={match.kickoff} />
+        <PredictionAction match={match} hasPrediction={hasPrediction} points={points} />
+        {showPoints ? <p className="text-xs text-muted-foreground">{points?.pts ?? 0} pts</p> : null}
+      </div>
+    )
 
     return (
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 sm:gap-x-3">
-        <div className="col-start-1 flex min-w-0 items-center gap-1.5">
-          <TeamBadge code={match.home} name={home?.name} logo={match.homeLogo} />
-          <span className="shrink-0 text-sm font-semibold">{home?.code ?? match.home}</span>
-          {showScore ? (
-            <span className="shrink-0 px-0.5 font-mono text-sm font-semibold text-foreground">
-              {match.hs ?? "-"}–{match.as ?? "-"}
-            </span>
-          ) : (
-            <span className="shrink-0 font-mono text-[11px] text-muted-foreground">vs</span>
-          )}
-          <TeamBadge code={match.away} name={away?.name} logo={match.awayLogo} />
-          <span className="truncate text-sm font-semibold">{away?.code ?? match.away}</span>
+      <>
+        <div className="flex items-center justify-between gap-2 sm:hidden">
+          <div className="min-w-0 flex-1">{teamsBlock}</div>
+          {actionsBlock}
         </div>
 
-        <div className="col-start-2 flex justify-center">
-          <MatchStatusBadge isLive={isLive} minute={match.minute} kickoff={match.kickoff} />
+        <div className="hidden grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-3 sm:grid">
+          <div className="col-start-1 flex min-w-0 items-center gap-1.5">{teamsBlock}</div>
+          <div className="col-start-2 flex justify-center">
+            <MatchStatusBadge isLive={isLive} minute={match.minute} kickoff={match.kickoff} />
+          </div>
+          <div className="col-start-3 flex items-center justify-end gap-2">
+            <PredictionAction match={match} hasPrediction={hasPrediction} points={points} />
+            {showPoints ? <p className="text-xs text-muted-foreground">{points?.pts ?? 0} pts</p> : null}
+          </div>
         </div>
-
-        <div className="col-start-3 flex items-center justify-end gap-2">
-          <PredictionAction match={match} hasPrediction={hasPrediction} points={points} />
-          {showPoints ? <p className="text-xs text-muted-foreground">{points?.pts ?? 0} pts</p> : null}
-        </div>
-      </div>
+      </>
     )
   }
 
