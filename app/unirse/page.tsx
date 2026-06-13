@@ -5,9 +5,52 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { evaluateUser } from '@/lib/achievements/evaluate'
 import Image from 'next/image'
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 type PageProps = { searchParams: Promise<{ code?: string; confirm?: string }> }
+
+export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
+  const { code } = await searchParams
+  const normalizedCode = normalizeInviteCode(code)
+
+  if (!normalizedCode) {
+    return {
+      title: 'Unirse a un grupo · OneProdex',
+      description: 'Sumate a un grupo de predicciones del Mundial 2026.',
+    }
+  }
+
+  const supabase = createServiceClient()
+  const group = await getGroupByInviteCode(supabase, normalizedCode)
+
+  if (!group) {
+    return {
+      title: 'Invitación no encontrada · OneProdex',
+      description: 'El link de invitación no es válido o expiró.',
+    }
+  }
+
+  const title = `Sumate a "${group.name}" · OneProdex`
+  const description = `Te invitaron a un grupo de predicciones del Mundial 2026. ${group.members} miembros ya están adentro.`
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      images: [{ url: '/oneprodex.png', width: 512, height: 512, alt: 'OneProdex' }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: ['/oneprodex.png'],
+    },
+  }
+}
 
 export default async function UnirsePage({ searchParams }: PageProps) {
   const { code, confirm } = await searchParams

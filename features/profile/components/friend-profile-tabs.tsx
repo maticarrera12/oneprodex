@@ -47,7 +47,9 @@ export function FriendProfileTabs({
         })}
       </div>
 
-      {activeTab === "Perfil" && <ProfileScreen data={profileData} />}
+      {activeTab === "Perfil" && (
+        <ProfileScreen data={profileData} isOwnProfile={false} />
+      )}
 
       {activeTab === "Bracket" && <FriendBracketTab data={bracketData} />}
 
