@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { getBracketData } from "@/features/bracket/api"
+import type { getBracketData } from "@/features/bracket/api"
 import { FriendBracketTab } from "@/features/bracket/components/friend-bracket-tab"
 import type { FriendPredictionsTabData, ProfileData } from "@/features/profile/api"
 import { FriendPredictionsTab } from "@/features/profile/components/friend-predictions-tab"

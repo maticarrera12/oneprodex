@@ -1,4 +1,6 @@
-import { getBracketData } from "@/features/bracket/api"
+"use client"
+
+import type { getBracketData } from "@/features/bracket/api"
 import { BracketScreen } from "@/features/bracket/components/bracket-screen"
 
 type BracketData = NonNullable<Awaited<ReturnType<typeof getBracketData>>>
