@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Flag } from "@/features/home/components/flag"
 import { GroupAvatar } from "@/features/groups/components/group-avatar"
 import { LineupsPanel } from "@/features/matches/components/lineups-panel"
+import { H2HPanel } from "@/features/matches/components/h2h-panel"
 import { canPickScorerForTeam, derivePredictionFlow } from "@/features/matches/utils/prediction-flow"
 import { formatKickoffHero } from "@/features/matches/utils/kickoff"
 import type { Match } from "@/features/matches/types"
@@ -29,7 +30,7 @@ import {
 } from "@/features/predictions/utils/consensus"
 import { MATCH_SCORING, MATCH_SCORING_LABELS } from "@/features/scoring/constants"
 import { userAccentColor } from "@/features/shared/utils/user-accent-color"
-import type { MatchLineupRow } from "@/lib/api-football/types"
+import type { MatchLineupRow, MatchH2HRow } from "@/lib/api-football/types"
 
 const EMPTY_LINEUPS: { home: MatchLineupRow[]; away: MatchLineupRow[] } = { home: [], away: [] }
 
@@ -41,6 +42,7 @@ type MatchDetailScreenProps = {
   consensusGroups: MatchConsensusGroup[]
   lineups?: { home: MatchLineupRow[]; away: MatchLineupRow[] }
   playersMap?: Map<number, string>
+  h2h?: MatchH2HRow[]
 }
 
 export function MatchDetailScreen({
@@ -51,6 +53,7 @@ export function MatchDetailScreen({
   consensusGroups,
   lineups = EMPTY_LINEUPS,
   playersMap = new Map(),
+  h2h = [],
 }: MatchDetailScreenProps) {
   const router = useRouter()
   const isLive = match.status === "LIVE"
@@ -259,6 +262,8 @@ export function MatchDetailScreen({
         homeLogo={match.homeLogo}
         awayLogo={match.awayLogo}
       />
+
+      <H2HPanel h2h={h2h} matchHome={match.home} matchAway={match.away} />
 
       <PlayerPredictionsGrid
         groups={consensusGroups}
