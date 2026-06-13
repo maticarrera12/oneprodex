@@ -1,5 +1,5 @@
-import { mapFixtureStatus, mapH2H, mapLineup, mapMatchEvent, mapPlayer, mapPrediction, mapTeam } from '@/lib/api-football/mappers'
-import type { AFH2HMatch, AFLineupTeam, AFMatchEvent, AFPredictionItem, AFSquadPlayer, AFTeam } from '@/lib/api-football/types'
+import { mapFixtureStatus, mapH2H, mapLineup, mapMatchEvent, mapOddsToPrediction, mapPlayer, mapPrediction, mapTeam } from '@/lib/api-football/mappers'
+import type { AFH2HMatch, AFLineupTeam, AFMatchEvent, AFOddsBookmaker, AFPredictionItem, AFSquadPlayer, AFTeam } from '@/lib/api-football/types'
 
 describe('mapFixtureStatus', () => {
   it('maps known upcoming codes', () => {
@@ -444,5 +444,90 @@ describe('mapPrediction — model-without-data gate (comparison.total 0/0)', () 
       predictions: { percent: { home: '60%', draw: '25%', away: '15%' }, advice: 'Winner: Brazil' },
     }
     expect(mapPrediction('WC001', item)?.home_pct).toBe(60)
+  })
+})
+
+// ─── mapOddsToPrediction ──────────────────────────────────────────────────────
+
+function makeBookmaker(
+  home: number,
+  draw: number,
+  away: number,
+  id = 1,
+  name = 'Bet365',
+): AFOddsBookmaker {
+  return {
+    id,
+    name,
+    bets: [
+      {
+        name: 'Match Winner',
+        values: [
+          { value: 'Home', odd: String(home) },
+          { value: 'Draw', odd: String(draw) },
+          { value: 'Away', odd: String(away) },
+        ],
+      },
+    ],
+  }
+}
+
+describe('mapOddsToPrediction — empty / invalid input', () => {
+  it('returns null for empty bookmakers array', () => {
+    const result = mapOddsToPrediction('WC001', [])
+    expect(result).toBeNull()
+  })
+
+  it('returns null when bookmaker has no Match Winner bet', () => {
+    const bm: AFOddsBookmaker = {
+      id: 1,
+      name: 'Bet365',
+      bets: [{ name: 'Both Teams To Score', values: [{ value: 'Home', odd: '1.5' }] }],
+    }
+    const result = mapOddsToPrediction('WC001', [bm])
+    expect(result).toBeNull()
+  })
+})
+
+describe('mapOddsToPrediction — single bookmaker', () => {
+  it('converts odds to implied probs, normalizes, and returns integers summing to 100', () => {
+    // odds: Home=2.0, Draw=3.5, Away=4.0
+    // implied: 0.5, 0.2857, 0.25 → sum=1.0357
+    // normalized: 48.27%, 27.58%, 24.15% → with largest-remainder → must sum to 100
+    const result = mapOddsToPrediction('WC001', [makeBookmaker(2.0, 3.5, 4.0)])
+    expect(result).not.toBeNull()
+    expect(result!.match_id).toBe('WC001')
+    expect(result!.home_pct + result!.draw_pct + result!.away_pct).toBe(100)
+    // home should be the largest
+    expect(result!.home_pct).toBeGreaterThan(result!.draw_pct)
+    expect(result!.draw_pct).toBeGreaterThan(result!.away_pct)
+  })
+})
+
+describe('mapOddsToPrediction — multi-bookmaker averaging', () => {
+  it('averages normalized probs across multiple bookmakers', () => {
+    // Bookmaker 1: Home=2.0, Draw=3.5, Away=4.0  → home dominant
+    // Bookmaker 2: Home=4.0, Draw=3.5, Away=2.0  → away dominant
+    // Average should produce a near-balanced result with home≈away
+    const bm1 = makeBookmaker(2.0, 3.5, 4.0, 1, 'Bet365')
+    const bm2 = makeBookmaker(4.0, 3.5, 2.0, 2, 'William Hill')
+    const result = mapOddsToPrediction('WC001', [bm1, bm2])
+    expect(result).not.toBeNull()
+    expect(result!.home_pct + result!.draw_pct + result!.away_pct).toBe(100)
+    // By symmetry, home ≈ away (within 2 due to integer rounding)
+    expect(Math.abs(result!.home_pct - result!.away_pct)).toBeLessThanOrEqual(2)
+  })
+})
+
+describe('mapOddsToPrediction — largest-remainder rounding invariant', () => {
+  it('guarantees home_pct + draw_pct + away_pct === 100 even when naive floor() drifts', () => {
+    // Use 3 bookmakers with odds that create a fractional drift scenario.
+    // The specific values are chosen so that simple floor() of percentages won't sum to 100.
+    const bm1 = makeBookmaker(1.8, 3.6, 5.0, 1, 'BM1')
+    const bm2 = makeBookmaker(1.9, 3.4, 4.8, 2, 'BM2')
+    const bm3 = makeBookmaker(1.75, 3.7, 5.5, 3, 'BM3')
+    const result = mapOddsToPrediction('WC001', [bm1, bm2, bm3])
+    expect(result).not.toBeNull()
+    expect(result!.home_pct + result!.draw_pct + result!.away_pct).toBe(100)
   })
 })

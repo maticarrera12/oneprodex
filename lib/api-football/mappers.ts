@@ -3,6 +3,7 @@ import type {
   AFH2HMatch,
   AFLineupTeam,
   AFMatchEvent,
+  AFOddsBookmaker,
   AFPredictionItem,
   AFSquadPlayer,
   AFStanding,
@@ -186,6 +187,84 @@ export function mapPrediction(
     draw_pct: draw,
     away_pct: away,
     advice: advice ?? null,
+    synced_at: new Date().toISOString(),
+  }
+}
+
+/**
+ * Converts bookmaker odds to a MatchPredictionRow using implied probability averaging.
+ *
+ * Algorithm:
+ * 1. For each bookmaker, find the "Match Winner" bet.
+ * 2. Parse H/D/A odds → implied probability (1/odd), normalize so they sum to 1.
+ * 3. Average the normalized probabilities across all valid bookmakers.
+ * 4. Convert to integers 0–100 using largest-remainder rounding (sum guaranteed = 100).
+ * 5. Return null if no bookmaker provides a valid "Match Winner" bet.
+ */
+export function mapOddsToPrediction(
+  fixtureId: string,
+  bookmakers: AFOddsBookmaker[],
+): MatchPredictionRow | null {
+  const accumulated = { home: 0, draw: 0, away: 0 }
+  let validCount = 0
+
+  for (const bookmaker of bookmakers) {
+    const matchWinnerBet = bookmaker.bets.find((b) => b.name === 'Match Winner')
+    if (!matchWinnerBet) continue
+
+    const homeVal = matchWinnerBet.values.find((v) => v.value === 'Home')
+    const drawVal = matchWinnerBet.values.find((v) => v.value === 'Draw')
+    const awayVal = matchWinnerBet.values.find((v) => v.value === 'Away')
+
+    if (!homeVal || !drawVal || !awayVal) continue
+
+    const pH = 1 / parseFloat(homeVal.odd)
+    const pD = 1 / parseFloat(drawVal.odd)
+    const pA = 1 / parseFloat(awayVal.odd)
+    const sum = pH + pD + pA
+
+    if (sum <= 0) continue
+
+    accumulated.home += pH / sum
+    accumulated.draw += pD / sum
+    accumulated.away += pA / sum
+    validCount++
+  }
+
+  if (validCount === 0) return null
+
+  const avgHome = accumulated.home / validCount
+  const avgDraw = accumulated.draw / validCount
+  const avgAway = accumulated.away / validCount
+
+  // Largest-remainder rounding: guarantees integers summing to exactly 100.
+  const scaled = [
+    { key: 'home' as const, value: avgHome * 100 },
+    { key: 'draw' as const, value: avgDraw * 100 },
+    { key: 'away' as const, value: avgAway * 100 },
+  ]
+
+  const floors = scaled.map((s) => ({ key: s.key, floor: Math.floor(s.value), remainder: s.value - Math.floor(s.value) }))
+  const totalFloor = floors.reduce((acc, s) => acc + s.floor, 0)
+  const remainder = 100 - totalFloor
+
+  floors.sort((a, b) => b.remainder - a.remainder)
+  for (let i = 0; i < remainder; i++) {
+    floors[i].floor++
+  }
+
+  const pcts = Object.fromEntries(floors.map((f) => [f.key, f.floor])) as {
+    home: number
+    draw: number
+    away: number
+  }
+
+  return {
+    match_id: fixtureId,
+    home_pct: pcts.home,
+    draw_pct: pcts.draw,
+    away_pct: pcts.away,
+    advice: null,
     synced_at: new Date().toISOString(),
   }
 }
