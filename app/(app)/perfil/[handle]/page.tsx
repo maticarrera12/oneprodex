@@ -43,6 +43,7 @@ export default async function FriendProfilePage({ params }: Props) {
     getFriendPredictionsTab(service, friendUserId),
   ])
 
+  // profileData is null when the user exists (handle resolved) but hasn't completed onboarding yet.
   if (!profileData) {
     notFound()
   }

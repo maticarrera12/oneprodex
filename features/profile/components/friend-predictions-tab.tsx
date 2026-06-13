@@ -81,11 +81,13 @@ function FinishedLiveRow({
   isLast: boolean
 }) {
   const predPillClass =
-    entry.kind === "exact"
-      ? "border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-primary)"
-      : entry.kind === "result"
-        ? "border-(--color-amber)/40 bg-(--color-amber)/10 text-(--color-amber)"
-        : "border-red-400/40 bg-red-400/10 text-red-400"
+    entry.status === "LIVE"
+      ? "border-(--color-border-hi) bg-(--color-card-hi) text-(--color-text2)"
+      : entry.kind === "exact"
+        ? "border-(--color-lime-deep) bg-(--color-lime-bg) text-(--color-primary)"
+        : entry.kind === "result"
+          ? "border-(--color-amber)/40 bg-(--color-amber)/10 text-(--color-amber)"
+          : "border-red-400/40 bg-red-400/10 text-red-400"
 
   const hasPick = entry.predictedHome !== null && entry.predictedAway !== null
   const ptsClass =

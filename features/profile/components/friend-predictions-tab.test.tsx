@@ -92,4 +92,18 @@ describe("FriendPredictionsTab", () => {
     expect(screen.getByText(/próximos/i)).toBeInTheDocument()
     expect(screen.getByText(/sin predicción/i)).toBeInTheDocument()
   })
+
+  it("LIVE entry with a pick does NOT get the red miss class (W1)", () => {
+    const data: FriendPredictionsTabData = {
+      finished: [],
+      live: [makeLive("l1")],
+      upcomingNext5: [],
+    }
+    render(<FriendPredictionsTab data={data} />)
+    // The prediction pill shows "1 - 0" (the live pick)
+    const pill = screen.getByText("1 - 0")
+    // Must NOT carry the red miss class tokens
+    expect(pill.className).not.toContain("text-red-400")
+    expect(pill.className).not.toContain("bg-red-400")
+  })
 })

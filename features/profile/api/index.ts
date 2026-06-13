@@ -424,21 +424,33 @@ export async function getUserByHandle(
   return data.id
 }
 
-/** Raw row shape returned by the predictions+matches join for the friend tab */
-type FriendPredictionsMatchRow = {
+/** Embedded prediction object in the inverted matches→predictions join */
+interface FriendPredictionEmbedRow {
   home_score: number | null
   away_score: number | null
   points: number | null
-  matches: {
-    id: string
-    home_team_code: string
-    away_team_code: string
-    home_score: number | null
-    away_score: number | null
-    kickoff: string
-    stage: string
-    status: string
-  } | null
+}
+
+/**
+ * Raw row shape returned by the inverted finished+live query:
+ * FROM matches WITH predictions!inner(...) filtered by user_id and status IN [FINISHED,LIVE]
+ */
+type FriendPredictionsMatchRow = {
+  id: string
+  home_team_code: string
+  away_team_code: string
+  home_score: number | null
+  away_score: number | null
+  kickoff: string
+  stage: string
+  status: string
+  predictions: FriendPredictionEmbedRow[]
+}
+
+/** Embedded upcoming prediction (left join — may be empty) */
+interface FriendUpcomingPredictionEmbedRow {
+  home_score: number
+  away_score: number
 }
 
 /** Raw upcoming row (match left-joined with the friend's prediction if any) */
@@ -447,10 +459,7 @@ type FriendUpcomingMatchRow = {
   home_team_code: string
   away_team_code: string
   kickoff: string
-  predictions: Array<{
-    home_score: number
-    away_score: number
-  }>
+  predictions: FriendUpcomingPredictionEmbedRow[]
 }
 
 export interface FriendPredictionEntry {
@@ -490,39 +499,40 @@ export function mapFriendPredictionEntry(
   row: FriendPredictionsMatchRow,
   teamLookup: ReturnType<typeof buildTeamsLookup>,
 ): FriendPredictionEntry | null {
-  const m = row.matches
-  if (!m) return null
+  // Row is now match-centric (FROM matches WITH predictions!inner).
+  // The embedded predictions array always has exactly one element (inner join by user_id).
+  const pick = row.predictions[0] ?? null
 
-  const homeTeamRecord = resolveTeam(m.home_team_code, teamLookup)
-  const awayTeamRecord = resolveTeam(m.away_team_code, teamLookup)
+  const homeTeamRecord = resolveTeam(row.home_team_code, teamLookup)
+  const awayTeamRecord = resolveTeam(row.away_team_code, teamLookup)
 
-  const predictedHome = row.home_score
-  const predictedAway = row.away_score
+  const predictedHome = pick?.home_score ?? null
+  const predictedAway = pick?.away_score ?? null
 
   let kind: ProfileHistoryKind | null = null
   if (
-    m.status === "FINISHED" &&
+    row.status === "FINISHED" &&
     predictedHome !== null &&
     predictedAway !== null &&
-    m.home_score !== null &&
-    m.away_score !== null
+    row.home_score !== null &&
+    row.away_score !== null
   ) {
-    kind = computePredictionKind(predictedHome, predictedAway, m.home_score, m.away_score)
+    kind = computePredictionKind(predictedHome, predictedAway, row.home_score, row.away_score)
   }
 
   return {
-    matchId: m.id,
-    homeTeam: homeTeamRecord?.name ?? m.home_team_code,
-    awayTeam: awayTeamRecord?.name ?? m.away_team_code,
+    matchId: row.id,
+    homeTeam: homeTeamRecord?.name ?? row.home_team_code,
+    awayTeam: awayTeamRecord?.name ?? row.away_team_code,
     homeLogo: normalizeLogoUrl(homeTeamRecord?.logo ?? null),
     awayLogo: normalizeLogoUrl(awayTeamRecord?.logo ?? null),
-    kickoff: m.kickoff,
-    status: m.status as "FINISHED" | "LIVE",
+    kickoff: row.kickoff,
+    status: row.status as "FINISHED" | "LIVE",
     predictedHome,
     predictedAway,
-    actualHome: m.home_score,
-    actualAway: m.away_score,
-    pts: row.points,
+    actualHome: row.home_score,
+    actualAway: row.away_score,
+    pts: pick?.points ?? null,
     kind,
   }
 }
@@ -532,15 +542,19 @@ export async function getFriendPredictionsTab(
   friendUserId: string,
 ): Promise<FriendPredictionsTabData> {
   const [finishedLiveResult, upcomingResult, teamsResult] = await Promise.all([
+    // Inverted query: FROM matches with predictions!inner so PostgREST filters parent rows server-side.
+    // Only matches that have a prediction from this user AND are FINISHED/LIVE are returned.
     supabase
-      .from("predictions")
+      .from("matches")
       .select(
-        "home_score, away_score, points, matches(id, home_team_code, away_team_code, home_score, away_score, kickoff, stage, status)",
+        "id, home_team_code, away_team_code, home_score, away_score, kickoff, stage, status, predictions!inner(home_score, away_score, points)",
       )
-      .eq("user_id", friendUserId)
-      .in("matches.status", ["FINISHED", "LIVE"])
-      .not("matches", "is", null)
-      .order("kickoff", { referencedTable: "matches", ascending: false }),
+      .in("status", ["FINISHED", "LIVE"])
+      .eq("predictions.user_id", friendUserId)
+      .order("kickoff", { ascending: false })
+      .limit(30),
+    // Upcoming: LEFT join so matches with no friend pick still appear ("Sin predicción").
+    // Embedded filter attaches only the friend's pick (or nothing) — does not exclude the parent row.
     supabase
       .from("matches")
       .select("id, home_team_code, away_team_code, kickoff, predictions!left(home_score, away_score)")
@@ -556,7 +570,7 @@ export async function getFriendPredictionsTab(
   const finishedLiveRows = (finishedLiveResult.data ?? []) as FriendPredictionsMatchRow[]
   const finishedLiveEntries = finishedLiveRows
     .map((row) => mapFriendPredictionEntry(row, teamLookup))
-    .filter((e): e is FriendPredictionEntry => e !== null && ["FINISHED", "LIVE"].includes(e.status))
+    .filter((e): e is FriendPredictionEntry => e !== null)
 
   const finished = finishedLiveEntries.filter((e) => e.status === "FINISHED")
   const live = finishedLiveEntries.filter((e) => e.status === "LIVE")

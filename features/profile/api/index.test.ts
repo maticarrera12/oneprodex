@@ -296,24 +296,21 @@ describe("getUserByHandle", () => {
   })
 })
 
-// --- Task 1.4: RED tests for mapFriendPredictionEntry ---
+// --- Task 1.4: tests for mapFriendPredictionEntry (match-centric row shape after C1) ---
 describe("mapFriendPredictionEntry", () => {
   const noopLookup = { byCode: new Map(), byApiId: new Map() }
 
+  // Row is now match-centric: FROM matches WITH predictions!inner(...)
   const baseMatchRow = {
+    id: "match-1",
+    home_team_code: "ARG",
+    away_team_code: "BRA",
     home_score: 1,
     away_score: 0,
-    points: 3,
-    matches: {
-      id: "match-1",
-      home_team_code: "ARG",
-      away_team_code: "BRA",
-      home_score: 1,
-      away_score: 0,
-      kickoff: "2026-06-14T18:00:00Z",
-      stage: "GROUP",
-      status: "FINISHED",
-    },
+    kickoff: "2026-06-14T18:00:00Z",
+    stage: "GROUP",
+    status: "FINISHED",
+    predictions: [{ home_score: 1, away_score: 0, points: 3 }],
   }
 
   it("maps a row with a pick to FriendPredictionEntry with kind=exact", () => {
@@ -331,13 +328,8 @@ describe("mapFriendPredictionEntry", () => {
     expect(entry!.status).toBe("FINISHED")
   })
 
-  it("maps a row with no prediction scores → predictedHome/Away null, kind null", () => {
-    const rowWithNoPick = {
-      ...baseMatchRow,
-      home_score: null,
-      away_score: null,
-      points: null,
-    }
+  it("maps a row with empty predictions array → predictedHome/Away null, kind null", () => {
+    const rowWithNoPick = { ...baseMatchRow, predictions: [] }
     const entry = mapFriendPredictionEntry(rowWithNoPick, noopLookup as never)
     expect(entry).not.toBeNull()
     expect(entry!.predictedHome).toBeNull()
@@ -346,30 +338,35 @@ describe("mapFriendPredictionEntry", () => {
     expect(entry!.kind).toBeNull()
   })
 
-  it("returns null when matches is null", () => {
-    const rowNoMatch = { home_score: 1, away_score: 0, points: 3, matches: null }
-    const entry = mapFriendPredictionEntry(rowNoMatch, noopLookup as never)
-    expect(entry).toBeNull()
+  it("maps a LIVE row — kind is null even with a pick (scores not final)", () => {
+    const liveRow = {
+      ...baseMatchRow,
+      status: "LIVE",
+      home_score: 1,
+      away_score: 0,
+      predictions: [{ home_score: 1, away_score: 0, points: null }],
+    }
+    const entry = mapFriendPredictionEntry(liveRow, noopLookup as never)
+    expect(entry).not.toBeNull()
+    expect(entry!.kind).toBeNull()
+    expect(entry!.status).toBe("LIVE")
   })
 })
 
-// --- Task 1.7: RED tests for getFriendPredictionsTab ---
+// --- Task 1.7 / C2: strict-spy tests for getFriendPredictionsTab ---
 describe("getFriendPredictionsTab", () => {
+  // Rows returned by the inverted query: FROM matches WITH predictions!inner(...)
   function makeFinishedLiveRow(status: "FINISHED" | "LIVE", matchId: string, kickoff: string) {
     return {
+      id: matchId,
+      home_team_code: "ARG",
+      away_team_code: "BRA",
       home_score: 2,
       away_score: 1,
-      points: status === "FINISHED" ? 3 : null,
-      matches: {
-        id: matchId,
-        home_team_code: "ARG",
-        away_team_code: "BRA",
-        home_score: 2,
-        away_score: 1,
-        kickoff,
-        stage: "GROUP",
-        status,
-      },
+      kickoff,
+      stage: "GROUP",
+      status,
+      predictions: [{ home_score: 2, away_score: 1, points: status === "FINISHED" ? 3 : null }],
     }
   }
 
@@ -383,44 +380,85 @@ describe("getFriendPredictionsTab", () => {
     }
   }
 
-  function makeSupabase(finishedLiveRows: unknown[], upcomingRows: unknown[]) {
+  // Strict spy: records every call made on the builder chain
+  type CallRecord = { method: string; args: unknown[] }
+
+  function makeStrictSupabase(finishedLiveRows: unknown[], upcomingRows: unknown[]) {
+    const matchesCalls: CallRecord[] = []
+
+    function recordCall(method: string, args: unknown[]) {
+      matchesCalls.push({ method, args })
+    }
+
+    const matchesChain = {
+      select: (cols: string) => { recordCall("select", [cols]); return matchesChain },
+      in: (col: string, vals: unknown[]) => { recordCall("in", [col, vals]); return matchesChain },
+      eq: (col: string, val: unknown) => { recordCall("eq", [col, val]); return matchesChain },
+      order: (col: string, opts?: unknown) => { recordCall("order", [col, opts]); return matchesChain },
+      limit: (n: number) => { recordCall("limit", [n]); return Promise.resolve({ data: finishedLiveRows, error: null }) },
+    }
+
+    // Separate chain for upcoming (second matches query — needs limit too)
+    // We track separate for clarity but reuse matchesCalls
+    const upcomingChain = {
+      select: (cols: string) => { recordCall("select:upcoming", [cols]); return upcomingChain },
+      in: (col: string, vals: unknown[]) => { recordCall("in:upcoming", [col, vals]); return upcomingChain },
+      eq: (col: string, val: unknown) => { recordCall("eq:upcoming", [col, val]); return upcomingChain },
+      order: (col: string, opts?: unknown) => { recordCall("order:upcoming", [col, opts]); return upcomingChain },
+      limit: (n: number) => { recordCall("limit:upcoming", [n]); return Promise.resolve({ data: upcomingRows, error: null }) },
+    }
+
+    let matchesCallCount = 0
+
     return {
+      _calls: matchesCalls,
       from: (table: string) => {
-        if (table === "predictions") {
-          return {
-            select: () => ({
-              eq: () => ({
-                in: () => ({
-                  not: () => ({
-                    order: () => Promise.resolve({ data: finishedLiveRows, error: null }),
-                  }),
-                }),
-              }),
-            }),
-          }
-        }
         if (table === "matches") {
-          return {
-            select: () => ({
-              eq: (_col: string, _val: string) => ({
-                eq: (_col2: string, _val2: string) => ({
-                  order: () => ({
-                    limit: () => Promise.resolve({ data: upcomingRows, error: null }),
-                  }),
-                }),
-              }),
-            }),
-          }
+          matchesCallCount++
+          return matchesCallCount === 1 ? matchesChain : upcomingChain
         }
         if (table === "teams") {
-          return {
-            select: () => Promise.resolve({ data: [], error: null }),
-          }
+          return { select: () => Promise.resolve({ data: [], error: null }) }
         }
         throw new Error(`Unexpected table: ${table}`)
       },
     }
   }
+
+  it("finished+live query goes FROM matches with correct filters, order, and limit", async () => {
+    const rows = [
+      makeFinishedLiveRow("FINISHED", "m1", "2026-06-10T18:00:00Z"),
+      makeFinishedLiveRow("LIVE", "m4", "2026-06-14T18:00:00Z"),
+    ]
+    const spy = makeStrictSupabase(rows, [])
+    await getFriendPredictionsTab(spy as never, "friend-123")
+
+    const calls = spy._calls
+    // Must filter by status IN ["FINISHED","LIVE"] on the parent matches table
+    expect(calls).toContainEqual({ method: "in", args: ["status", ["FINISHED", "LIVE"]] })
+    // Must filter predictions by user_id (embedded filter on the joined resource)
+    expect(calls).toContainEqual({ method: "eq", args: ["predictions.user_id", "friend-123"] })
+    // Must order by kickoff descending
+    expect(calls).toContainEqual({ method: "order", args: ["kickoff", { ascending: false }] })
+    // Must have a limit of 30
+    expect(calls).toContainEqual({ method: "limit", args: [30] })
+  })
+
+  it("upcoming query uses correct filter, order, and limit", async () => {
+    const upcoming = [makeUpcomingRow("u1", "2026-06-20T18:00:00Z", true)]
+    const spy = makeStrictSupabase([], upcoming)
+    await getFriendPredictionsTab(spy as never, "friend-456")
+
+    const calls = spy._calls
+    // Must filter by status = UPCOMING
+    expect(calls).toContainEqual({ method: "eq:upcoming", args: ["status", "UPCOMING"] })
+    // Must filter embedded predictions by user_id
+    expect(calls).toContainEqual({ method: "eq:upcoming", args: ["predictions.user_id", "friend-456"] })
+    // Must order kickoff ascending (soonest first)
+    expect(calls).toContainEqual({ method: "order:upcoming", args: ["kickoff", { ascending: true }] })
+    // Must limit to 5
+    expect(calls).toContainEqual({ method: "limit:upcoming", args: [5] })
+  })
 
   it("returns finished and live arrays from finished+live query rows", async () => {
     const rows = [
@@ -433,8 +471,8 @@ describe("getFriendPredictionsTab", () => {
       makeUpcomingRow("u1", "2026-06-20T18:00:00Z", true),
       makeUpcomingRow("u2", "2026-06-21T18:00:00Z", false),
     ]
-    const supabase = makeSupabase(rows, upcoming)
-    const result = await getFriendPredictionsTab(supabase as never, "friend-123")
+    const spy = makeStrictSupabase(rows, upcoming)
+    const result = await getFriendPredictionsTab(spy as never, "friend-123")
 
     expect(result.finished).toHaveLength(3)
     expect(result.live).toHaveLength(1)
@@ -442,8 +480,8 @@ describe("getFriendPredictionsTab", () => {
   })
 
   it("returns all-empty arrays when no data", async () => {
-    const supabase = makeSupabase([], [])
-    const result = await getFriendPredictionsTab(supabase as never, "friend-123")
+    const spy = makeStrictSupabase([], [])
+    const result = await getFriendPredictionsTab(spy as never, "friend-123")
     expect(result.finished).toHaveLength(0)
     expect(result.live).toHaveLength(0)
     expect(result.upcomingNext5).toHaveLength(0)
@@ -454,8 +492,8 @@ describe("getFriendPredictionsTab", () => {
       makeUpcomingRow("u1", "2026-06-20T18:00:00Z", true),
       makeUpcomingRow("u2", "2026-06-21T18:00:00Z", false),
     ]
-    const supabase = makeSupabase([], upcoming)
-    const result = await getFriendPredictionsTab(supabase as never, "friend-123")
+    const spy = makeStrictSupabase([], upcoming)
+    const result = await getFriendPredictionsTab(spy as never, "friend-123")
     expect(result.upcomingNext5[0].predictedHome).toBe(1)
     expect(result.upcomingNext5[0].predictedAway).toBe(0)
     expect(result.upcomingNext5[1].predictedHome).toBeNull()

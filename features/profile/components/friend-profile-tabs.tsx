@@ -4,10 +4,9 @@ import { useState } from "react"
 import { getBracketData } from "@/features/bracket/api"
 import { BracketScreen } from "@/features/bracket/components/bracket-screen"
 import { EmptyState } from "@/features/shared/components/empty-state"
-import type { ProfileData } from "@/features/profile/api"
+import type { FriendPredictionsTabData, ProfileData } from "@/features/profile/api"
 import { FriendPredictionsTab } from "@/features/profile/components/friend-predictions-tab"
 import ProfileScreen from "@/features/profile/components/profile-screen"
-import type { FriendPredictionsTabData } from "@/features/profile/api"
 
 type BracketData = NonNullable<Awaited<ReturnType<typeof getBracketData>>>
 
