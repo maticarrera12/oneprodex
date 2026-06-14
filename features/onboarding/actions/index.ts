@@ -294,15 +294,14 @@ export async function saveTournamentPredictions(formData: FormData): Promise<voi
 
   const service = createServiceClient()
 
-  // Awards are immutable once all three required picks exist.
-  const awardsLockResult = await service
-    .from("tournament_predictions")
-    .select("top_scorer_api_id,best_player_api_id,best_young_player_api_id")
-    .eq("user_id", userId)
-    .maybeSingle()
-  if (awardsLockResult.error) throw new Error(awardsLockResult.error.message)
-  const existing = awardsLockResult.data
-  if (existing?.top_scorer_api_id && existing?.best_player_api_id && existing?.best_young_player_api_id) {
+  // Awards are immutable once onboarding is complete. Key the lock off
+  // users.awards_at — the same canonical completion flag saveBracketPicks
+  // uses — instead of the presence of award rows. A redo flow that clears
+  // awards_at must reopen BOTH the bracket and the awards; locking on the
+  // stale tournament_predictions rows here would dead-end such a redo.
+  const lockResult = await service.from("users").select("awards_at").eq("id", userId).maybeSingle()
+  if (lockResult.error) throw new Error(lockResult.error.message)
+  if (lockResult.data?.awards_at) {
     throw new Error("Forbidden: awards already submitted")
   }
 
