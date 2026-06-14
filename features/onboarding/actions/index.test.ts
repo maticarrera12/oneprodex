@@ -874,17 +874,37 @@ describe("onboarding actions", () => {
   })
 
   describe("saveTournamentPredictions", () => {
-    it("marks awards_at when all awards are saved", async () => {
-      const tournamentSelectChain = {
+    it("rejects when awards_at is already set", async () => {
+      const lockChain = {
         eq: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockResolvedValue({
-          data: {
-            top_scorer_api_id: null,
-            best_player_api_id: null,
-            best_young_player_api_id: null,
-          },
-          error: null,
+        maybeSingle: vi.fn().mockResolvedValue({ data: { awards_at: "2026-05-14T00:00:00Z" }, error: null }),
+      }
+      const tournamentUpsert = vi.fn()
+      const service = {
+        from: vi.fn((table: string) => {
+          if (table === "users") return { select: vi.fn().mockReturnValue(lockChain) }
+          if (table === "tournament_predictions") return { upsert: tournamentUpsert }
+          throw new Error(`Unexpected table ${table}`)
         }),
+      }
+      mocks.createServiceClient.mockReturnValue(service)
+
+      await expect(
+        saveTournamentPredictions(
+          buildMultiFormData({
+            top_scorer_api_id: "10",
+            best_player_api_id: "20",
+            best_young_player_api_id: "30",
+          })
+        )
+      ).rejects.toThrow("Forbidden: awards already submitted")
+      expect(tournamentUpsert).not.toHaveBeenCalled()
+    })
+
+    it("marks awards_at when all awards are saved", async () => {
+      const lockChain = {
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { awards_at: null }, error: null }),
       }
       const tournamentUpsert = vi.fn().mockResolvedValue({ error: null })
       const userUpdateEq = vi.fn().mockResolvedValue({ error: null })
@@ -893,11 +913,10 @@ describe("onboarding actions", () => {
         from: vi.fn((table: string) => {
           if (table === "tournament_predictions") {
             return {
-              select: vi.fn().mockReturnValue(tournamentSelectChain),
               upsert: tournamentUpsert,
             }
           }
-          if (table === "users") return { update: userUpdate }
+          if (table === "users") return { select: vi.fn().mockReturnValue(lockChain), update: userUpdate }
           throw new Error(`Unexpected table ${table}`)
         }),
       }
