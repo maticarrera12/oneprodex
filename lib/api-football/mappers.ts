@@ -62,6 +62,7 @@ export function mapTeam(team: AFTeam): TeamRow {
 
 export function mapFixture(fixture: AFFixture, teamCodeMap: Map<number, string>): MatchRow {
   const status = mapFixtureStatus(fixture.fixture.status.short)
+  const penalty = fixture.score?.penalty ?? null
 
   return {
     id: String(fixture.fixture.id),
@@ -69,6 +70,8 @@ export function mapFixture(fixture: AFFixture, teamCodeMap: Map<number, string>)
     away_team_code: teamCodeMap.get(fixture.teams.away.id) ?? String(fixture.teams.away.id),
     home_score: fixture.goals.home,
     away_score: fixture.goals.away,
+    home_pen_score: penalty?.home ?? null,
+    away_pen_score: penalty?.away ?? null,
     status,
     minute: fixture.fixture.status.elapsed,
     kickoff: fixture.fixture.date,

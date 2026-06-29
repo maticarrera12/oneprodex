@@ -3,8 +3,78 @@ import { BRACKET_SCORING } from "@/features/scoring/constants"
 import {
   bracketPointsForSlot,
   buildBracketPickPointsUpdates,
+  matchWinner,
   resolveBracketSlotForMatch,
 } from "@/features/scoring/bracket"
+
+// ─── matchWinner ─────────────────────────────────────────────────────────────
+
+describe("matchWinner", () => {
+  const base = {
+    id: "m1",
+    home_team_code: "ARG",
+    away_team_code: "FRA",
+    home_score: null,
+    away_score: null,
+    home_pen_score: null,
+    away_pen_score: null,
+    status: "FINISHED",
+    kickoff: "2026-07-19T18:00:00Z",
+    stage: "Final",
+  }
+
+  it("returns null when status is not FINISHED", () => {
+    const m = { ...base, home_score: 1, away_score: 0, status: "LIVE" }
+    expect(matchWinner(m)).toBeNull()
+  })
+
+  it("returns null when home_score is null", () => {
+    const m = { ...base, home_score: null, away_score: 0 }
+    expect(matchWinner(m)).toBeNull()
+  })
+
+  it("returns null when away_score is null", () => {
+    const m = { ...base, home_score: 1, away_score: null }
+    expect(matchWinner(m)).toBeNull()
+  })
+
+  it("returns home team code when home wins regular time", () => {
+    const m = { ...base, home_score: 2, away_score: 1 }
+    expect(matchWinner(m)).toBe("ARG")
+  })
+
+  it("returns away team code when away wins regular time", () => {
+    const m = { ...base, home_score: 0, away_score: 3 }
+    expect(matchWinner(m)).toBe("FRA")
+  })
+
+  it("resolves draw via home penalty win → home team code", () => {
+    const m = { ...base, home_score: 3, away_score: 3, home_pen_score: 4, away_pen_score: 2 }
+    expect(matchWinner(m)).toBe("ARG")
+  })
+
+  it("resolves draw via away penalty win → away team code", () => {
+    const m = { ...base, home_score: 1, away_score: 1, home_pen_score: 3, away_pen_score: 5 }
+    expect(matchWinner(m)).toBe("FRA")
+  })
+
+  it("returns null on draw when penalty data is absent", () => {
+    const m = { ...base, home_score: 2, away_score: 2, home_pen_score: null, away_pen_score: null }
+    expect(matchWinner(m)).toBeNull()
+  })
+
+  it("returns null on draw when only one pen score is available", () => {
+    const m = { ...base, home_score: 0, away_score: 0, home_pen_score: 4, away_pen_score: null }
+    expect(matchWinner(m)).toBeNull()
+  })
+
+  it("returns null on draw when penalty scores are equal", () => {
+    const m = { ...base, home_score: 1, away_score: 1, home_pen_score: 5, away_pen_score: 5 }
+    expect(matchWinner(m)).toBeNull()
+  })
+})
+
+// ─── bracketPointsForSlot ─────────────────────────────────────────────────────
 
 describe("bracketPointsForSlot", () => {
   it("escalates by round", () => {

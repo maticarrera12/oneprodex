@@ -9,12 +9,14 @@ type KnockoutStage =
   | "3rd Place Final"
   | "Final"
 
-type KnockoutMatch = {
+export type KnockoutMatch = {
   id: string
   home_team_code: string
   away_team_code: string
   home_score: number | null
   away_score: number | null
+  home_pen_score: number | null
+  away_pen_score: number | null
   status: string
   kickoff: string | null
   stage: string
@@ -66,11 +68,25 @@ export function isKnockoutStage(stage: string): stage is KnockoutStage {
   return KNOCKOUT_STAGES.has(stage)
 }
 
-function matchWinner(match: KnockoutMatch): string | null {
+type WinnerResolvable = Pick<
+  KnockoutMatch,
+  "home_team_code" | "away_team_code" | "home_score" | "away_score" | "home_pen_score" | "away_pen_score" | "status"
+>
+
+export function matchWinner(match: WinnerResolvable): string | null {
   if (match.status !== "FINISHED") return null
   if (match.home_score === null || match.away_score === null) return null
-  if (match.home_score === match.away_score) return null
-  return match.home_score > match.away_score ? match.home_team_code : match.away_team_code
+
+  if (match.home_score !== match.away_score) {
+    return match.home_score > match.away_score ? match.home_team_code : match.away_team_code
+  }
+
+  // Draw: resolve via penalty shoot-out scores
+  if (match.home_pen_score === null || match.away_pen_score === null) return null
+  if (match.home_pen_score > match.away_pen_score) return match.home_team_code
+  if (match.away_pen_score > match.home_pen_score) return match.away_team_code
+
+  return null
 }
 
 export function resolveBracketSlotForMatch(
@@ -101,5 +117,3 @@ export function buildBracketPickPointsUpdates(
     points: pick.team_code === winner ? award : 0,
   }))
 }
-
-export { matchWinner }

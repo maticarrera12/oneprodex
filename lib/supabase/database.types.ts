@@ -379,9 +379,11 @@ export type Database = {
       }
       matches: {
         Row: {
+          away_pen_score: number | null
           away_score: number | null
           away_team_code: string
           group_code: string | null
+          home_pen_score: number | null
           home_score: number | null
           home_team_code: string
           id: string
@@ -393,9 +395,11 @@ export type Database = {
           synced_at: string | null
         }
         Insert: {
+          away_pen_score?: number | null
           away_score?: number | null
           away_team_code: string
           group_code?: string | null
+          home_pen_score?: number | null
           home_score?: number | null
           home_team_code: string
           id: string
@@ -407,9 +411,11 @@ export type Database = {
           synced_at?: string | null
         }
         Update: {
+          away_pen_score?: number | null
           away_score?: number | null
           away_team_code?: string
           group_code?: string | null
+          home_pen_score?: number | null
           home_score?: number | null
           home_team_code?: string
           id?: string

@@ -126,6 +126,8 @@ async function scoreMatch(
     id: string
     home_score: number | null
     away_score: number | null
+    home_pen_score: number | null
+    away_pen_score: number | null
     home_team_code: string
     away_team_code: string
     status: string

@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GroupCode, GroupRankings } from "@/features/onboarding/types"
 import { resolveR32Pairs } from "@/features/onboarding/utils/slot-resolver"
 import type { BracketRound, BracketScoreStat } from "@/features/bracket/types"
+import { matchWinner } from "@/features/scoring/bracket"
+import type { KnockoutMatch } from "@/features/scoring/bracket"
 import { BRACKET_SCORING } from "@/features/scoring/constants"
 import type { Database } from "@/lib/supabase/database.types"
 import { applyWorldCupSeasonKickoffFilter } from "@/lib/world-cup/season"
@@ -22,7 +24,7 @@ type BracketData = {
 type TeamRow = Pick<Database["public"]["Tables"]["teams"]["Row"], "code" | "name" | "logo">
 type GroupPickRow = Pick<Database["public"]["Tables"]["group_picks"]["Row"], "group_code" | "position" | "team_code">
 type BracketPickRow = Pick<Database["public"]["Tables"]["bracket_picks"]["Row"], "slot" | "team_code">
-type KnockoutMatchRow = Pick<Database["public"]["Tables"]["matches"]["Row"], "id" | "home_team_code" | "away_team_code" | "home_score" | "away_score" | "status" | "kickoff" | "stage">
+type KnockoutMatchRow = Pick<Database["public"]["Tables"]["matches"]["Row"], "id" | "home_team_code" | "away_team_code" | "home_score" | "away_score" | "home_pen_score" | "away_pen_score" | "status" | "kickoff" | "stage">
 
 const KNOCKOUT_STAGES: Array<{ stage: string } & Omit<BracketRound, "matches">> = [
   { stage: "Round of 32",    id: "r32",   title: "Ronda de 32",    wide: true },
@@ -56,9 +58,9 @@ function buildActualRounds(knockoutMatches: KnockoutMatchRow[], logoByCode: Map<
         sb: m.away_score,
         done: m.status === "FINISHED",
         kickoff: m.kickoff,
-        pen: false,
-        sap: null,
-        sbp: null,
+        pen: m.home_pen_score !== null || m.away_pen_score !== null,
+        sap: m.home_pen_score,
+        sbp: m.away_pen_score,
       })),
     }]
   })
@@ -227,14 +229,14 @@ export async function getBracketData(
     applyWorldCupSeasonKickoffFilter(
       supabase
         .from("matches")
-        .select("home_team_code,away_team_code,home_score,away_score,stage")
+        .select("id,home_team_code,away_team_code,home_score,away_score,home_pen_score,away_pen_score,status,kickoff,stage")
         .eq("status", "FINISHED")
         .in("stage", Object.keys(STAGE_TO_SLOT_PREFIX).concat(["Final"])),
     ),
     applyWorldCupSeasonKickoffFilter(
       supabase
         .from("matches")
-        .select("id,home_team_code,away_team_code,home_score,away_score,status,kickoff,stage")
+        .select("id,home_team_code,away_team_code,home_score,away_score,home_pen_score,away_pen_score,status,kickoff,stage")
         .in("stage", KNOCKOUT_STAGES.map((s) => s.stage)),
     ).order("kickoff", { ascending: true }),
   ])
@@ -249,8 +251,8 @@ export async function getBracketData(
 
   const winnersByStage = new Map<string, Set<string>>()
   for (const match of knockoutResult.data ?? []) {
-    if (match.home_score === null || match.away_score === null) continue
-    const winner = match.home_score > match.away_score ? match.home_team_code : match.away_team_code
+    const winner = matchWinner(match as KnockoutMatch)
+    if (!winner) continue
     const set = winnersByStage.get(match.stage) ?? new Set<string>()
     set.add(winner)
     winnersByStage.set(match.stage, set)
