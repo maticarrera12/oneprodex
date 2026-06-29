@@ -1,5 +1,53 @@
-import { mapFixtureStatus, mapH2H, mapLineup, mapMatchEvent, mapOddsToPrediction, mapPlayer, mapPrediction, mapTeam } from '@/lib/api-football/mappers'
-import type { AFH2HMatch, AFLineupTeam, AFMatchEvent, AFOddsBookmaker, AFPredictionItem, AFSquadPlayer, AFTeam } from '@/lib/api-football/types'
+import { mapFixture, mapFixtureStatus, mapH2H, mapLineup, mapMatchEvent, mapOddsToPrediction, mapPlayer, mapPrediction, mapTeam } from '@/lib/api-football/mappers'
+import type { AFFixture, AFH2HMatch, AFLineupTeam, AFMatchEvent, AFOddsBookmaker, AFPredictionItem, AFSquadPlayer, AFTeam } from '@/lib/api-football/types'
+
+// ─── mapFixture — penalty capture ────────────────────────────────────────────
+
+describe('mapFixture — penalty score capture', () => {
+  const teamCodeMap = new Map<number, string>([[10, 'ARG'], [20, 'FRA']])
+
+  function makeFixture(overrides: Partial<AFFixture> = {}): AFFixture {
+    return {
+      fixture: { id: 999, date: '2026-07-19T18:00:00Z', status: { short: 'PEN', elapsed: 120 } },
+      league: { round: 'Final', group: null },
+      teams: { home: { id: 10, code: 'ARG' }, away: { id: 20, code: 'FRA' } },
+      goals: { home: 3, away: 3 },
+      ...overrides,
+    } as AFFixture
+  }
+
+  it("captures home and away penalty scores when penalty data is present", () => {
+    const fixture = {
+      ...makeFixture(),
+      score: { penalty: { home: 4, away: 2 } },
+    } as unknown as AFFixture
+
+    const result = mapFixture(fixture, teamCodeMap) as unknown as Record<string, unknown>
+    expect(result.home_pen_score).toBe(4)
+    expect(result.away_pen_score).toBe(2)
+  })
+
+  it("maps penalty scores to null when penalty object is null in the API response", () => {
+    const fixture = {
+      ...makeFixture(),
+      score: { penalty: { home: null, away: null } },
+    } as unknown as AFFixture
+
+    const result = mapFixture(fixture, teamCodeMap) as unknown as Record<string, unknown>
+    expect(result.home_pen_score).toBeNull()
+    expect(result.away_pen_score).toBeNull()
+  })
+
+  it("maps penalty scores to null when the score field is entirely absent", () => {
+    const fixture = makeFixture() // no score field
+
+    const result = mapFixture(fixture, teamCodeMap) as unknown as Record<string, unknown>
+    expect(result.home_pen_score).toBeNull()
+    expect(result.away_pen_score).toBeNull()
+  })
+})
+
+// ─── mapFixtureStatus ─────────────────────────────────────────────────────────
 
 describe('mapFixtureStatus', () => {
   it('maps known upcoming codes', () => {
