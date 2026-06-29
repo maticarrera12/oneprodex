@@ -144,7 +144,9 @@ describe("deriveOnboardingStep", () => {
     expect(step).toEqual({ status: "bracket" })
   })
 
-  it("returns awards when prode picks were saved to continue but are incomplete", () => {
+  it("returns bracket when prode picks were saved to continue but are incomplete", () => {
+    // Early exit with open matches remaining must still launch the bracket
+    // (seeded off projected standings), not skip straight to awards.
     const step = deriveOnboardingStep({
       awardsAt: null,
       prodePicksSubmittedAt: "2026-06-10T16:00:00.000Z",
@@ -157,7 +159,7 @@ describe("deriveOnboardingStep", () => {
       openPredictedCount: 12,
       openUnpredictedCount: 60,
     })
-    expect(step).toEqual({ status: "awards" })
+    expect(step).toEqual({ status: "bracket" })
   })
 
   it("returns awards when prode picks done and bracket done but awards missing (prode mode)", () => {
@@ -254,7 +256,7 @@ describe("deriveOnboardingStep", () => {
     expect(step).toEqual({ status: "bracket" })
   })
 
-  it("returns awards via submitted-at early-exit even when openUnpredictedCount > 0", () => {
+  it("launches bracket on submitted-at early-exit even when openUnpredictedCount > 0", () => {
     const step = deriveOnboardingStep({
       awardsAt: null,
       prodePicksSubmittedAt: "2026-06-10T16:00:00.000Z",
@@ -262,6 +264,22 @@ describe("deriveOnboardingStep", () => {
       groupPickCount: 0,
       bestThirdCount: 0,
       bracketPickCount: 0,
+      hasTournamentPrediction: false,
+      hasAllAwards: false,
+      openPredictedCount: 5,
+      openUnpredictedCount: 25,
+    })
+    expect(step).toEqual({ status: "bracket" })
+  })
+
+  it("returns awards on early-exit only once the bracket is also complete", () => {
+    const step = deriveOnboardingStep({
+      awardsAt: null,
+      prodePicksSubmittedAt: "2026-06-10T16:00:00.000Z",
+      onboardingMode: "prode",
+      groupPickCount: 0,
+      bestThirdCount: 0,
+      bracketPickCount: 32,
       hasTournamentPrediction: false,
       hasAllAwards: false,
       openPredictedCount: 5,
