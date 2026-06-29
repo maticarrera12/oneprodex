@@ -6,18 +6,8 @@ import {
   matchWinner,
   resolveBracketSlotForMatch,
 } from "@/features/scoring/bracket"
+import type { KnockoutMatch } from "@/features/scoring/bracket"
 import { applyWorldCupSeasonKickoffFilter } from "@/lib/world-cup/season"
-
-type KnockoutMatch = {
-  id: string
-  home_team_code: string
-  away_team_code: string
-  home_score: number | null
-  away_score: number | null
-  status: string
-  kickoff: string | null
-  stage: string
-}
 
 export async function scoreBracketForMatch(
   supabase: SupabaseClient<Database>,
@@ -29,7 +19,7 @@ export async function scoreBracketForMatch(
   if (!winner) return 0
 
   const { data: stageMatches, error: stageError } = await applyWorldCupSeasonKickoffFilter(
-    supabase.from("matches").select("id,home_team_code,away_team_code,home_score,away_score,status,kickoff,stage"),
+    supabase.from("matches").select("id,home_team_code,away_team_code,home_score,away_score,home_pen_score,away_pen_score,status,kickoff,stage"),
   ).eq("stage", match.stage)
 
   if (stageError || !stageMatches) return 0
@@ -62,7 +52,7 @@ export async function scoreAllFinishedBracketMatches(
   supabase: SupabaseClient<Database>,
 ): Promise<{ scored: number; winners: number }> {
   const { data: matches, error } = await applyWorldCupSeasonKickoffFilter(
-    supabase.from("matches").select("id,home_team_code,away_team_code,home_score,away_score,status,kickoff,stage"),
+    supabase.from("matches").select("id,home_team_code,away_team_code,home_score,away_score,home_pen_score,away_pen_score,status,kickoff,stage"),
   )
     .eq("status", "FINISHED")
     .in("stage", [

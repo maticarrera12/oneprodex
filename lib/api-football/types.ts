@@ -68,6 +68,15 @@ export interface AFFixtureTeam {
   name?: string
 }
 
+export interface AFFixturePenaltyScore {
+  home: number | null
+  away: number | null
+}
+
+export interface AFFixtureScore {
+  penalty: AFFixturePenaltyScore | null
+}
+
 export interface AFFixture {
   fixture: AFFixtureInfo
   league: {
@@ -82,6 +91,7 @@ export interface AFFixture {
     home: number | null
     away: number | null
   }
+  score?: AFFixtureScore | null
 }
 
 export interface AFFixturesResponse {
@@ -138,6 +148,8 @@ export interface MatchRow {
   away_team_code: string
   home_score: number | null
   away_score: number | null
+  home_pen_score: number | null
+  away_pen_score: number | null
   status: SyncMatchStatus
   minute: number | null
   kickoff: string
