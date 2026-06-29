@@ -67,6 +67,11 @@ describe("matchWinner", () => {
     const m = { ...base, home_score: 0, away_score: 0, home_pen_score: 4, away_pen_score: null }
     expect(matchWinner(m)).toBeNull()
   })
+
+  it("returns null on draw when penalty scores are equal", () => {
+    const m = { ...base, home_score: 1, away_score: 1, home_pen_score: 5, away_pen_score: 5 }
+    expect(matchWinner(m)).toBeNull()
+  })
 })
 
 // ─── bracketPointsForSlot ─────────────────────────────────────────────────────

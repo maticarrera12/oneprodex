@@ -531,7 +531,7 @@ describe("evalLoVeiaVenir", () => {
   it("awards when the predicted champion wins the real final", async () => {
     const result = await evalLoVeiaVenir(
       "user-1",
-      buildFinalSupabase("ARG", { home_team_code: "ARG", away_team_code: "FRA", home_score: 3, away_score: 1 })
+      buildFinalSupabase("ARG", { home_team_code: "ARG", away_team_code: "FRA", home_score: 3, away_score: 1, status: "FINISHED" })
     )
     expect(result?.achievement_id).toBe("lo_veia_venir")
   })
@@ -540,9 +540,25 @@ describe("evalLoVeiaVenir", () => {
     expect(
       await evalLoVeiaVenir(
         "user-1",
-        buildFinalSupabase("BRZ", { home_team_code: "ARG", away_team_code: "FRA", home_score: 3, away_score: 1 })
+        buildFinalSupabase("BRZ", { home_team_code: "ARG", away_team_code: "FRA", home_score: 3, away_score: 1, status: "FINISHED" })
       )
     ).toBeNull()
+  })
+
+  it("awards when the predicted champion wins the final on penalties", async () => {
+    const result = await evalLoVeiaVenir(
+      "user-1",
+      buildFinalSupabase("ARG", {
+        home_team_code: "ARG",
+        away_team_code: "FRA",
+        home_score: 1,
+        away_score: 1,
+        home_pen_score: 4,
+        away_pen_score: 2,
+        status: "FINISHED",
+      })
+    )
+    expect(result?.achievement_id).toBe("lo_veia_venir")
   })
 })
 

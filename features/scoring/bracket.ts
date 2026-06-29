@@ -68,7 +68,12 @@ export function isKnockoutStage(stage: string): stage is KnockoutStage {
   return KNOCKOUT_STAGES.has(stage)
 }
 
-function matchWinner(match: KnockoutMatch): string | null {
+type WinnerResolvable = Pick<
+  KnockoutMatch,
+  "home_team_code" | "away_team_code" | "home_score" | "away_score" | "home_pen_score" | "away_pen_score" | "status"
+>
+
+export function matchWinner(match: WinnerResolvable): string | null {
   if (match.status !== "FINISHED") return null
   if (match.home_score === null || match.away_score === null) return null
 
@@ -112,5 +117,3 @@ export function buildBracketPickPointsUpdates(
     points: pick.team_code === winner ? award : 0,
   }))
 }
-
-export { matchWinner }

@@ -5,6 +5,7 @@ import {
   type GroupMatchResult,
   type TeamGroupStats,
 } from '@/features/standings/utils/group-tiebreak'
+import { matchWinner } from '@/features/scoring/bracket'
 
 type SupabaseClient = ReturnType<typeof createServiceClient>
 
@@ -493,17 +494,16 @@ export async function evalLoVeiaVenir(
 
   const { data: finalMatch } = await supabase
     .from('matches')
-    .select('home_team_code, away_team_code, home_score, away_score')
+    .select('home_team_code, away_team_code, home_score, away_score, home_pen_score, away_pen_score, status')
     .in('stage', ['Final', 'FINAL'])
     .eq('status', 'FINISHED')
     .maybeSingle()
 
-  if (!finalMatch || finalMatch.home_score === null || finalMatch.away_score === null) return null
+  if (!finalMatch) return null
 
-  let champion: string | null = null
-  if (finalMatch.home_score > finalMatch.away_score) champion = finalMatch.home_team_code
-  else if (finalMatch.away_score > finalMatch.home_score) champion = finalMatch.away_team_code
-
+  // Resolve the champion via the shared penalty-aware helper so a final decided
+  // on penalties (equal regular-time score) still awards the achievement.
+  const champion = matchWinner(finalMatch)
   if (!champion || tournamentPred.champion_code !== champion) return null
 
   return { achievement_id: 'lo_veia_venir', tier: 'bronze', progress_json: null }
