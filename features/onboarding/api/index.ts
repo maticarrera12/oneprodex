@@ -32,8 +32,12 @@ export function deriveOnboardingStep(input: DeriveStepInput): OnboardingStep {
   if (!input.onboardingMode) return { status: 'mode_select' }
 
   if (input.onboardingMode === 'prode') {
-    if (input.openUnpredictedCount > 0) {
-      if (input.prodePicksSubmittedAt) return { status: 'awards' }
+    // Keep predicting only while open group matches remain AND the user has not
+    // chosen to exit early. Exiting early (prodePicksSubmittedAt set) or
+    // finishing all open matches both lead into the bracket, which seeds off the
+    // projected standings derived from whatever predictions exist so far —
+    // partial predictions still produce a complete projected table.
+    if (input.openUnpredictedCount > 0 && !input.prodePicksSubmittedAt) {
       const totalOpen = input.openUnpredictedCount + input.openPredictedCount
       return { status: 'prode_picks', filled: input.openPredictedCount, total: totalOpen }
     }
