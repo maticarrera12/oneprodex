@@ -130,6 +130,10 @@ const SLOT_PARENTS: Partial<Record<SlotId, [SlotId, SlotId]>> = (() => {
   return map
 })()
 
+export function getSlotParents(slot: SlotId): readonly [SlotId, SlotId] | null {
+  return SLOT_PARENTS[slot] ?? null
+}
+
 function matchupHitPointsForSlot(slot: SlotId): number {
   if (slot.startsWith("R16_")) return MATCHUP_HIT_SCORING.R16
   if (slot.startsWith("QF_")) return MATCHUP_HIT_SCORING.QF

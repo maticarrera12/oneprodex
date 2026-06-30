@@ -39,6 +39,8 @@ export type SlotId =
 export interface BracketPick {
   slot: SlotId
   team_code: string
+  home_score: number | null
+  away_score: number | null
 }
 
 export interface OnboardingTeam {

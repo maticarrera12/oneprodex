@@ -19,6 +19,8 @@ type GroupPickInput = {
 type BracketPickInput = {
   slot: SlotId
   team_code: string
+  home_score: number | null
+  away_score: number | null
 }
 
 type SearchPlayer = {
@@ -96,11 +98,22 @@ function parseBestThirds(formData: FormData): string[] {
     .filter(Boolean)
 }
 
+function parseScore(value: unknown): number | null {
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed < 0) return null
+  return parsed
+}
+
 function parseBracketPicks(formData: FormData): BracketPickInput[] {
-  const payload = parseJsonValue<Array<{ slot: string; team_code: string }>>(formData.get("picks"), [])
+  const payload = parseJsonValue<Array<{ slot: string; team_code: string; home_score?: unknown; away_score?: unknown }>>(
+    formData.get("picks"),
+    [],
+  )
   return payload.map((pick) => ({
     slot: pick.slot as SlotId,
     team_code: pick.team_code.trim().toUpperCase(),
+    home_score: parseScore(pick.home_score),
+    away_score: parseScore(pick.away_score),
   }))
 }
 
@@ -262,6 +275,8 @@ export async function saveBracketPicks(formData: FormData): Promise<void> {
         user_id: userId,
         slot: pick.slot,
         team_code: pick.team_code,
+        home_score: pick.home_score,
+        away_score: pick.away_score,
       })),
       { onConflict: "user_id,slot" }
     )

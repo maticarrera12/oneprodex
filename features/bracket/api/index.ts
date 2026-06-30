@@ -23,7 +23,8 @@ type BracketData = {
 
 type TeamRow = Pick<Database["public"]["Tables"]["teams"]["Row"], "code" | "name" | "logo">
 type GroupPickRow = Pick<Database["public"]["Tables"]["group_picks"]["Row"], "group_code" | "position" | "team_code">
-type BracketPickRow = Pick<Database["public"]["Tables"]["bracket_picks"]["Row"], "slot" | "team_code">
+type BracketPickRow = Pick<Database["public"]["Tables"]["bracket_picks"]["Row"], "slot" | "team_code" | "home_score" | "away_score">
+type ScoreBySlot = Map<string, { home: number | null; away: number | null }>
 type KnockoutMatchRow = Pick<Database["public"]["Tables"]["matches"]["Row"], "id" | "home_team_code" | "away_team_code" | "home_score" | "away_score" | "home_pen_score" | "away_pen_score" | "status" | "kickoff" | "stage">
 
 const KNOCKOUT_STAGES: Array<{ stage: string } & Omit<BracketRound, "matches">> = [
@@ -102,15 +103,20 @@ function getStarterTeams(rankings: GroupRankings | null, bestThirds: string[]): 
   return resolveR32Pairs(rankings, bestThirds).flatMap(({ home, away }) => [home, away])
 }
 
-function buildRounds(picksBySlot: Map<string, string>, starters: string[], logoByCode: Map<string, string | null>): BracketRound[] {
-  const match = (id: string, a: string, b: string) => ({
+function buildRounds(
+  picksBySlot: Map<string, string>,
+  starters: string[],
+  logoByCode: Map<string, string | null>,
+  scoresBySlot: ScoreBySlot,
+): BracketRound[] {
+  const match = (id: string, slot: string, a: string, b: string) => ({
     id,
     a,
     b,
     logoA: logoByCode.get(a) ?? null,
     logoB: logoByCode.get(b) ?? null,
-    sa: null,
-    sb: null,
+    sa: scoresBySlot.get(slot)?.home ?? null,
+    sb: scoresBySlot.get(slot)?.away ?? null,
     done: false,
     kickoff: null,
     pen: false,
@@ -119,12 +125,13 @@ function buildRounds(picksBySlot: Map<string, string>, starters: string[], logoB
   })
 
   const r32 = Array.from({ length: 16 }, (_, index) =>
-    match(`r32-${index + 1}`, starters[index * 2] ?? "???", starters[index * 2 + 1] ?? "???")
+    match(`r32-${index + 1}`, `R32_P${index + 1}`, starters[index * 2] ?? "???", starters[index * 2 + 1] ?? "???")
   )
 
   const r16 = Array.from({ length: 8 }, (_, index) =>
     match(
       `r16-${index + 1}`,
+      `R16_P${index + 1}`,
       picksBySlot.get(`R32_P${index * 2 + 1}`) ?? "???",
       picksBySlot.get(`R32_P${index * 2 + 2}`) ?? "???"
     )
@@ -133,6 +140,7 @@ function buildRounds(picksBySlot: Map<string, string>, starters: string[], logoB
   const qf = Array.from({ length: 4 }, (_, index) =>
     match(
       `qf-${index + 1}`,
+      `QF_P${index + 1}`,
       picksBySlot.get(`R16_P${index * 2 + 1}`) ?? "???",
       picksBySlot.get(`R16_P${index * 2 + 2}`) ?? "???"
     )
@@ -141,6 +149,7 @@ function buildRounds(picksBySlot: Map<string, string>, starters: string[], logoB
   const sf = Array.from({ length: 2 }, (_, index) =>
     match(
       `sf-${index + 1}`,
+      `SF_P${index + 1}`,
       picksBySlot.get(`QF_P${index * 2 + 1}`) ?? "???",
       picksBySlot.get(`QF_P${index * 2 + 2}`) ?? "???"
     )
@@ -155,8 +164,8 @@ function buildRounds(picksBySlot: Map<string, string>, starters: string[], logoB
   const sf1Loser = sf1Winner ? (sf1Winner === sf1Left ? sf1Right : sf1Left) : "???"
   const sf2Loser = sf2Winner ? (sf2Winner === sf2Left ? sf2Right : sf2Left) : "???"
 
-  const third = [match("third-1", sf1Loser, sf2Loser)]
-  const final = [match("final-1", sf1Winner ?? "???", sf2Winner ?? "???")]
+  const third = [match("third-1", "THIRD", sf1Loser, sf2Loser)]
+  const final = [match("final-1", "FINAL", sf1Winner ?? "???", sf2Winner ?? "???")]
 
   return [
     { id: "r32", title: "Ronda de 32", matches: r32, wide: true },
@@ -225,7 +234,7 @@ export async function getBracketData(
       .eq("position", 3)
       .eq("advances_as_third", true)
       .order("group_code", { ascending: true }),
-    supabase.from("bracket_picks").select("slot,team_code").eq("user_id", userId).order("slot", { ascending: true }),
+    supabase.from("bracket_picks").select("slot,team_code,home_score,away_score").eq("user_id", userId).order("slot", { ascending: true }),
     applyWorldCupSeasonKickoffFilter(
       supabase
         .from("matches")
@@ -261,13 +270,16 @@ export async function getBracketData(
   const teamsByCode = new Map((teamsResult.data ?? []).map((team: TeamRow) => [team.code, team.name] as const))
   const logoByCode = new Map((teamsResult.data ?? []).map((team: TeamRow) => [team.code, team.logo ?? null] as const))
   const picksBySlot = new Map((picksResult.data ?? []).map((pick: BracketPickRow) => [pick.slot, pick.team_code] as const))
+  const scoresBySlot: ScoreBySlot = new Map(
+    (picksResult.data ?? []).map((pick: BracketPickRow) => [pick.slot, { home: pick.home_score, away: pick.away_score }] as const),
+  )
   const rankings = groupRowsResult.error ? null : buildRankings(groupRowsResult.data ?? [])
   const bestThirds = thirdRowsResult.error ? [] : (thirdRowsResult.data ?? []).map((row) => row.team_code)
   const starterTeams = getStarterTeams(rankings, bestThirds)
   const championCode = picksBySlot.get("FINAL") ?? "???"
 
   return {
-    rounds: buildRounds(picksBySlot, starterTeams, logoByCode),
+    rounds: buildRounds(picksBySlot, starterTeams, logoByCode, scoresBySlot),
     actualRounds: buildActualRounds((allKnockoutResult.data ?? []) as KnockoutMatchRow[], logoByCode),
     scoreStats: buildScoreStats(picksBySlot, winnersByStage),
     champion: {
