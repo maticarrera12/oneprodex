@@ -19,6 +19,21 @@ describe("deriveOnboardingStep", () => {
     expect(step).toEqual({ status: "complete" })
   })
 
+  it("reopens the bracket when awards are set but the bracket is incomplete (old-bug recovery)", () => {
+    const step = deriveOnboardingStep({
+      awardsAt: "2026-05-14T12:00:00.000Z",
+      onboardingMode: "prode",
+      groupPickCount: 0,
+      bestThirdCount: 0,
+      bracketPickCount: 10,
+      hasTournamentPrediction: true,
+      hasAllAwards: true,
+      openPredictedCount: 20,
+      openUnpredictedCount: 52,
+    })
+    expect(step).toEqual({ status: "bracket" })
+  })
+
   it("returns mode_select when onboardingMode is null", () => {
     const step = deriveOnboardingStep({
       awardsAt: null,

@@ -879,7 +879,11 @@ describe("onboarding actions", () => {
       await expect(saveBracketPicks(buildFormData("picks", picks))).rejects.toThrow("Expected 32 bracket picks")
     })
 
-    it("rejects when onboarding is already completed", async () => {
+    const bracketCountChain = (count: number) => ({
+      select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ count, error: null }) }),
+    })
+
+    it("rejects when onboarding is already completed (awards set + full bracket)", async () => {
       const bracketUpsert = vi.fn()
       const lockChain = {
         eq: vi.fn().mockReturnThis(),
@@ -888,7 +892,7 @@ describe("onboarding actions", () => {
       const service = {
         from: vi.fn((table: string) => {
           if (table === "users") return { select: vi.fn().mockReturnValue(lockChain) }
-          if (table === "bracket_picks") return { upsert: bracketUpsert }
+          if (table === "bracket_picks") return { ...bracketCountChain(32), upsert: bracketUpsert }
           if (table === "tournament_predictions") return { upsert: vi.fn() }
           throw new Error(`Unexpected table ${table}`)
         }),
@@ -901,6 +905,27 @@ describe("onboarding actions", () => {
       expect(bracketUpsert).not.toHaveBeenCalled()
     })
 
+    it("allows saving when awards_at is set but the bracket was never built (old-bug recovery)", async () => {
+      const bracketUpsert = vi.fn().mockResolvedValue({ error: null })
+      const tournamentUpsert = vi.fn().mockResolvedValue({ error: null })
+      const lockChain = {
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { awards_at: "2026-05-14T00:00:00Z" }, error: null }),
+      }
+      const service = {
+        from: vi.fn((table: string) => {
+          if (table === "users") return { select: vi.fn().mockReturnValue(lockChain) }
+          if (table === "bracket_picks") return { ...bracketCountChain(0), upsert: bracketUpsert }
+          if (table === "tournament_predictions") return { upsert: tournamentUpsert }
+          throw new Error(`Unexpected table ${table}`)
+        }),
+      }
+      mocks.createServiceClient.mockReturnValue(service)
+
+      await saveBracketPicks(buildFormData("picks", validBracketPicks()))
+      expect(bracketUpsert).toHaveBeenCalled()
+    })
+
     it("writes champion_code from FINAL slot", async () => {
       const bracketUpsert = vi.fn().mockResolvedValue({ error: null })
       const tournamentUpsert = vi.fn().mockResolvedValue({ error: null })
@@ -911,7 +936,7 @@ describe("onboarding actions", () => {
       const service = {
         from: vi.fn((table: string) => {
           if (table === "users") return { select: vi.fn().mockReturnValue(lockChain) }
-          if (table === "bracket_picks") return { upsert: bracketUpsert }
+          if (table === "bracket_picks") return { ...bracketCountChain(0), upsert: bracketUpsert }
           if (table === "tournament_predictions") return { upsert: tournamentUpsert }
           throw new Error(`Unexpected table ${table}`)
         }),

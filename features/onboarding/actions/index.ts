@@ -263,9 +263,16 @@ export async function saveBracketPicks(formData: FormData): Promise<void> {
   validateBracketPicks(picks)
 
   const service = createServiceClient()
-  const lockResult = await service.from("users").select("awards_at").eq("id", userId).maybeSingle()
+  // The bracket is immutable only once it has actually been COMPLETED (32 picks)
+  // alongside awards. Users with awards_at set but an incomplete bracket (old
+  // routing bug) must still be able to build it, so the lock checks the existing
+  // pick count, not awards_at alone.
+  const [lockResult, existingCountResult] = await Promise.all([
+    service.from("users").select("awards_at").eq("id", userId).maybeSingle(),
+    service.from("bracket_picks").select("user_id", { count: "exact", head: true }).eq("user_id", userId),
+  ])
   if (lockResult.error) throw new Error(lockResult.error.message)
-  if (lockResult.data?.awards_at) {
+  if (lockResult.data?.awards_at && (existingCountResult.count ?? 0) >= 32) {
     throw new Error("Forbidden: onboarding already completed")
   }
 
