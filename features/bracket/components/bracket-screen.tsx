@@ -1,8 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 
+import { saveKnockoutScorePick } from "@/features/onboarding/actions"
 import { BracketChampionCard } from "@/features/bracket/components/bracket-champion-card"
 import { BracketHeader } from "@/features/bracket/components/bracket-header"
 import { BracketMatchCard } from "@/features/bracket/components/bracket-match-card"
@@ -25,6 +27,11 @@ type BracketScreenProps = {
     subtitle: string
   }
   readOnly?: boolean
+  // Enables per-match score picking on the real ("Actual") bracket. Only the
+  // viewer's OWN bracket should allow this — a friend's bracket stays read-only.
+  // Independent of `readOnly` (onboarding-complete users still predict knockouts).
+  allowScorePicks?: boolean
+  userScores?: Record<string, { home: number; away: number }>
 }
 
 function computeHalfPositions(basePositions: number[], halfRounds: BracketRound[]): number[][] {
@@ -47,8 +54,29 @@ function computeHalfPositions(basePositions: number[], halfRounds: BracketRound[
   })
 }
 
-export function BracketScreen({ rounds, actualRounds, scoreStats, champion, readOnly = false }: BracketScreenProps) {
+export function BracketScreen({ rounds, actualRounds, scoreStats, champion, readOnly = false, allowScorePicks = false, userScores }: BracketScreenProps) {
   const [tab, setTab] = useState<BracketViewTab>("Mis picks")
+  const router = useRouter()
+  const [, startTransition] = useTransition()
+
+  function handlePickScore(matchId: string, home: number, away: number) {
+    const formData = new FormData()
+    formData.set("match_id", matchId)
+    formData.set("home_score", String(home))
+    formData.set("away_score", String(away))
+    startTransition(async () => {
+      try {
+        await saveKnockoutScorePick(formData)
+        router.refresh()
+      } catch {
+        // surfaced server-side via lock errors; ignore here to keep the steppers responsive
+      }
+    })
+  }
+
+  // Per-match score picking is only meaningful on the viewer's own real
+  // ("Actual") bracket.
+  const onPickScore = tab === "Actual" && allowScorePicks ? handlePickScore : undefined
 
   const activeRounds = tab === "Actual" ? actualRounds : rounds
   const mainRounds = activeRounds.filter((r) => r.id !== "third" && r.id !== "final")
@@ -109,6 +137,8 @@ export function BracketScreen({ rounds, actualRounds, scoreStats, champion, read
               round={round}
               positions={leftPositions[index] ?? []}
               columnHeight={columnHeight}
+              onPickScore={onPickScore}
+              userScores={userScores}
             />
           ))}
 
@@ -121,7 +151,12 @@ export function BracketScreen({ rounds, actualRounds, scoreStats, champion, read
               <div className="relative" style={{ height: columnHeight }}>
                 {/* Final */}
                 <div className="absolute inset-x-0" style={{ top: sfTop }}>
-                  <BracketMatchCard match={finalRound.matches[0]} final />
+                  <BracketMatchCard
+                    match={finalRound.matches[0]}
+                    final
+                    onPickScore={onPickScore}
+                    userScore={finalRound.matches[0].matchId ? userScores?.[finalRound.matches[0].matchId] ?? null : null}
+                  />
                 </div>
                 {/* Third place */}
                 {thirdRound?.matches[0] && (
@@ -129,7 +164,12 @@ export function BracketScreen({ rounds, actualRounds, scoreStats, champion, read
                     <p className="mb-1.5 px-1 font-mono text-[10px] uppercase tracking-wider text-(--color-text3)">
                       {thirdRound.title}
                     </p>
-                    <BracketMatchCard match={thirdRound.matches[0]} final={false} />
+                    <BracketMatchCard
+                      match={thirdRound.matches[0]}
+                      final={false}
+                      onPickScore={onPickScore}
+                      userScore={thirdRound.matches[0].matchId ? userScores?.[thirdRound.matches[0].matchId] ?? null : null}
+                    />
                   </div>
                 )}
               </div>
@@ -145,6 +185,8 @@ export function BracketScreen({ rounds, actualRounds, scoreStats, champion, read
                 round={round}
                 positions={rightPositions[originalIndex] ?? []}
                 columnHeight={columnHeight}
+                onPickScore={onPickScore}
+                userScores={userScores}
               />
             )
           })}

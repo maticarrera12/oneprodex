@@ -1,5 +1,8 @@
 export interface BracketMatch {
   id: string
+  // Real DB match id — set on the "Actual" bracket so per-match score picks can
+  // target it; null for the predicted bracket (no real fixture yet).
+  matchId?: string | null
   a: string
   b: string
   logoA: string | null

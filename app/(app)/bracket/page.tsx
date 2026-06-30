@@ -33,6 +33,14 @@ export default async function BracketPage() {
   }
 
   return (
-    <BracketScreen rounds={data.rounds} actualRounds={data.actualRounds} scoreStats={data.scoreStats} champion={data.champion} readOnly={data.readOnly} />
+    <BracketScreen
+      rounds={data.rounds}
+      actualRounds={data.actualRounds}
+      scoreStats={data.scoreStats}
+      champion={data.champion}
+      readOnly={data.readOnly}
+      allowScorePicks
+      userScores={Object.fromEntries(data.userKspByMatchId)}
+    />
   )
 }

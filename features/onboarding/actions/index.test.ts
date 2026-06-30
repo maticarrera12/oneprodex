@@ -35,7 +35,7 @@ vi.mock("@/lib/achievements/evaluate", () => ({
   evaluateUser: mocks.evaluateUser,
 }))
 
-import { saveBestThirds, saveBracketPicks, saveGroupPicks, setOnboardingMode, resetOnboardingMode, saveMatchScorePick, deriveAndPersistGroupRankings, saveTournamentPredictions, continueFromProdePicks } from "@/features/onboarding/actions"
+import { saveBestThirds, saveBracketPicks, saveGroupPicks, setOnboardingMode, resetOnboardingMode, saveMatchScorePick, saveKnockoutScorePick, deriveAndPersistGroupRankings, saveTournamentPredictions, continueFromProdePicks } from "@/features/onboarding/actions"
 
 const ALL_SLOTS = [
   "R32_P1",
@@ -547,6 +547,62 @@ describe("onboarding actions", () => {
         expect.objectContaining({ match_id: "m-ok" }),
         { onConflict: "user_id,match_id" }
       )
+    })
+  })
+
+  describe("saveKnockoutScorePick", () => {
+    function buildKnockoutService(
+      matchData: { id: string; stage: string; status: string; kickoff: string } | null,
+      upsertFn = vi.fn().mockResolvedValue({ error: null }),
+    ) {
+      const matchSelectChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: matchData, error: null }),
+      }
+      return {
+        from: vi.fn((table: string) => {
+          if (table === "matches") return matchSelectChain
+          if (table === "knockout_score_picks") return { upsert: upsertFn }
+          return { select: vi.fn().mockReturnThis() }
+        }),
+      }
+    }
+
+    it("upserts a knockout score pick for an UPCOMING knockout match", async () => {
+      const futureKickoff = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+      const upsertFn = vi.fn().mockResolvedValue({ error: null })
+      mocks.createServiceClient.mockReturnValue(
+        buildKnockoutService({ id: "ko-1", stage: "Round of 16", status: "UPCOMING", kickoff: futureKickoff }, upsertFn),
+      )
+
+      const formData = buildMultiFormData({ match_id: "ko-1", home_score: "2", away_score: "1" })
+      await expect(saveKnockoutScorePick(formData)).resolves.not.toThrow()
+      expect(upsertFn).toHaveBeenCalledWith(
+        expect.objectContaining({ match_id: "ko-1", home_score: 2, away_score: 1 }),
+        { onConflict: "user_id,match_id" },
+      )
+      expect(mocks.revalidatePath).toHaveBeenCalledWith("/bracket")
+    })
+
+    it("rejects a non-knockout (group-stage) match", async () => {
+      const futureKickoff = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+      mocks.createServiceClient.mockReturnValue(
+        buildKnockoutService({ id: "g-1", stage: "Group Stage - 1", status: "UPCOMING", kickoff: futureKickoff }),
+      )
+
+      const formData = buildMultiFormData({ match_id: "g-1", home_score: "1", away_score: "0" })
+      await expect(saveKnockoutScorePick(formData)).rejects.toThrow("Not a knockout match")
+    })
+
+    it("rejects a knockout match whose kickoff has already passed", async () => {
+      const pastKickoff = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+      mocks.createServiceClient.mockReturnValue(
+        buildKnockoutService({ id: "ko-lag", stage: "Quarter-finals", status: "UPCOMING", kickoff: pastKickoff }),
+      )
+
+      const formData = buildMultiFormData({ match_id: "ko-lag", home_score: "1", away_score: "1" })
+      await expect(saveKnockoutScorePick(formData)).rejects.toThrow(/locked/i)
     })
   })
 

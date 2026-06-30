@@ -19,6 +19,7 @@ type BracketData = {
     subtitle: string
   }
   readOnly: boolean
+  userKspByMatchId: Map<string, { home: number; away: number }>
 }
 
 type TeamRow = Pick<Database["public"]["Tables"]["teams"]["Row"], "code" | "name" | "logo">
@@ -51,6 +52,7 @@ function buildActualRounds(knockoutMatches: KnockoutMatchRow[], logoByCode: Map<
       ...roundMeta,
       matches: stageMatches.map((m, i) => ({
         id: `actual-${roundMeta.id}-${i}`,
+        matchId: m.id,
         a: m.home_team_code,
         b: m.away_team_code,
         logoA: logoByCode.get(m.home_team_code) ?? null,
@@ -218,7 +220,7 @@ export async function getBracketData(
   supabase: SupabaseClient<Database>,
   userId: string
 ): Promise<BracketData | null> {
-  const [teamsResult, userResult, groupRowsResult, thirdRowsResult, picksResult, knockoutResult, allKnockoutResult] = await Promise.all([
+  const [teamsResult, userResult, groupRowsResult, thirdRowsResult, picksResult, knockoutResult, allKnockoutResult, kspResult] = await Promise.all([
     supabase.from("teams").select("code,name,logo"),
     supabase.from("users").select("awards_at").eq("id", userId).maybeSingle(),
     supabase
@@ -248,6 +250,7 @@ export async function getBracketData(
         .select("id,home_team_code,away_team_code,home_score,away_score,home_pen_score,away_pen_score,status,kickoff,stage")
         .in("stage", KNOCKOUT_STAGES.map((s) => s.stage)),
     ).order("kickoff", { ascending: true }),
+    supabase.from("knockout_score_picks").select("match_id,home_score,away_score").eq("user_id", userId),
   ])
 
   if (picksResult.error) {
@@ -277,6 +280,11 @@ export async function getBracketData(
   const bestThirds = thirdRowsResult.error ? [] : (thirdRowsResult.data ?? []).map((row) => row.team_code)
   const starterTeams = getStarterTeams(rankings, bestThirds)
   const championCode = picksBySlot.get("FINAL") ?? "???"
+  const userKspByMatchId = new Map(
+    (kspResult.error ? [] : kspResult.data ?? []).map(
+      (row) => [row.match_id, { home: row.home_score, away: row.away_score }] as const,
+    ),
+  )
 
   return {
     rounds: buildRounds(picksBySlot, starterTeams, logoByCode, scoresBySlot),
@@ -289,5 +297,6 @@ export async function getBracketData(
       subtitle: "Predicción de campeón",
     },
     readOnly: Boolean(userResult.data?.awards_at),
+    userKspByMatchId,
   }
 }
