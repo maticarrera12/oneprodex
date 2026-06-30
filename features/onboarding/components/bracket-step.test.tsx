@@ -45,7 +45,10 @@ function getCard(slot: string): HTMLElement {
 }
 
 function teamButtons(slot: string): HTMLElement[] {
-  return within(getCard(slot)).getAllByRole("button")
+  // Exclude the optional scoreline steppers (which carry an aria-label).
+  return within(getCard(slot))
+    .getAllByRole("button")
+    .filter((button) => !button.getAttribute("aria-label"))
 }
 
 function buttonTeam(button: HTMLElement): string {
@@ -156,6 +159,40 @@ describe("BracketStep", () => {
     const picks = JSON.parse(String(formData.get("picks"))) as Array<{ slot: string; team_code: string }>
     expect(picks).toHaveLength(32)
     expect(new Set(picks.map((p) => p.slot)).size).toBe(32)
+  })
+
+  it("includes optional scorelines in the submit payload (set on one slot, null elsewhere)", async () => {
+    const onContinue = renderBracket()
+
+    for (const slot of R32_SLOTS) pickFirstTeam(slot)
+    for (const slot of R16_SLOTS) pickFirstTeam(slot)
+    for (const slot of QF_SLOTS) pickFirstTeam(slot)
+    for (const slot of SF_SLOTS) pickFirstTeam(slot)
+    pickFirstTeam("THIRD")
+    pickFirstTeam("FINAL")
+
+    // Set a 2-1 scoreline on R32_P1 via the optional steppers.
+    const incButtons = within(getCard("R32_P1"))
+      .getAllByRole("button")
+      .filter((button) => button.getAttribute("aria-label")?.startsWith("Sumar"))
+    // First "+" from blank lands on 0, then increments — mirrors the prode stepper.
+    fireEvent.click(incButtons[0]) // home → 0
+    fireEvent.click(incButtons[0]) // home → 1
+    fireEvent.click(incButtons[0]) // home → 2
+    fireEvent.click(incButtons[1]) // away → 0
+    fireEvent.click(incButtons[1]) // away → 1
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar y continuar" }))
+    expect(await screen.findByRole("button", { name: "Guardando..." })).toBeInTheDocument()
+
+    const formData = onContinue.mock.calls[0]?.[0] as FormData
+    const picks = JSON.parse(String(formData.get("picks"))) as Array<{
+      slot: string
+      home_score: number | null
+      away_score: number | null
+    }>
+    expect(picks.find((p) => p.slot === "R32_P1")).toMatchObject({ home_score: 2, away_score: 1 })
+    expect(picks.find((p) => p.slot === "R32_P2")).toMatchObject({ home_score: null, away_score: null })
   })
 
   it("shows an error and keeps picks when saving fails", async () => {

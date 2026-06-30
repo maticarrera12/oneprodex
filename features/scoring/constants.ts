@@ -16,6 +16,16 @@ export const BRACKET_SCORING = {
   FINAL: 160,
 } as const
 
+// MATCHUP HIT — bonus for predicting the exact knockout pairing (set of two
+// teams) at a slot, independent of the winner pick. Applies from R16 onward;
+// R32 pairings derive from group picks (not bracket picks) and THIRD is omitted.
+export const MATCHUP_HIT_SCORING = {
+  R16: 20,
+  QF: 35,
+  SF: 50,
+  FINAL: 80,
+} as const
+
 export const UPSET_BONUS = {
   min: 8,
   max: 25,

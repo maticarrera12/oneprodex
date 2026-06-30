@@ -1,14 +1,30 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
 import {
-  buildBracketPickPointsUpdates,
+  bracketPointsForSlot,
+  getSlotParents,
   isKnockoutStage,
   matchWinner,
   resolveBracketSlotForMatch,
+  scoreKnockoutResult,
+  scoreMatchupHit,
 } from "@/features/scoring/bracket"
 import type { KnockoutMatch } from "@/features/scoring/bracket"
+import type { SlotId } from "@/features/onboarding/types"
 import { applyWorldCupSeasonKickoffFilter } from "@/lib/world-cup/season"
 
+type SlotPick = { team_code: string; home_score: number | null; away_score: number | null }
+
+/**
+ * Combined per-slot scoring for a finished knockout match. Writes
+ * bracket_picks.points = ADVANCEMENT + MATCHUP HIT + RESULT, each term computed
+ * independently (a correct matchup pays even with a wrong winner pick).
+ *
+ * MATCHUP HIT and RESULT require the user's predicted pairing at the slot, which
+ * is the SET of their two parent-slot winners — so they apply from R16 onward.
+ * R32 (and THIRD) earn ADVANCEMENT only here; R32 RESULT needs the per-user
+ * group-pick seeding and is a tracked follow-up.
+ */
 export async function scoreBracketForMatch(
   supabase: SupabaseClient<Database>,
   match: KnockoutMatch,
@@ -27,21 +43,69 @@ export async function scoreBracketForMatch(
   const slot = resolveBracketSlotForMatch(match, stageMatches)
   if (!slot) return 0
 
-  const { data: picks, error: picksError } = await supabase
+  const parents = getSlotParents(slot)
+  const slotsToLoad: SlotId[] = parents ? [slot, parents[0], parents[1]] : [slot]
+
+  const { data: pickRows, error: picksError } = await supabase
     .from("bracket_picks")
-    .select("user_id,team_code")
-    .eq("slot", slot)
+    .select("user_id,slot,team_code,home_score,away_score")
+    .in("slot", slotsToLoad)
 
-  if (picksError || !picks?.length) return 0
+  if (picksError || !pickRows?.length) return 0
 
-  const updates = buildBracketPickPointsUpdates(slot, winner, picks)
+  // Group each user's relevant picks (this slot + its two parent slots).
+  const byUser = new Map<string, Map<SlotId, SlotPick>>()
+  for (const row of pickRows) {
+    const slots = byUser.get(row.user_id) ?? new Map<SlotId, SlotPick>()
+    slots.set(row.slot as SlotId, {
+      team_code: row.team_code,
+      home_score: row.home_score,
+      away_score: row.away_score,
+    })
+    byUser.set(row.user_id, slots)
+  }
+
+  const realScores =
+    match.home_score !== null && match.away_score !== null
+      ? {
+          homeTeam: match.home_team_code,
+          awayTeam: match.away_team_code,
+          homeScore: match.home_score,
+          awayScore: match.away_score,
+        }
+      : null
+
+  const updates: Array<{ user_id: string; points: number }> = []
+  for (const [userId, slots] of byUser) {
+    const own = slots.get(slot)
+    if (!own) continue // user did not pick this slot
+
+    let points = own.team_code === winner ? bracketPointsForSlot(slot) : 0
+
+    if (parents) {
+      const picksBySlot = new Map<SlotId, string>([...slots].map(([s, pick]) => [s, pick.team_code]))
+      points += scoreMatchupHit(slot, match.home_team_code, match.away_team_code, picksBySlot)
+
+      const homeTeam = slots.get(parents[0])?.team_code
+      const awayTeam = slots.get(parents[1])?.team_code
+      if (realScores && homeTeam && awayTeam) {
+        points += scoreKnockoutResult(
+          { homeTeam, awayTeam, homeScore: own.home_score, awayScore: own.away_score },
+          realScores,
+        )
+      }
+    }
+
+    updates.push({ user_id: userId, points })
+  }
+
   await Promise.all(
     updates.map((row) =>
       supabase
         .from("bracket_picks")
         .update({ points: row.points })
         .eq("user_id", row.user_id)
-        .eq("slot", row.slot),
+        .eq("slot", slot),
     ),
   )
 

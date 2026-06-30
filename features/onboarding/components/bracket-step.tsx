@@ -27,6 +27,43 @@ type Match = {
   right: string
 }
 
+type ScorePair = { home: number | null; away: number | null }
+
+function ScoreStepper({
+  value,
+  label,
+  onChange,
+}: {
+  value: number | null
+  label: string
+  onChange: (next: number | null) => void
+}) {
+  const btn =
+    "inline-flex size-5 items-center justify-center rounded border border-(--color-border-hi) bg-(--color-card-hi) text-[11px] leading-none text-foreground transition disabled:opacity-40"
+  return (
+    <span className="inline-flex items-center gap-1">
+      <button
+        type="button"
+        aria-label={`Restar ${label}`}
+        disabled={value === null}
+        onClick={() => onChange(value !== null && value > 0 ? value - 1 : null)}
+        className={btn}
+      >
+        −
+      </button>
+      <span className="w-4 text-center font-mono text-xs font-semibold">{value ?? "-"}</span>
+      <button
+        type="button"
+        aria-label={`Sumar ${label}`}
+        onClick={() => onChange(value === null ? 0 : value + 1)}
+        className={btn}
+      >
+        +
+      </button>
+    </span>
+  )
+}
+
 const ROUND_CONFIG: RoundConfig[] = [
   { id: "R32", title: "Ronda de 32", size: 16 },
   { id: "R16", title: "Octavos", size: 8 },
@@ -147,7 +184,17 @@ export function BracketStep({ groupRankings, bestThirds, initialPicks, logoByCod
       ),
     [initialPicks]
   )
+  const initialScores = useMemo(
+    () =>
+      new Map<SlotId, ScorePair>(
+        (initialPicks ?? [])
+          .filter((pick) => pick.slot && (pick.home_score !== null || pick.away_score !== null))
+          .map((pick) => [pick.slot, { home: pick.home_score, away: pick.away_score }] as const)
+      ),
+    [initialPicks]
+  )
   const [picks, setPicks] = useState<Map<SlotId, string>>(initialMap)
+  const [scorePicks, setScorePicks] = useState<Map<SlotId, ScorePair>>(initialScores)
   const [isPending, startTransition] = useTransition()
   const [isBackPending, startBackTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -157,7 +204,24 @@ export function BracketStep({ groupRankings, bestThirds, initialPicks, logoByCod
     setPicks((current) => {
       const cleaned = clearDownstream(current, slot)
       cleaned.set(slot, winner)
+      // Drop scorelines for the rounds this change invalidated downstream.
+      setScorePicks((scores) => {
+        const next = new Map(scores)
+        for (const key of current.keys()) {
+          if (!cleaned.has(key) && key !== slot) next.delete(key)
+        }
+        return next
+      })
       return cleaned
+    })
+  }
+
+  function setScore(slot: SlotId, side: "home" | "away", value: number | null) {
+    setScorePicks((current) => {
+      const next = new Map(current)
+      const existing = next.get(slot) ?? { home: null, away: null }
+      next.set(slot, { ...existing, [side]: value })
+      return next
     })
   }
 
@@ -179,7 +243,10 @@ export function BracketStep({ groupRankings, bestThirds, initialPicks, logoByCod
   function handleContinue() {
     if (!canSubmit) return
     setError(null)
-    const payload = [...picks.entries()].map(([slot, team_code]) => ({ slot, team_code }))
+    const payload = [...picks.entries()].map(([slot, team_code]) => {
+      const score = scorePicks.get(slot)
+      return { slot, team_code, home_score: score?.home ?? null, away_score: score?.away ?? null }
+    })
     const formData = new FormData()
     formData.set("picks", JSON.stringify(payload))
 
@@ -200,6 +267,7 @@ export function BracketStep({ groupRankings, bestThirds, initialPicks, logoByCod
 
   function renderMatchCard(match: Match) {
     const winner = picks.get(match.slot)
+    const score = scorePicks.get(match.slot) ?? { home: null, away: null }
     const isLockedByUpstream = match.left === "---" || match.right === "---"
     return (
       <article key={match.slot} className="rounded-lg border border-(--color-border-hi) bg-background p-2">
@@ -242,7 +310,22 @@ export function BracketStep({ groupRankings, bestThirds, initialPicks, logoByCod
         </div>
         {isLockedByUpstream ? (
           <p className="mt-1 text-[10px] text-(--color-text4)">Completá cruces previos</p>
-        ) : null}
+        ) : (
+          <div className="mt-1.5 flex items-center justify-center gap-1.5 border-t border-(--color-border-hi) pt-1.5">
+            <ScoreStepper
+              value={score.home}
+              label={`Goles ${match.left}`}
+              onChange={(next) => setScore(match.slot, "home", next)}
+            />
+            <span className="font-mono text-[10px] text-(--color-text3)">–</span>
+            <ScoreStepper
+              value={score.away}
+              label={`Goles ${match.right}`}
+              onChange={(next) => setScore(match.slot, "away", next)}
+            />
+            <span className="ml-1 text-[9px] text-(--color-text4)">marcador (opcional)</span>
+          </div>
+        )}
       </article>
     )
   }

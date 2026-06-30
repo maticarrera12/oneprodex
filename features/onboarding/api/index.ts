@@ -6,7 +6,7 @@ import { buildTeamToGroupMap } from "@/features/onboarding/utils/team-groups"
 import { applyWorldCupSeasonKickoffFilter } from "@/lib/world-cup/season"
 
 type GroupPickRow = Pick<Database["public"]["Tables"]["group_picks"]["Row"], "group_code" | "position" | "team_code">
-type BracketPickRow = Pick<Database["public"]["Tables"]["bracket_picks"]["Row"], "slot" | "team_code">
+type BracketPickRow = Pick<Database["public"]["Tables"]["bracket_picks"]["Row"], "slot" | "team_code" | "home_score" | "away_score">
 type TournamentPredictionRow = Pick<
   Database["public"]["Tables"]["tournament_predictions"]["Row"],
   "top_scorer_api_id" | "best_player_api_id" | "best_young_player_api_id"
@@ -80,7 +80,12 @@ function mapRankings(rows: GroupPickRow[]): GroupRankings | null {
 
 function mapBracketPicks(rows: BracketPickRow[]): OnboardingState["bracketPicks"] {
   if (rows.length === 0) return null
-  return rows.map((row) => ({ slot: row.slot as BracketPick["slot"], team_code: row.team_code }))
+  return rows.map((row) => ({
+    slot: row.slot as BracketPick["slot"],
+    team_code: row.team_code,
+    home_score: row.home_score,
+    away_score: row.away_score,
+  }))
 }
 
 function mapTournamentPrediction(row: TournamentPredictionRow | null): OnboardingState["tournamentPredictions"] {
@@ -220,7 +225,7 @@ export async function getOnboardingState(
       .eq("position", 3)
       .eq("advances_as_third", true)
       .order("group_code", { ascending: true }),
-    supabase.from("bracket_picks").select("slot,team_code").eq("user_id", userId).order("slot", { ascending: true }),
+    supabase.from("bracket_picks").select("slot,team_code,home_score,away_score").eq("user_id", userId).order("slot", { ascending: true }),
   ])
 
   return {

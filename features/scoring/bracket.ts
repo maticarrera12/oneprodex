@@ -1,5 +1,5 @@
 import type { SlotId } from "@/features/onboarding/types"
-import { BRACKET_SCORING } from "@/features/scoring/constants"
+import { BRACKET_SCORING, MATCH_SCORING, MATCHUP_HIT_SCORING } from "@/features/scoring/constants"
 
 type KnockoutStage =
   | "Round of 32"
@@ -116,4 +116,94 @@ export function buildBracketPickPointsUpdates(
     slot,
     points: pick.team_code === winner ? award : 0,
   }))
+}
+
+// Each knockout slot from R16 onward is fed by the winners of two parent slots.
+// A user's predicted pairing at a slot is the SET of those two parent winners.
+// R32 pairings derive from group picks (not bracket picks) and are excluded.
+const SLOT_PARENTS: Partial<Record<SlotId, [SlotId, SlotId]>> = (() => {
+  const map: Partial<Record<SlotId, [SlotId, SlotId]>> = {}
+  for (let i = 1; i <= 8; i++) map[`R16_P${i}` as SlotId] = [`R32_P${i * 2 - 1}` as SlotId, `R32_P${i * 2}` as SlotId]
+  for (let i = 1; i <= 4; i++) map[`QF_P${i}` as SlotId] = [`R16_P${i * 2 - 1}` as SlotId, `R16_P${i * 2}` as SlotId]
+  for (let i = 1; i <= 2; i++) map[`SF_P${i}` as SlotId] = [`QF_P${i * 2 - 1}` as SlotId, `QF_P${i * 2}` as SlotId]
+  map.FINAL = ["SF_P1", "SF_P2"]
+  return map
+})()
+
+export function getSlotParents(slot: SlotId): readonly [SlotId, SlotId] | null {
+  return SLOT_PARENTS[slot] ?? null
+}
+
+function matchupHitPointsForSlot(slot: SlotId): number {
+  if (slot.startsWith("R16_")) return MATCHUP_HIT_SCORING.R16
+  if (slot.startsWith("QF_")) return MATCHUP_HIT_SCORING.QF
+  if (slot.startsWith("SF_")) return MATCHUP_HIT_SCORING.SF
+  if (slot === "FINAL") return MATCHUP_HIT_SCORING.FINAL
+  return 0
+}
+
+/**
+ * MATCHUP HIT — bonus when the user's predicted pairing at a slot (the SET of the
+ * two parent-slot winners they picked) equals the real pairing at that slot.
+ * Independent of the winner pick and the scoreline. Returns 0 for R32/THIRD,
+ * when a parent pick is missing, or when the pairing differs.
+ */
+export function scoreMatchupHit(
+  slot: SlotId,
+  realHome: string,
+  realAway: string,
+  picksBySlot: Map<SlotId, string>,
+): number {
+  const bonus = matchupHitPointsForSlot(slot)
+  if (bonus === 0) return 0
+
+  const parents = SLOT_PARENTS[slot]
+  if (!parents) return 0
+
+  const p1 = picksBySlot.get(parents[0])
+  const p2 = picksBySlot.get(parents[1])
+  if (!p1 || !p2 || p1 === p2) return 0
+
+  const matches =
+    (p1 === realHome && p2 === realAway) || (p1 === realAway && p2 === realHome)
+  return matches ? bonus : 0
+}
+
+type ResultScoreline = {
+  homeTeam: string
+  awayTeam: string
+  homeScore: number | null
+  awayScore: number | null
+}
+
+/**
+ * RESULT — scores the user's predicted scoreline against the real (regular/AET)
+ * scoreline, like the group stage. Aligns the predicted card orientation to the
+ * real fixture by team code, so a swapped home/away still scores. Returns 0 when
+ * the scoreline is incomplete or the predicted teams are not the real
+ * participants. Exact scoreline → exactScore; correct outcome → correctResult.
+ */
+export function scoreKnockoutResult(
+  pred: ResultScoreline,
+  real: { homeTeam: string; awayTeam: string; homeScore: number; awayScore: number },
+): number {
+  if (pred.homeScore === null || pred.awayScore === null) return 0
+
+  let predHome: number
+  let predAway: number
+  if (pred.homeTeam === real.homeTeam && pred.awayTeam === real.awayTeam) {
+    predHome = pred.homeScore
+    predAway = pred.awayScore
+  } else if (pred.homeTeam === real.awayTeam && pred.awayTeam === real.homeTeam) {
+    predHome = pred.awayScore
+    predAway = pred.homeScore
+  } else {
+    return 0
+  }
+
+  if (predHome === real.homeScore && predAway === real.awayScore) return MATCH_SCORING.exactScore
+  if (Math.sign(predHome - predAway) === Math.sign(real.homeScore - real.awayScore)) {
+    return MATCH_SCORING.correctResult
+  }
+  return 0
 }
