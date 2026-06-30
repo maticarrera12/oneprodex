@@ -9,6 +9,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { createClient } from "@/lib/supabase/server"
 import { evaluateUser } from "@/lib/achievements/evaluate"
 import { applyWorldCupSeasonKickoffFilter } from "@/lib/world-cup/season"
+import { isKnockoutStage } from "@/features/scoring/bracket"
 
 type GroupPickInput = {
   group_code: string
@@ -411,6 +412,42 @@ export async function saveMatchScorePick(formData: FormData): Promise<void> {
 
   revalidatePath("/onboarding")
   revalidatePath("/standings")
+}
+
+export async function saveKnockoutScorePick(formData: FormData): Promise<void> {
+  const matchId = formData.get("match_id") as string
+  const homeScore = Number(formData.get("home_score"))
+  const awayScore = Number(formData.get("away_score"))
+
+  if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0) {
+    throw new Error("Invalid score")
+  }
+
+  const userId = await getAuthUserId()
+  const service = createServiceClient()
+
+  // Only real knockout matches that have not yet kicked off can be predicted.
+  // The bracket TREE still advances by the real result — this pick only earns
+  // RESULT points scored against the real scoreline.
+  const { data: matchRow, error: matchLookupError } = await applyWorldCupSeasonKickoffFilter(
+    service.from("matches").select("id,stage,kickoff,status"),
+  )
+    .eq("id", matchId)
+    .maybeSingle()
+
+  if (matchLookupError) throw new Error(matchLookupError.message)
+  if (!matchRow || !isKnockoutStage(matchRow.stage ?? "")) throw new Error("Not a knockout match")
+  if (matchRow.status !== "UPCOMING" || new Date(matchRow.kickoff) <= new Date()) {
+    throw new Error("Match is locked and cannot be predicted")
+  }
+
+  const { error } = await service.from("knockout_score_picks").upsert(
+    { user_id: userId, match_id: matchId, home_score: homeScore, away_score: awayScore },
+    { onConflict: "user_id,match_id" },
+  )
+  if (error) throw new Error(error.message)
+
+  revalidatePath("/bracket")
 }
 
 export async function deriveAndPersistGroupRankings(userId: string): Promise<void> {
