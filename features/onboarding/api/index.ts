@@ -28,7 +28,13 @@ export type DeriveStepInput = {
 }
 
 export function deriveOnboardingStep(input: DeriveStepInput): OnboardingStep {
-  if (input.awardsAt) return { status: 'complete' }
+  // "Complete" requires BOTH awards and a finished bracket. Users hit by the old
+  // prode routing bug have awards_at set but an empty bracket — reopen the
+  // bracket for them instead of dead-ending on /onboarding → home.
+  if (input.awardsAt) {
+    if (input.bracketPickCount < 32) return { status: 'bracket' }
+    return { status: 'complete' }
+  }
   if (!input.onboardingMode) return { status: 'mode_select' }
 
   if (input.onboardingMode === 'prode') {
