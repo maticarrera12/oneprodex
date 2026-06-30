@@ -10,8 +10,55 @@ import {
   scoreMatchupHit,
 } from "@/features/scoring/bracket"
 import type { KnockoutMatch } from "@/features/scoring/bracket"
-import type { SlotId } from "@/features/onboarding/types"
+import type { GroupCode, GroupRankings, SlotId } from "@/features/onboarding/types"
+import { resolveR32Pairs } from "@/features/onboarding/utils/slot-resolver"
 import { applyWorldCupSeasonKickoffFilter } from "@/lib/world-cup/season"
+
+const GROUP_CODES: GroupCode[] = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]
+
+/**
+ * Resolves each user's predicted R32 pairings (in slot order R32_P1..P16) from
+ * their group picks + best thirds. Needed for R32 RESULT scoring: the predicted
+ * R32 matchup comes from group standings, not from bracket picks.
+ */
+async function loadR32PredictedPairsByUser(
+  supabase: SupabaseClient<Database>,
+  userIds: string[],
+): Promise<Map<string, Array<{ home: string; away: string }>>> {
+  const result = new Map<string, Array<{ home: string; away: string }>>()
+  if (userIds.length === 0) return result
+
+  const { data, error } = await supabase
+    .from("group_picks")
+    .select("user_id,group_code,position,team_code,advances_as_third")
+    .in("user_id", userIds)
+
+  if (error || !data) return result
+
+  const rowsByUser = new Map<string, typeof data>()
+  for (const row of data) {
+    const list = rowsByUser.get(row.user_id) ?? []
+    list.push(row)
+    rowsByUser.set(row.user_id, list)
+  }
+
+  for (const [userId, rows] of rowsByUser) {
+    const rankings = {} as GroupRankings
+    for (const g of GROUP_CODES) rankings[g] = ["", "", "", ""]
+    for (const row of rows) {
+      const g = row.group_code as GroupCode
+      if (rankings[g] && row.position >= 1 && row.position <= 4) rankings[g][row.position - 1] = row.team_code
+    }
+    const bestThirds = rows
+      .filter((r) => r.position === 3 && r.advances_as_third)
+      .sort((a, b) => a.group_code.localeCompare(b.group_code))
+      .map((r) => r.team_code)
+
+    result.set(userId, resolveR32Pairs(rankings, bestThirds))
+  }
+
+  return result
+}
 
 type SlotPick = { team_code: string; home_score: number | null; away_score: number | null }
 
@@ -75,6 +122,13 @@ export async function scoreBracketForMatch(
         }
       : null
 
+  // R32 has no parent bracket picks — its predicted pairing comes from each
+  // user's group-pick seeding, which we need to align the scoreline for RESULT.
+  const isR32 = slot.startsWith("R32_")
+  const r32PairsByUser =
+    isR32 && realScores ? await loadR32PredictedPairsByUser(supabase, [...byUser.keys()]) : null
+  const r32Index = isR32 ? Number(slot.slice("R32_P".length)) - 1 : -1
+
   const updates: Array<{ user_id: string; points: number }> = []
   for (const [userId, slots] of byUser) {
     const own = slots.get(slot)
@@ -91,6 +145,15 @@ export async function scoreBracketForMatch(
       if (realScores && homeTeam && awayTeam) {
         points += scoreKnockoutResult(
           { homeTeam, awayTeam, homeScore: own.home_score, awayScore: own.away_score },
+          realScores,
+        )
+      }
+    } else if (realScores && r32PairsByUser) {
+      // R32 RESULT — no MATCHUP HIT (matchups come from group picks, not bracket picks).
+      const pair = r32PairsByUser.get(userId)?.[r32Index]
+      if (pair) {
+        points += scoreKnockoutResult(
+          { homeTeam: pair.home, awayTeam: pair.away, homeScore: own.home_score, awayScore: own.away_score },
           realScores,
         )
       }
