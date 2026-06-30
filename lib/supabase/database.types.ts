@@ -221,6 +221,48 @@ export type Database = {
           },
         ]
       }
+      knockout_score_picks: {
+        Row: {
+          away_score: number
+          home_score: number
+          locked_at: string
+          match_id: string
+          points: number | null
+          user_id: string
+        }
+        Insert: {
+          away_score: number
+          home_score: number
+          locked_at?: string
+          match_id: string
+          points?: number | null
+          user_id: string
+        }
+        Update: {
+          away_score?: number
+          home_score?: number
+          locked_at?: string
+          match_id?: string
+          points?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knockout_score_picks_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knockout_score_picks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_events: {
         Row: {
           id: string
