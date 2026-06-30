@@ -68,18 +68,24 @@ export type Database = {
       }
       bracket_picks: {
         Row: {
+          away_score: number | null
+          home_score: number | null
           points: number | null
           slot: string
           team_code: string
           user_id: string
         }
         Insert: {
+          away_score?: number | null
+          home_score?: number | null
           points?: number | null
           slot: string
           team_code: string
           user_id: string
         }
         Update: {
+          away_score?: number | null
+          home_score?: number | null
           points?: number | null
           slot?: string
           team_code?: string
