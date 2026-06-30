@@ -134,8 +134,63 @@ export async function scoreAllFinishedBracketMatches(
   let winners = 0
   for (const match of matches) {
     winners += await scoreBracketForMatch(supabase, match)
+    await scoreKnockoutScorePicksForMatch(supabase, match)
     scored++
   }
 
   return { scored, winners }
+}
+
+/**
+ * Scores the per-match scoreline predictions (knockout_score_picks) for a
+ * finished knockout match against the real result. The bracket tree itself
+ * advances by the real result regardless of these picks — they only earn
+ * RESULT points (exact / correct outcome). The pick's teams are the real
+ * fixture's teams, so orientation is direct.
+ */
+export async function scoreKnockoutScorePicksForMatch(
+  supabase: SupabaseClient<Database>,
+  match: KnockoutMatch,
+): Promise<number> {
+  if (!isKnockoutStage(match.stage)) return 0
+  if (match.home_score === null || match.away_score === null) return 0
+
+  const { data: picks, error } = await supabase
+    .from("knockout_score_picks")
+    .select("user_id,home_score,away_score")
+    .eq("match_id", match.id)
+
+  if (error || !picks?.length) return 0
+
+  const real = {
+    homeTeam: match.home_team_code,
+    awayTeam: match.away_team_code,
+    homeScore: match.home_score,
+    awayScore: match.away_score,
+  }
+
+  const updates = picks.map((pick) => ({
+    user_id: pick.user_id,
+    points: scoreKnockoutResult(
+      {
+        homeTeam: match.home_team_code,
+        awayTeam: match.away_team_code,
+        homeScore: pick.home_score,
+        awayScore: pick.away_score,
+      },
+      real,
+    ),
+  }))
+
+  await Promise.all(
+    updates.map((row) =>
+      supabase
+        .from("knockout_score_picks")
+        .update({ points: row.points })
+        .eq("user_id", row.user_id)
+        .eq("match_id", match.id),
+    ),
+  )
+
+  return updates.filter((row) => row.points > 0).length
 }
